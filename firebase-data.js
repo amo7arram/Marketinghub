@@ -29,6 +29,7 @@ export const auth = getAuth(app);
 const INITIATIVES = "initiatives";
 const METRICS = "metrics";
 const RESOURCES = "resources";
+const REQUESTS = "requests";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -122,6 +123,29 @@ export function deleteResource(id) {
 }
 
 export const RESOURCE_TYPES = ["Social Media","Print","Stationery","Logo & Brand Mark","Presentation Template","Guideline Document","Other"];
+
+// ── REQUESTS CRUD (Coordinator Request Form → log visible in admin) ────
+export function watchRequests(callback) {
+  const q = query(collection(db, REQUESTS), orderBy("createdAt", "desc"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export function addRequest(data) {
+  return addDoc(collection(db, REQUESTS), { ...data, createdAt: Timestamp.now() });
+}
+
+export function deleteRequest(id) {
+  return deleteDoc(doc(db, REQUESTS, id));
+}
+
+export const REQUEST_TYPES = [
+  "New Doctor Announcement","Specialty Awareness Campaign","Event / Seminar / Webinar Promotion",
+  "Print Flyer / Poster","Social Media Post (single)","Video / Reel Production",
+  "Seasonal / Occasion Campaign","Patient Education Content","Internal Communication","Other"
+];
+export const PRIORITIES = ["Normal","High","Urgent"];
 
 // ── SHARED CONSTANTS (used by both admin + portal for consistency) ──────
 export const DEPARTMENTS = [

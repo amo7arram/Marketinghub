@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC — New Marketing Request</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--gold:#C8A96E;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;--green:#1DB87A;--red:#E0392B;
+  --radius:6px;--radius-lg:10px;--shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+}
+html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.hidden{display:none !important}
+
+/* LOGIN */
+.login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy),#003766)}
+.login-card{background:var(--surface);border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center}
+.login-logo-img{width:130px;margin-bottom:10px}
+.login-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.login-field{margin-bottom:14px;text-align:left}
+.login-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.login-input{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.login-input:focus{outline:none;border-color:var(--navy)}
+.login-btn{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:600;font-size:14px;cursor:pointer;margin-top:6px;font-family:inherit}
+.login-btn:hover{background:#003f7a}
+.login-error{background:#FFE8E8;color:#9B2020;padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:14px;display:none;text-align:left}
+
+/* FORM PAGE */
+.page-wrap{display:none;min-height:100vh}
+.page-wrap.active{display:flex;justify-content:center;padding:40px 20px}
+.topbar{position:fixed;top:0;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:58px;z-index:10}
+.topbar-logo{display:flex;align-items:center;gap:10px}
+.topbar-logo-img{height:30px}
+.topbar-logo-text{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text-2)}
+.btn{font-size:12px;padding:7px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;background:var(--surface);color:var(--text-2);font-family:inherit;font-weight:500}
+.btn:hover{background:var(--bg)}
+
+.form-card{background:var(--surface);border-radius:14px;box-shadow:var(--shadow-lg);width:580px;max-width:100%;margin-top:70px;height:fit-content;padding:32px}
+.form-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text);margin-bottom:4px}
+.form-sub{font-size:12px;color:var(--text-3);margin-bottom:26px}
+.field-group{margin-bottom:16px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;display:block}
+.req{color:var(--red)}
+.field-input,.field-select,.field-textarea{width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.field-textarea{min-height:100px;resize:vertical}
+.field-input:focus,.field-select:focus,.field-textarea:focus{outline:none;border-color:var(--navy)}
+.submit-btn{width:100%;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;margin-top:6px}
+.submit-btn:hover{background:#003f7a}
+.success-msg{background:#E8F8F0;border:1px solid var(--green);border-radius:var(--radius-lg);padding:18px;font-size:13px;color:#0E7A55;display:none;margin-top:18px;font-weight:500;text-align:center}
+.success-msg.show{display:block}
+.success-msg small{display:block;font-size:11px;font-weight:400;margin-top:4px;color:var(--text-3)}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
+.toast.show{display:block}
+.toast.error{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <img class="login-logo-img" src="logo.jpg" alt="IMC">
+    <div class="login-sub">Marketing Request — Coordinator Access</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-field"><label class="login-label">Email</label><input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa"></div>
+    <div class="login-field"><label class="login-label">Password</label><input class="login-input" type="password" id="login-password" placeholder="••••••••"></div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<div class="page-wrap" id="page-wrap">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <img class="topbar-logo-img" src="logo.jpg" alt="IMC">
+      <span class="topbar-logo-text">Marketing Hub · New Request</span>
+    </div>
+    <button class="btn" onclick="doLogout()">Sign Out</button>
+  </div>
+  <div class="form-card">
+    <div class="form-title">New Marketing Request</div>
+    <div class="form-sub">Submit a request to the marketing team — they'll follow up directly.</div>
+
+    <div class="field-group"><label class="field-label">Title<span class="req">*</span></label><input class="field-input" id="f-title" placeholder="e.g. Welcome Dr. Ahmed Al-Zahrani — Cardiology Consultant"></div>
+
+    <div class="field-row">
+      <div class="field-group"><label class="field-label">Department<span class="req">*</span></label>
+        <select class="field-select" id="f-department">
+          <option value="">Select department</option>
+          <option>Women's Health</option><option>Cardiology</option><option>Children's Health</option>
+          <option>Diabetes & Chronic</option><option>Dermatology & Plastics</option><option>Orthopedics</option>
+          <option>Oncology</option><option>General Surgery</option><option>General / Brand</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field-group"><label class="field-label">Request Type<span class="req">*</span></label><select class="field-select" id="f-type"></select></div>
+    </div>
+
+    <div class="field-group"><label class="field-label">Description<span class="req">*</span></label><textarea class="field-textarea" id="f-description" placeholder="What exactly do you need? Who is the target audience?"></textarea></div>
+
+    <div class="field-row">
+      <div class="field-group"><label class="field-label">Deadline<span class="req">*</span></label><input class="field-input" type="date" id="f-deadline"></div>
+      <div class="field-group"><label class="field-label">Priority</label><select class="field-select" id="f-priority"></select></div>
+    </div>
+
+    <button class="submit-btn" onclick="submitRequest()">Submit Request</button>
+    <div class="success-msg" id="success-msg">✓ Request submitted successfully!<small>The marketing team will review it shortly.</small></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { login, logout, watchAuth, addRequest, REQUEST_TYPES, PRIORITIES } from './firebase-data.js';
+
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  try { await login(email, password); }
+  catch(e) { errEl.textContent = 'Sign-in failed — check your email and password.'; errEl.style.display = 'block'; }
+}
+window.doLogout = async function() { await logout(); }
+
+watchAuth(user => {
+  document.getElementById('login-wrap').style.display = user ? 'none' : 'flex';
+  document.getElementById('page-wrap').classList.toggle('active', !!user);
+  if(user) populateSelects();
+});
+
+function populateSelects() {
+  document.getElementById('f-type').innerHTML = '<option value="">Select request type</option>' + REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('f-priority').innerHTML = PRIORITIES.map(p=>`<option>${p}</option>`).join('');
+}
+
+window.submitRequest = async function() {
+  const title = document.getElementById('f-title').value.trim();
+  const department = document.getElementById('f-department').value;
+  const type = document.getElementById('f-type').value;
+  const description = document.getElementById('f-description').value.trim();
+  const deadline = document.getElementById('f-deadline').value;
+  const priority = document.getElementById('f-priority').value;
+
+  if(!title || !department || !type || !description || !deadline) {
+    showToast('Please fill in all required fields (*)', true);
+    return;
+  }
+
+  try {
+    await addRequest({ title, department, type, description, deadline, priority });
+    document.getElementById('success-msg').classList.add('show');
+    ['f-title','f-description','f-deadline'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-department').value = '';
+    document.getElementById('f-type').value = '';
+    setTimeout(()=>document.getElementById('success-msg').classList.remove('show'), 5000);
+  } catch(e) {
+    showToast('Submission failed: ' + e.message, true);
+  }
+}
+
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=>t.className='toast', 3000);
+}
+</script>
+</body>
+</html>

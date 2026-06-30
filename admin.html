@@ -136,6 +136,7 @@ tr:hover td{background:var(--bg)}
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('initiatives',this)">Initiatives</div>
+    <div class="tab" onclick="switchTab('requests',this)">Requests</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
   </div>
@@ -159,6 +160,15 @@ tr:hover td{background:var(--bg)}
       <table>
         <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th>Dates</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- REQUESTS PAGE -->
+    <div class="page" id="page-requests">
+      <div class="toolbar"><div style="font-size:12px;color:var(--text-3)">Submitted via the coordinator request form — read-only log</div></div>
+      <table>
+        <thead><tr><th>Submitted</th><th>Title</th><th>Department</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th></th></tr></thead>
+        <tbody id="requests-table-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -298,6 +308,7 @@ import {
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
   getMetrics, watchMetrics, addMetric, updateMetric, deleteMetric,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
+  watchRequests, deleteRequest,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, HEALTH_DAY_CATEGORIES
 } from './firebase-data.js';
 
@@ -305,6 +316,7 @@ import {
 let ALL_INITIATIVES = [];
 let ALL_METRICS = [];
 let ALL_RESOURCES = [];
+let ALL_REQUESTS = [];
 let currentType = 'Campaign';
 let editingId = null;
 let editingMetricId = null;
@@ -314,6 +326,7 @@ let selectedChannels = [];
 let unsubInitiatives = null;
 let unsubMetrics = null;
 let unsubResources = null;
+let unsubRequests = null;
 
 // ── AUTH ───────────────────────────────────────────────────────────────
 window.doLogin = async function() {
@@ -344,6 +357,7 @@ watchAuth(user => {
     if(unsubInitiatives) unsubInitiatives();
     if(unsubMetrics) unsubMetrics();
     if(unsubResources) unsubResources();
+    if(unsubRequests) unsubRequests();
   }
 });
 
@@ -352,6 +366,7 @@ function initData() {
   unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); });
   unsubMetrics = watchMetrics(data => { ALL_METRICS = data; renderMetricsTable(); });
   unsubResources = watchResources(data => { ALL_RESOURCES = data; renderResourcesTable(); });
+  unsubRequests = watchRequests(data => { ALL_REQUESTS = data; renderRequestsTable(); });
 }
 
 // ── TABS ───────────────────────────────────────────────────────────────
@@ -677,6 +692,31 @@ window.renderResourcesTable = function() {
         </td>
       </tr>`).join('')
     : '<tr><td colspan="5" class="empty">No resources found</td></tr>';
+}
+
+// ── REQUESTS (read-only log + delete) ──────────────────────────────────
+const PRIORITY_CLASS = {'Urgent':'b-cancelled','High':'b-production','Normal':'b-ready'};
+window.removeRequest = async function(id, title) {
+  if(!confirm(`Delete request "${title}" from the log?`)) return;
+  try { await deleteRequest(id); showToast('Request removed'); }
+  catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+window.renderRequestsTable = function() {
+  document.getElementById('requests-table-body').innerHTML = ALL_REQUESTS.length
+    ? ALL_REQUESTS.map(r=>{
+        const submitted = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-GB') : '—';
+        return `<tr>
+          <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${submitted}</td>
+          <td style="font-weight:600">${r.title||''}</td>
+          <td>${r.department||''}</td>
+          <td style="font-size:11px">${r.type||''}</td>
+          <td><span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${r.priority||'Normal'}</span></td>
+          <td style="font-size:11px;color:var(--text-3)">${r.deadline||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3);max-width:220px">${r.description||''}</td>
+          <td><button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="8" class="empty">No requests submitted yet</td></tr>';
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
