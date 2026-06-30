@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC Admin — Marketing Strategy 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--blue:#00A3D9;--gold:#C8A96E;
+  --bg:#F0F2F7;--surface:#FFFFFF;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;
+  --green:#1DB87A;--red:#E0392B;--orange:#E8820C;
+  --radius:6px;--radius-lg:10px;--shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+}
+html,body{height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.hidden{display:none !important}
+
+/* ── LOGIN ── */
+.login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy),#003766)}
+.login-card{background:var(--surface);border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.login-logo{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy);margin-bottom:2px}
+.login-logo span{color:var(--gold)}
+.login-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.login-field{margin-bottom:14px}
+.login-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.login-input{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.login-input:focus{outline:none;border-color:var(--navy)}
+.login-btn{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:600;font-size:14px;cursor:pointer;margin-top:6px;font-family:inherit}
+.login-btn:hover{background:#003f7a}
+.login-error{background:#FFE8E8;color:#9B2020;padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:14px;display:none}
+
+/* ── APP SHELL ── */
+.app{display:none;min-height:100vh}
+.app.active{display:block}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:58px}
+.topbar-logo{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--navy)}
+.topbar-logo span{color:var(--gold)}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.user-email{font-size:12px;color:var(--text-3)}
+.btn{font-size:12px;padding:8px 16px;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;background:var(--surface);color:var(--text-2);font-family:inherit;font-weight:500}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn-primary:hover{background:#003f7a}
+.btn-danger{color:var(--red);border-color:var(--red)}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+.tabs{display:flex;gap:4px;padding:14px 28px 0;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+
+.content{padding:28px;max-width:1200px;margin:0 auto}
+.page{display:none}.page.active{display:block}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:10px;flex-wrap:wrap}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.filter-select,.filter-input{font-size:12px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;background:var(--surface)}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+th{background:var(--navy);color:#fff;padding:10px 12px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+tr:hover td{background:var(--bg)}
+.row-actions{display:flex;gap:6px}
+.badge{display:inline-flex;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.b-planned{background:#E4EDFF;color:#1649A3}
+.b-production{background:#FFF0D4;color:#9B5800}
+.b-ready{background:#E4F8F0;color:#0E7A55}
+.b-published{background:#D4F0E2;color:#0D6E44}
+.b-cancelled{background:#FFE8E8;color:#9B2020}
+.type-pill{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF0FF;color:#2E3BAA}
+
+/* ── MODAL FORM ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.5);z-index:50;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:560px;max-width:100%;box-shadow:var(--shadow-lg)}
+.modal-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:800}
+.modal-close{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;color:var(--text-3)}
+.modal-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.modal-body{padding:20px 24px;max-height:65vh;overflow-y:auto}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.type-switcher{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.type-btn{flex:1;min-width:100px;padding:9px;text-align:center;border:1.5px solid var(--border);border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;color:var(--text-2)}
+.type-btn.active{border-color:var(--navy);background:#E4EDFF;color:var(--navy)}
+.field-group{margin-bottom:14px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field-label{font-size:11.5px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.field-input,.field-select,.field-textarea{width:100%;padding:8px 11px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:12.5px}
+.field-textarea{min-height:60px;resize:vertical}
+.field-input:focus,.field-select:focus,.field-textarea:focus{outline:none;border-color:var(--navy)}
+.chip-select{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 12px;border:1.5px solid var(--border-strong);border-radius:20px;font-size:11.5px;cursor:pointer;color:var(--text-2);user-select:none}
+.chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.field-section-title{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin:18px 0 10px;padding-top:10px;border-top:1px solid var(--border)}
+.field-section-title:first-child{margin-top:0;padding-top:0;border-top:none}
+.empty{text-align:center;padding:40px;color:var(--text-3);font-size:12px}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
+.toast.show{display:block}
+.toast.error{background:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">IMC<span> 2026</span></div>
+    <div class="login-sub">Marketing Strategy Admin Panel</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-field">
+      <label class="login-label">Email</label>
+      <input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa">
+    </div>
+    <div class="login-field">
+      <label class="login-label">Password</label>
+      <input class="login-input" type="password" id="login-password" placeholder="••••••••">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="topbar-logo">IMC<span> 2026</span> · Admin</div>
+    <div class="topbar-right">
+      <span class="user-email" id="user-email"></span>
+      <button class="btn" onclick="doLogout()">Sign Out</button>
+      <a class="btn btn-primary" href="IMC_Marketing_Strategy_2026.html" target="_blank">View Portal ↗</a>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('initiatives',this)">Initiatives</div>
+    <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
+  </div>
+
+  <div class="content">
+    <!-- INITIATIVES PAGE -->
+    <div class="page active" id="page-initiatives">
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select" id="f-type" onchange="renderTable()">
+            <option value="">All Types</option><option>Campaign</option><option>Event</option><option>Content</option><option>Health Day</option>
+          </select>
+          <select class="filter-select" id="f-dept" onchange="renderTable()"><option value="">All Departments</option></select>
+          <select class="filter-select" id="f-status" onchange="renderTable()">
+            <option value="">All Status</option><option>Planned</option><option>In Production</option><option>Ready</option><option>Published</option><option>Cancelled</option>
+          </select>
+          <input class="filter-input" type="text" placeholder="Search..." id="f-search" oninput="renderTable()">
+        </div>
+        <button class="btn btn-primary" onclick="openForm()">+ New Initiative</button>
+      </div>
+      <table>
+        <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th>Dates</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- METRICS PAGE -->
+    <div class="page" id="page-metrics">
+      <div class="toolbar">
+        <div></div>
+        <button class="btn btn-primary" onclick="openMetricForm()">+ New Metric</button>
+      </div>
+      <table>
+        <thead><tr><th>Metric Name</th><th>Category</th><th>Current</th><th>Previous</th><th>Unit</th><th>Period</th><th>Actions</th></tr></thead>
+        <tbody id="metrics-table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── INITIATIVE FORM MODAL ── -->
+<div class="modal-overlay" id="form-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="form-title">New Initiative</div>
+      <button class="modal-close" onclick="closeForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group">
+        <label class="field-label">Type</label>
+        <div class="type-switcher" id="type-switcher"></div>
+      </div>
+
+      <div class="field-section-title">Core Details</div>
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="fld-title"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="fld-department"></select></div>
+        <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-status"></select></div>
+      </div>
+      <div class="field-group"><label class="field-label">Entity (select all that apply)</label><div class="chip-select" id="fld-entity"></div></div>
+      <div class="field-group" id="fld-arabic-wrap"><label class="field-label">Name (Arabic)</label><input class="field-input" id="fld-nameAr"></div>
+
+      <div class="field-section-title">Dates</div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Start Date</label><input class="field-input" type="date" id="fld-startDate"></div>
+        <div class="field-group" id="fld-enddate-wrap"><label class="field-label">End Date</label><input class="field-input" type="date" id="fld-endDate"></div>
+      </div>
+
+      <div class="field-section-title" id="section-detail">Details</div>
+      <div class="field-group" id="fld-objective-wrap"><label class="field-label" id="fld-objective-label">Objective / Description</label><textarea class="field-textarea" id="fld-objective"></textarea></div>
+      <div class="field-group" id="fld-channels-wrap"><label class="field-label">Channels</label><div class="chip-select" id="fld-channels"></div></div>
+      <div class="field-group" id="fld-contenttype-wrap"><label class="field-label">Content Type</label><select class="field-select" id="fld-contentType"></select></div>
+      <div class="field-group" id="fld-hdcategory-wrap"><label class="field-label">Health Day Category</label><select class="field-select" id="fld-hdCategory"></select></div>
+      <div class="field-group" id="fld-postlink-wrap"><label class="field-label">Post Link</label><input class="field-input" id="fld-postLink" placeholder="https://instagram.com/p/..."></div>
+
+      <div class="field-section-title" id="section-perf">Performance (optional)</div>
+      <div class="field-row" id="fld-perf-wrap">
+        <div class="field-group"><label class="field-label">Reach</label><input class="field-input" type="number" id="fld-reach"></div>
+        <div class="field-group"><label class="field-label">Impressions</label><input class="field-input" type="number" id="fld-impressions"></div>
+      </div>
+      <div class="field-group" id="fld-eng-wrap"><label class="field-label">Engagements</label><input class="field-input" type="number" id="fld-engagements"></div>
+
+      <div class="field-group"><label class="field-label">Assigned To</label><input class="field-input" id="fld-assignedTo"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveInitiative()">Save Initiative</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── METRIC FORM MODAL ── -->
+<div class="modal-overlay" id="metric-overlay">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="metric-form-title">New Metric</div>
+      <button class="modal-close" onclick="closeMetricForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Metric Name</label><input class="field-input" id="m-name" placeholder="e.g. Instagram Reach"></div>
+      <div class="field-group"><label class="field-label">Category</label><input class="field-input" id="m-category" placeholder="e.g. Social Media"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Current Value</label><input class="field-input" type="number" id="m-current"></div>
+        <div class="field-group"><label class="field-label">Previous Value</label><input class="field-input" type="number" id="m-previous"></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Unit</label><select class="field-select" id="m-unit"><option value="">Number</option><option>Percentage</option><option>SAR</option></select></div>
+        <div class="field-group"><label class="field-label">Period</label><input class="field-input" id="m-period" placeholder="2026-06"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Notes</label><input class="field-input" id="m-notes"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeMetricForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMetric()">Save Metric</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import {
+  login, logout, watchAuth,
+  getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
+  getMetrics, watchMetrics, addMetric, updateMetric, deleteMetric,
+  DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, HEALTH_DAY_CATEGORIES
+} from './firebase-data.js';
+
+// ── STATE ──────────────────────────────────────────────────────────────
+let ALL_INITIATIVES = [];
+let ALL_METRICS = [];
+let currentType = 'Campaign';
+let editingId = null;
+let editingMetricId = null;
+let selectedEntities = [];
+let selectedChannels = [];
+let unsubInitiatives = null;
+let unsubMetrics = null;
+
+// ── AUTH ───────────────────────────────────────────────────────────────
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  try {
+    await login(email, password);
+  } catch(e) {
+    errEl.textContent = 'Sign-in failed — check your email and password.';
+    errEl.style.display = 'block';
+  }
+}
+window.doLogout = async function() {
+  await logout();
+}
+
+watchAuth(user => {
+  if(user) {
+    document.getElementById('login-wrap').style.display = 'none';
+    document.getElementById('app').classList.add('active');
+    document.getElementById('user-email').textContent = user.email;
+    initData();
+  } else {
+    document.getElementById('login-wrap').style.display = 'flex';
+    document.getElementById('app').classList.remove('active');
+    if(unsubInitiatives) unsubInitiatives();
+    if(unsubMetrics) unsubMetrics();
+  }
+});
+
+function initData() {
+  populateStaticSelects();
+  unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); });
+  unsubMetrics = watchMetrics(data => { ALL_METRICS = data; renderMetricsTable(); });
+}
+
+// ── TABS ───────────────────────────────────────────────────────────────
+window.switchTab = function(id, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-'+id).classList.add('active');
+}
+
+// ── STATIC SELECT POPULATION ──────────────────────────────────────────
+function populateStaticSelects() {
+  const deptFilter = document.getElementById('f-dept');
+  DEPARTMENTS.forEach(d => deptFilter.innerHTML += `<option>${d}</option>`);
+
+  const fldDept = document.getElementById('fld-department');
+  fldDept.innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+
+  const fldStatus = document.getElementById('fld-status');
+  fldStatus.innerHTML = STATUSES.map(s=>`<option>${s}</option>`).join('');
+
+  const fldContentType = document.getElementById('fld-contentType');
+  fldContentType.innerHTML = CONTENT_TYPES.map(c=>`<option>${c}</option>`).join('');
+
+  const fldHd = document.getElementById('fld-hdCategory');
+  fldHd.innerHTML = HEALTH_DAY_CATEGORIES.map(h=>`<option>${h}</option>`).join('');
+
+  document.getElementById('type-switcher').innerHTML = TYPES.map(t=>
+    `<div class="type-btn" data-type="${t}" onclick="selectType('${t}')">${t}</div>`
+  ).join('');
+
+  document.getElementById('fld-entity').innerHTML = ENTITIES.map(e=>
+    `<div class="chip" data-val="${e}" onclick="toggleChip(this,'entity')">${e}</div>`
+  ).join('');
+
+  document.getElementById('fld-channels').innerHTML = CHANNELS.map(c=>
+    `<div class="chip" data-val="${c}" onclick="toggleChip(this,'channels')">${c}</div>`
+  ).join('');
+}
+
+window.toggleChip = function(el, group) {
+  el.classList.toggle('active');
+  const arr = group==='entity' ? selectedEntities : selectedChannels;
+  const val = el.dataset.val;
+  const idx = arr.indexOf(val);
+  if(el.classList.contains('active') && idx===-1) arr.push(val);
+  if(!el.classList.contains('active') && idx>-1) arr.splice(idx,1);
+}
+
+// ── TYPE SWITCHER → SHOW/HIDE RELEVANT FIELDS ───────────────────────────
+window.selectType = function(type) {
+  currentType = type;
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
+
+  const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
+  show('fld-arabic-wrap', type==='Health Day');
+  show('fld-enddate-wrap', type==='Campaign');
+  show('fld-objective-wrap', true);
+  show('fld-channels-wrap', type==='Campaign' || type==='Event');
+  show('fld-contenttype-wrap', type==='Content');
+  show('fld-hdcategory-wrap', type==='Health Day');
+  show('fld-postlink-wrap', type==='Campaign' || type==='Content' || type==='Event');
+  show('fld-perf-wrap', type==='Campaign' || type==='Content');
+  show('fld-eng-wrap', type==='Campaign' || type==='Content');
+  show('section-perf', type==='Campaign' || type==='Content');
+
+  document.getElementById('fld-objective-label').textContent =
+    type==='Health Day' ? 'Notes' : (type==='Event' ? 'Description' : 'Objective / Description');
+}
+
+// ── FORM OPEN / CLOSE ────────────────────────────────────────────────────
+window.openForm = function(initiative=null) {
+  editingId = initiative ? initiative.id : null;
+  document.getElementById('form-title').textContent = initiative ? 'Edit Initiative' : 'New Initiative';
+  selectedEntities = initiative ? [...(initiative.entity||[])] : [];
+  selectedChannels = initiative ? [...(initiative.channels||[])] : [];
+
+  selectType(initiative ? initiative.type : 'Campaign');
+
+  document.getElementById('fld-title').value = initiative?.title || '';
+  document.getElementById('fld-department').value = initiative?.department || DEPARTMENTS[0];
+  document.getElementById('fld-status').value = initiative?.status || 'Planned';
+  document.getElementById('fld-nameAr').value = initiative?.nameAr || '';
+  document.getElementById('fld-startDate').value = initiative?.startDate || '';
+  document.getElementById('fld-endDate').value = initiative?.endDate || '';
+  document.getElementById('fld-objective').value = initiative?.objective || '';
+  document.getElementById('fld-contentType').value = initiative?.contentType || CONTENT_TYPES[0];
+  document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
+  document.getElementById('fld-postLink').value = initiative?.postLink || '';
+  document.getElementById('fld-reach').value = initiative?.reach || '';
+  document.getElementById('fld-impressions').value = initiative?.impressions || '';
+  document.getElementById('fld-engagements').value = initiative?.engagements || '';
+  document.getElementById('fld-assignedTo').value = initiative?.assignedTo || '';
+
+  // sync chips
+  document.querySelectorAll('#fld-entity .chip').forEach(c=>c.classList.toggle('active', selectedEntities.includes(c.dataset.val)));
+  document.querySelectorAll('#fld-channels .chip').forEach(c=>c.classList.toggle('active', selectedChannels.includes(c.dataset.val)));
+
+  document.getElementById('form-overlay').classList.add('open');
+}
+window.closeForm = function() {
+  document.getElementById('form-overlay').classList.remove('open');
+}
+
+// ── SAVE / DELETE INITIATIVE ─────────────────────────────────────────────
+window.saveInitiative = async function() {
+  const title = document.getElementById('fld-title').value.trim();
+  if(!title) { showToast('Title is required', true); return; }
+
+  const data = {
+    type: currentType,
+    title,
+    department: document.getElementById('fld-department').value,
+    status: document.getElementById('fld-status').value,
+    entity: selectedEntities,
+    nameAr: document.getElementById('fld-nameAr').value.trim(),
+    startDate: document.getElementById('fld-startDate').value,
+    endDate: document.getElementById('fld-endDate').value,
+    objective: document.getElementById('fld-objective').value.trim(),
+    channels: selectedChannels,
+    contentType: document.getElementById('fld-contentType').value,
+    hdCategory: document.getElementById('fld-hdCategory').value,
+    postLink: document.getElementById('fld-postLink').value.trim(),
+    reach: Number(document.getElementById('fld-reach').value) || null,
+    impressions: Number(document.getElementById('fld-impressions').value) || null,
+    engagements: Number(document.getElementById('fld-engagements').value) || null,
+    assignedTo: document.getElementById('fld-assignedTo').value.trim(),
+  };
+
+  try {
+    if(editingId) {
+      await updateInitiative(editingId, data);
+      showToast('Initiative updated');
+    } else {
+      await addInitiative(data);
+      showToast('Initiative created');
+    }
+    closeForm();
+  } catch(e) {
+    showToast('Save failed: ' + e.message, true);
+  }
+}
+
+window.editInitiative = function(id) {
+  const item = ALL_INITIATIVES.find(i=>i.id===id);
+  if(item) openForm(item);
+}
+
+window.removeInitiative = async function(id, title) {
+  if(!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  try {
+    await deleteInitiative(id);
+    showToast('Initiative deleted');
+  } catch(e) {
+    showToast('Delete failed: ' + e.message, true);
+  }
+}
+
+// ── RENDER TABLE ──────────────────────────────────────────────────────
+const STATUS_CLASS = {'Planned':'b-planned','In Production':'b-production','Ready':'b-ready','Published':'b-published','Cancelled':'b-cancelled'};
+
+window.renderTable = function() {
+  const typeF = document.getElementById('f-type').value;
+  const deptF = document.getElementById('f-dept').value;
+  const statusF = document.getElementById('f-status').value;
+  const q = document.getElementById('f-search').value.toLowerCase();
+
+  const filtered = ALL_INITIATIVES.filter(i=>{
+    if(typeF && i.type!==typeF) return false;
+    if(deptF && i.department!==deptF) return false;
+    if(statusF && i.status!==statusF) return false;
+    if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  document.getElementById('table-body').innerHTML = filtered.length
+    ? filtered.map(i=>`
+      <tr>
+        <td><span class="type-pill">${i.type||''}</span></td>
+        <td style="font-weight:600">${i.title||''}</td>
+        <td>${i.department||''}</td>
+        <td>${(i.entity||[]).join(', ')}</td>
+        <td style="font-size:11px;color:var(--text-3)">${i.startDate||'—'}${i.endDate?' → '+i.endDate:''}</td>
+        <td><span class="badge ${STATUS_CLASS[i.status]||'b-planned'}">${i.status||''}</span></td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editInitiative('${i.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeInitiative('${i.id}','${(i.title||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No initiatives found</td></tr>';
+}
+
+// ── METRICS ───────────────────────────────────────────────────────────
+window.openMetricForm = function(metric=null) {
+  editingMetricId = metric ? metric.id : null;
+  document.getElementById('metric-form-title').textContent = metric ? 'Edit Metric' : 'New Metric';
+  document.getElementById('m-name').value = metric?.metricName || '';
+  document.getElementById('m-category').value = metric?.category || '';
+  document.getElementById('m-current').value = metric?.currentValue ?? '';
+  document.getElementById('m-previous').value = metric?.previousValue ?? '';
+  document.getElementById('m-unit').value = metric?.unit || '';
+  document.getElementById('m-period').value = metric?.period || '';
+  document.getElementById('m-notes').value = metric?.notes || '';
+  document.getElementById('metric-overlay').classList.add('open');
+}
+window.closeMetricForm = function() {
+  document.getElementById('metric-overlay').classList.remove('open');
+}
+window.saveMetric = async function() {
+  const metricName = document.getElementById('m-name').value.trim();
+  if(!metricName) { showToast('Metric name is required', true); return; }
+  const data = {
+    metricName,
+    category: document.getElementById('m-category').value.trim(),
+    currentValue: Number(document.getElementById('m-current').value) || 0,
+    previousValue: Number(document.getElementById('m-previous').value) || 0,
+    unit: document.getElementById('m-unit').value,
+    period: document.getElementById('m-period').value.trim(),
+    notes: document.getElementById('m-notes').value.trim(),
+  };
+  try {
+    if(editingMetricId) { await updateMetric(editingMetricId, data); showToast('Metric updated'); }
+    else { await addMetric(data); showToast('Metric created'); }
+    closeMetricForm();
+  } catch(e) { showToast('Save failed: ' + e.message, true); }
+}
+window.editMetric = function(id) {
+  const m = ALL_METRICS.find(x=>x.id===id);
+  if(m) openMetricForm(m);
+}
+window.removeMetric = async function(id, name) {
+  if(!confirm(`Delete metric "${name}"?`)) return;
+  try { await deleteMetric(id); showToast('Metric deleted'); }
+  catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+window.renderMetricsTable = function() {
+  document.getElementById('metrics-table-body').innerHTML = ALL_METRICS.length
+    ? ALL_METRICS.map(m=>`
+      <tr>
+        <td style="font-weight:600">${m.metricName||''}</td>
+        <td>${m.category||''}</td>
+        <td style="font-weight:600">${m.currentValue ?? '—'}</td>
+        <td>${m.previousValue ?? '—'}</td>
+        <td>${m.unit||'—'}</td>
+        <td>${m.period||'—'}</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editMetric('${m.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeMetric('${m.id}','${(m.metricName||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No metrics found</td></tr>';
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=>t.className='toast', 2500);
+}
+</script>
+</body>
+</html>
