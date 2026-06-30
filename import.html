@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC — Data Import Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#00539B;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--text:#0F1423;--text-3:#8890A8;--green:#1DB87A;--red:#E0392B;--radius:8px}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);padding:30px;font-size:14px}
+.wrap{max-width:780px;margin:0 auto}
+h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.warn{background:#FFF6E0;border:1px solid #E8C975;border-radius:var(--radius);padding:14px 16px;font-size:12px;color:#7A4A00;margin-bottom:24px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.login-box input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;margin-right:8px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.card h3{font-family:'Syne',sans-serif;font-size:14px;margin-bottom:4px}
+.card p{font-size:12px;color:var(--text-3);margin-bottom:14px}
+button{font-size:12px;padding:9px 16px;border-radius:6px;border:1px solid var(--navy);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit;font-weight:600;margin-right:8px}
+button.secondary{background:var(--surface);color:var(--navy)}
+button:disabled{opacity:0.5;cursor:not-allowed}
+.log{font-size:11px;color:var(--text-3);margin-top:12px;max-height:160px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px;display:none}
+.log.show{display:block}
+.log div{padding:2px 0}
+.log .ok{color:var(--green)}
+.log .err{color:var(--red)}
+.hidden{display:none}
+.status-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#E4F8F0;color:#0E7A55;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>IMC Marketing Portal — Data Import Tool</h1>
+  <div class="sub">One-time migration from the old Google Sheet into Firestore</div>
+  <div class="warn">⚠️ Run each import only once. Running it twice will create duplicate entries (this tool does not check for existing duplicates). Review the preview count before confirming.</div>
+
+  <div class="login-box" id="login-box">
+    <strong style="font-size:13px">Sign in to continue</strong><br><br>
+    <input type="email" id="email" placeholder="email">
+    <input type="password" id="password" placeholder="password">
+    <button onclick="doLogin()">Sign In</button>
+    <div id="login-err" style="color:var(--red);font-size:11px;margin-top:8px"></div>
+  </div>
+
+  <div id="tools" class="hidden">
+    <div class="card">
+      <h3>Campaigns <span id="status-campaigns"></span></h3>
+      <p>Imports the old <code>Campaigns</code> sheet tab as <strong>type: Campaign</strong> initiatives.</p>
+      <button onclick="previewImport('campaigns')">Preview</button>
+      <button class="secondary hidden" id="confirm-campaigns" onclick="runImport('campaigns')">Confirm Import</button>
+      <div class="log" id="log-campaigns"></div>
+    </div>
+
+    <div class="card">
+      <h3>Health Days <span id="status-healthdays"></span></h3>
+      <p>Imports the old <code>Health_Days</code> sheet tab as <strong>type: Health Day</strong> initiatives.</p>
+      <button onclick="previewImport('healthdays')">Preview</button>
+      <button class="secondary hidden" id="confirm-healthdays" onclick="runImport('healthdays')">Confirm Import</button>
+      <div class="log" id="log-healthdays"></div>
+    </div>
+
+    <div class="card">
+      <h3>Content Library <span id="status-library"></span></h3>
+      <p>Imports the old <code>Content_Library</code> sheet tab as <strong>type: Content</strong> initiatives. This also covers what used to be the separate Calendar tab, since SM Calendar now reads from Content.</p>
+      <button onclick="previewImport('library')">Preview</button>
+      <button class="secondary hidden" id="confirm-library" onclick="runImport('library')">Confirm Import</button>
+      <div class="log" id="log-library"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { login, watchAuth, addInitiative } from './firebase-data.js';
+
+const OLD_SHEET_ID = '1bm1nh5DHMlmerxa4rdPgUY2HlJw0VA9xlTqpLZcn-J0';
+const BASE = `https://docs.google.com/spreadsheets/d/${OLD_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+
+let pendingData = {}; // holds previewed rows keyed by import id, ready to confirm
+
+window.doLogin = async function() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const err = document.getElementById('login-err');
+  err.textContent = '';
+  try {
+    await login(email, password);
+  } catch(e) {
+    err.textContent = 'Sign-in failed — check email/password.';
+  }
+}
+
+watchAuth(user => {
+  document.getElementById('login-box').classList.toggle('hidden', !!user);
+  document.getElementById('tools').classList.toggle('hidden', !user);
+});
+
+// ── CSV PARSER (same logic as the old portal) ───────────────────────────
+function parseCSV(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  if(lines.length < 2) return rows;
+  const headers = lines[0].replace(/\r/g,'').split(',').map(h=>h.replace(/^"|"$/g,'').trim());
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const vals=[]; let cur='', inQ=false;
+    for(let c=0;c<lines[i].length;c++){
+      const ch=lines[i][c];
+      if(ch==='"'){inQ=!inQ;}
+      else if(ch===','&&!inQ){vals.push(cur.trim());cur='';}
+      else cur+=ch;
+    }
+    vals.push(cur.trim());
+    const obj={};
+    headers.forEach((h,idx)=>{obj[h]=vals[idx]||'';});
+    rows.push(obj);
+  }
+  return rows;
+}
+
+async function fetchOldSheet(tabName) {
+  const res = await fetch(BASE + encodeURIComponent(tabName));
+  if(!res.ok) throw new Error('Could not fetch sheet tab: ' + tabName);
+  return parseCSV(await res.text());
+}
+
+function splitList(str) {
+  return (str||'').split(',').map(s=>s.trim()).filter(Boolean);
+}
+function toNum(v) {
+  const n = parseFloat(String(v||'').replace(/,/g,''));
+  return isNaN(n) ? null : n;
+}
+function toDateStr(v) {
+  if(!v) return '';
+  const d = new Date(v);
+  if(isNaN(d)) return '';
+  return d.toISOString().split('T')[0];
+}
+
+// ── MAPPERS: old sheet row → new initiatives schema ─────────────────────
+const MAPPERS = {
+  campaigns: {
+    sheetTab: 'Campaigns',
+    map: r => ({
+      type: 'Campaign',
+      title: r['Campaign Name']||'Untitled',
+      department: r['Department']||'',
+      entity: splitList(r['Entity']),
+      startDate: toDateStr(r['Start Date']),
+      endDate: toDateStr(r['End Date']),
+      status: r['Status']||'Planned',
+      channels: splitList(r['Channels']),
+      objective: r['Objective']||r['Description']||'',
+      postLink: r['Post Link']||r['Social Link']||'',
+      reach: toNum(r['Reach']||r['Performance - Reach']),
+      impressions: toNum(r['Impressions']||r['Performance - Impressions']),
+      engagements: toNum(r['Engagements']||r['Performance - Engagements']),
+      assignedTo: r['Assigned To']||'',
+      nameAr: '', contentType: '', hdCategory: ''
+    })
+  },
+  healthdays: {
+    sheetTab: 'Health_Days',
+    map: r => ({
+      type: 'Health Day',
+      title: r['Health Day Name']||'Untitled',
+      nameAr: r['Health Day Name AR']||'',
+      department: r['Department']||'',
+      entity: [],
+      startDate: toDateStr(r['Date']),
+      endDate: '',
+      status: r['Status']||'Planned',
+      hdCategory: r['Type']||'MOH Health Day',
+      channels: [], objective: '', postLink: '', reach:null, impressions:null, engagements:null, assignedTo:'', contentType:''
+    })
+  },
+  library: {
+    sheetTab: 'Content_Library',
+    map: r => ({
+      type: 'Content',
+      title: r['Campaign Name']||r['Headline EN']||'Untitled',
+      department: r['Department']||'',
+      entity: splitList(r['Entity']),
+      startDate: toDateStr(r['Date Published']),
+      endDate: '',
+      status: r['Status']||'Planned',
+      channels: splitList(r['Channel']),
+      contentType: r['Content Type']||'Post',
+      postLink: r['Post Link']||r['Social Link']||'',
+      reach: toNum(r['Performance - Reach']),
+      engagements: toNum(r['Performance - Engagements']),
+      impressions: null,
+      objective: r['Caption']||'', assignedTo: '', hdCategory: '', nameAr: r['Headline AR']||''
+    })
+  }
+};
+
+window.previewImport = async function(key) {
+  const logEl = document.getElementById('log-'+key);
+  logEl.classList.add('show');
+  logEl.innerHTML = '<div>Fetching old sheet data...</div>';
+  try {
+    const rawRows = await fetchOldSheet(MAPPERS[key].sheetTab);
+    const mapped = rawRows.map(MAPPERS[key].map).filter(m => m.title && m.title !== 'Untitled');
+    pendingData[key] = mapped;
+    logEl.innerHTML = `<div class="ok">✓ Found ${mapped.length} valid rows ready to import.</div>` +
+      mapped.slice(0,5).map(m=>`<div>• ${m.title} (${m.department||'no dept'})</div>`).join('') +
+      (mapped.length>5 ? `<div>...and ${mapped.length-5} more</div>` : '');
+    document.getElementById('confirm-'+key).classList.remove('hidden');
+  } catch(e) {
+    logEl.innerHTML = `<div class="err">✗ ${e.message}</div>`;
+  }
+}
+
+window.runImport = async function(key) {
+  const logEl = document.getElementById('log-'+key);
+  const rows = pendingData[key];
+  if(!rows || !rows.length) { logEl.innerHTML += '<div class="err">Nothing to import — run Preview first.</div>'; return; }
+  const confirmBtn = document.getElementById('confirm-'+key);
+  confirmBtn.disabled = true;
+  logEl.innerHTML += `<div>Importing ${rows.length} rows...</div>`;
+  let success=0, failed=0;
+  for(const row of rows) {
+    try { await addInitiative(row); success++; }
+    catch(e) { failed++; }
+  }
+  logEl.innerHTML += `<div class="ok">✓ Import complete: ${success} added${failed?', '+failed+' failed':''}.</div>`;
+  document.getElementById('status-'+key).innerHTML = `<span class="status-pill">Imported ✓</span>`;
+  confirmBtn.disabled = false;
+}
+</script>
+</body>
+</html>
