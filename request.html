@@ -56,6 +56,8 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
 .toast.show{display:block}
 .toast.error{background:var(--red)}
+#word-count.limit-near{color:var(--gold);font-weight:600}
+#word-count.limit-reached{color:var(--red);font-weight:600}
 </style>
 </head>
 <body>
@@ -83,6 +85,11 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
     <div class="form-title">New Marketing Request</div>
     <div class="form-sub">Submit a request to the marketing team — they'll follow up directly.</div>
 
+    <div class="field-row">
+      <div class="field-group"><label class="field-label">Your Name<span class="req">*</span></label><input class="field-input" id="f-requester-name" placeholder="Dr. / Mr. / Ms. ..."></div>
+      <div class="field-group"><label class="field-label">Email Address<span class="req">*</span></label><input class="field-input" type="email" id="f-email" placeholder="you@imc.med.sa"></div>
+    </div>
+
     <div class="field-group"><label class="field-label">Title<span class="req">*</span></label><input class="field-input" id="f-title" placeholder="e.g. Welcome Dr. Ahmed Al-Zahrani — Cardiology Consultant"></div>
 
     <div class="field-row">
@@ -97,7 +104,14 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
       <div class="field-group"><label class="field-label">Request Type<span class="req">*</span></label><select class="field-select" id="f-type"></select></div>
     </div>
 
-    <div class="field-group"><label class="field-label">Description<span class="req">*</span></label><textarea class="field-textarea" id="f-description" placeholder="What exactly do you need? Who is the target audience?"></textarea></div>
+    <div class="field-group">
+      <label class="field-label">Description<span class="req">*</span></label>
+      <textarea class="field-textarea" id="f-description" placeholder="What exactly do you need? Who is the target audience?" oninput="onDescInput()"></textarea>
+      <div style="font-size:11px;color:var(--text-3);margin-top:5px;display:flex;justify-content:space-between">
+        <span>📧 Need to share more detail (files, links, longer brief)? Email the marketing team directly after submitting.</span>
+        <span id="word-count" style="white-space:nowrap;margin-left:10px">0 / 200 words</span>
+      </div>
+    </div>
 
     <div class="field-row">
       <div class="field-group"><label class="field-label">Deadline<span class="req">*</span></label><input class="field-input" type="date" id="f-deadline"></div>
@@ -112,7 +126,9 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { login, logout, watchAuth, addRequest, REQUEST_TYPES, PRIORITIES } from './firebase-data.js';
+import { login, logout, watchAuth, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES } from './firebase-data.js';
+
+let currentUserEmail = null;
 
 window.doLogin = async function() {
   const email = document.getElementById('login-email').value.trim();
@@ -127,7 +143,7 @@ window.doLogout = async function() { await logout(); }
 watchAuth(user => {
   document.getElementById('login-wrap').style.display = user ? 'none' : 'flex';
   document.getElementById('page-wrap').classList.toggle('active', !!user);
-  if(user) populateSelects();
+  if(user) { currentUserEmail = user.email; populateSelects(); }
 });
 
 function populateSelects() {
@@ -135,7 +151,24 @@ function populateSelects() {
   document.getElementById('f-priority').innerHTML = PRIORITIES.map(p=>`<option>${p}</option>`).join('');
 }
 
+const MAX_WORDS = 200;
+window.onDescInput = function() {
+  const el = document.getElementById('f-description');
+  const counter = document.getElementById('word-count');
+  let words = el.value.trim().split(/\s+/).filter(Boolean);
+  if(words.length > MAX_WORDS) {
+    // Hard cap — truncate back to the limit
+    words = words.slice(0, MAX_WORDS);
+    el.value = words.join(' ');
+  }
+  counter.textContent = `${words.length} / ${MAX_WORDS} words`;
+  counter.classList.toggle('limit-reached', words.length >= MAX_WORDS);
+  counter.classList.toggle('limit-near', words.length >= MAX_WORDS*0.85 && words.length < MAX_WORDS);
+}
+
 window.submitRequest = async function() {
+  const requesterName = document.getElementById('f-requester-name').value.trim();
+  const email = document.getElementById('f-email').value.trim();
   const title = document.getElementById('f-title').value.trim();
   const department = document.getElementById('f-department').value;
   const type = document.getElementById('f-type').value;
@@ -143,20 +176,33 @@ window.submitRequest = async function() {
   const deadline = document.getElementById('f-deadline').value;
   const priority = document.getElementById('f-priority').value;
 
-  if(!title || !department || !type || !description || !deadline) {
+  if(!requesterName || !email || !title || !department || !type || !description || !deadline) {
     showToast('Please fill in all required fields (*)', true);
     return;
   }
 
+  const submitBtn = document.querySelector('.submit-btn');
+  submitBtn.disabled = true;
+
   try {
-    await addRequest({ title, department, type, description, deadline, priority });
+    const todayCount = await getTodayRequestCount(currentUserEmail);
+    if(todayCount >= DAILY_REQUEST_LIMIT) {
+      showToast(`Daily limit reached — you can submit up to ${DAILY_REQUEST_LIMIT} requests per day. Please try again tomorrow.`, true);
+      submitBtn.disabled = false;
+      return;
+    }
+
+    await addRequest({ requesterName, email, title, department, type, description, deadline, priority, submittedBy: currentUserEmail });
     document.getElementById('success-msg').classList.add('show');
-    ['f-title','f-description','f-deadline'].forEach(id => document.getElementById(id).value = '');
+    ['f-requester-name','f-email','f-title','f-description','f-deadline'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-department').value = '';
     document.getElementById('f-type').value = '';
+    onDescInput();
     setTimeout(()=>document.getElementById('success-msg').classList.remove('show'), 5000);
   } catch(e) {
     showToast('Submission failed: ' + e.message, true);
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
