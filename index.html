@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC Marketing Strategy 2026 — المركز الطبي الدولي</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--blue:#00A3D9;--gold:#C8A96E;--gold-light:#F5EDD8;
+  --bg:#F0F2F7;--surface:#FFFFFF;--surface-2:#F7F8FB;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;
+  --green:#1DB87A;--red:#E0392B;--orange:#E8820C;--purple:#6C5CE7;--teal:#0BA4A4;
+  --radius:6px;--radius-lg:10px;--radius-xl:16px;
+  --shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+  --sidebar-w:230px;--transition:0.2s ease;
+}
+html,body{height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;overflow:hidden}
+.app{display:flex;height:100vh}
+.sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--navy);display:flex;flex-direction:column;position:relative;z-index:20}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;height:58px}
+.content-area{flex:1;overflow-y:auto;padding:28px;background:var(--bg)}
+.page{display:none}.page.active{display:block}
+
+.sidebar::before{content:'';position:absolute;inset:0;background:linear-gradient(160deg,rgba(0,163,217,0.15) 0%,transparent 60%);pointer-events:none}
+.sidebar-logo{padding:20px 18px;border-bottom:1px solid rgba(255,255,255,0.08);position:relative;display:flex;align-items:center;gap:10px;background:#fff}
+.sidebar-logo-img{height:38px}
+.sidebar-logo-text{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:0.08em}
+.nav{flex:1;padding:12px 0;overflow-y:auto}
+.nav-section{font-size:9px;font-weight:700;color:rgba(255,255,255,0.28);text-transform:uppercase;letter-spacing:0.12em;padding:14px 20px 5px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;font-size:12.5px;color:rgba(255,255,255,0.6);cursor:pointer;transition:all var(--transition);border-left:2px solid transparent;font-weight:400}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.9)}
+.nav-item.active{background:rgba(255,255,255,0.1);color:#fff;border-left-color:var(--gold);font-weight:500}
+.nav-icon{width:16px;height:16px;flex-shrink:0;font-size:13px;text-align:center;line-height:16px;opacity:0.75}
+.nav-item.active .nav-icon{opacity:1}
+.sidebar-footer{padding:14px 20px;border-top:1px solid rgba(255,255,255,0.08);font-size:10px;color:rgba(255,255,255,0.35);line-height:1.8}
+.sync-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#1DB87A;margin-right:5px;vertical-align:middle}
+
+.page-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--text);letter-spacing:-0.01em}
+.page-sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.btn{font-size:12px;padding:7px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;background:var(--surface);color:var(--text-2);font-family:inherit;font-weight:500;transition:all var(--transition);white-space:nowrap}
+.btn:hover{background:var(--bg);border-color:var(--navy)}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.date-range-wrap{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2)}
+.date-range-wrap input{font-size:11px;padding:5px 8px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;background:var(--surface);color:var(--text);width:120px}
+
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.metrics-grid-wide{grid-template-columns:repeat(5,1fr)}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--navy));opacity:0.7}
+.metric-label{font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px}
+.metric-icon{position:absolute;top:14px;right:14px;font-size:18px;opacity:0.12}
+.metric-value{font-family:'Syne',sans-serif;font-size:28px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-0.02em}
+.metric-delta{font-size:10px;margin-top:6px}
+.up{color:var(--green)}.down{color:var(--red)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text)}
+.card-link{font-size:11px;color:var(--navy);cursor:pointer;font-weight:500}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-container{position:relative;height:200px;margin-top:4px}
+
+.badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.03em;white-space:nowrap}
+.b-planned{background:#E4EDFF;color:#1649A3}
+.b-production{background:#FFF0D4;color:#9B5800}
+.b-ready{background:#E4F8F0;color:#0E7A55}
+.b-published{background:#D4F0E2;color:#0D6E44}
+.b-cancelled{background:#FFE8E8;color:#9B2020}
+.b-moh{background:#E4EDFF;color:#1649A3}
+.b-occasion{background:#FFF6E0;color:#7A4A00}
+.b-imc{background:#EEF0FF;color:#2E3BAA}
+.b-upcoming{background:#E4EDFF;color:#1649A3}
+.b-live{background:#D4F0E2;color:#0D6E44}
+.b-past{background:#F0F2F7;color:#8890A8}
+.ent-imc{background:#E4EDFF;color:#1649A3}
+.ent-makkah{background:#E8F6FF;color:#0070A8}
+.ent-tfc{background:#E8FFF2;color:#0D7A45}
+.ent-jp{background:#FFF0E8;color:#8C3800}
+.ent-rsm{background:#F0E8FF;color:#5A0E9B}
+
+.loading{text-align:center;padding:32px;color:var(--text-3);font-size:12px}
+.loading::before{content:'⟳';display:block;font-size:22px;margin-bottom:8px;animation:spin 1.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-3);font-size:12px}
+.empty-state-icon{font-size:28px;margin-bottom:8px;opacity:0.3}
+
+.camp-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.camp-row:last-child{border:none;padding-bottom:0}
+.camp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.camp-name{flex:1;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.camp-dept{font-size:10px;color:var(--text-3);min-width:90px}
+
+/* CALENDAR */
+.cal-controls{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.cal-select{font-size:12px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;cursor:pointer}
+.cal-grid-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+.cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);background:var(--navy)}
+.cal-wd{font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.65);text-align:center;padding:9px 4px;text-transform:uppercase;letter-spacing:0.08em}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-cell{min-height:92px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:7px;background:var(--surface)}
+.cal-cell:nth-child(7n){border-right:none}
+.cal-cell.other-month{background:var(--bg);opacity:0.45}
+.cal-cell.today .cal-day-num{background:var(--navy);color:#fff;border-radius:50%}
+.cal-day-num{font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px;width:20px;height:20px;display:flex;align-items:center;justify-content:center}
+.cal-ev{font-size:9px;padding:2px 5px;border-radius:3px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600}
+.cal-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--text-3)}
+.leg{display:flex;align-items:center;gap:4px}
+.leg-dot{width:8px;height:8px;border-radius:2px}
+
+/* TIMELINE */
+.timeline-wrap{max-width:860px;position:relative;padding-bottom:20px}
+.timeline-spine{position:absolute;left:110px;top:8px;bottom:0;width:2px;background:linear-gradient(to bottom,var(--navy),rgba(0,83,155,0.08));border-radius:2px;z-index:0}
+.tl-month{display:flex;gap:0;margin-bottom:32px;position:relative;align-items:flex-start}
+.tl-month-label{width:106px;flex-shrink:0;text-align:right;padding-right:22px;padding-top:3px}
+.tl-month-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--navy);line-height:1;text-transform:uppercase;letter-spacing:0.04em}
+.tl-month-year{font-size:9px;color:var(--text-3);font-weight:500;letter-spacing:0.06em;margin-top:2px}
+.tl-dot{width:12px;height:12px;border-radius:50%;background:var(--navy);border:2px solid var(--bg);box-shadow:0 0 0 2px var(--navy);flex-shrink:0;margin-top:4px;position:relative;z-index:1}
+.tl-content{flex:1;min-width:0;padding-left:20px}
+.tl-dept-list{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.tl-dept-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:600;color:var(--text);box-shadow:var(--shadow);white-space:nowrap}
+.tl-dept-chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tl-camp-row{display:flex;align-items:flex-start;gap:8px;padding:7px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:5px;font-size:11px}
+.tl-camp-row-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.tl-camp-row-name{font-weight:600;color:var(--text);flex:1;min-width:0}
+.tl-camp-row-meta{font-size:10px;color:var(--text-3);white-space:nowrap;flex-shrink:0}
+.tl-camp-row-desc{font-size:10px;color:var(--text-3);margin-top:2px;line-height:1.4}
+.tl-month.current .tl-dot{background:var(--gold);box-shadow:0 0 0 4px rgba(200,169,110,0.25);border-color:var(--bg)}
+.tl-month.current .tl-month-name{color:var(--gold)}
+.tl-month.past .tl-month-name{color:var(--text-3)}
+.tl-month.past .tl-dot{background:var(--border-strong);box-shadow:0 0 0 2px var(--border-strong)}
+.tl-no-camps{font-size:10px;color:var(--text-3);font-style:italic;padding:4px 0}
+
+/* TABLE */
+.camp-table{width:100%;border-collapse:collapse;font-size:12px}
+.camp-table th{background:var(--navy);color:#fff;padding:10px 12px;text-align:left;font-size:10.5px;font-weight:700;white-space:nowrap;letter-spacing:0.04em;text-transform:uppercase}
+.camp-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.camp-table tr:hover td{background:var(--surface-2)}
+a.post-link{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--navy);text-decoration:none;border:1px solid var(--border);border-radius:4px;padding:2px 7px;background:var(--bg);font-weight:500;white-space:nowrap}
+a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+/* DEPT CAMPAIGNS */
+.dept-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px}
+.dept-tab{font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid var(--border);cursor:pointer;font-weight:500;color:var(--text-2);background:var(--surface);transition:all var(--transition);white-space:nowrap}
+.dept-tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.dept-view{display:none}.dept-view.active{display:block}
+.dept-banner{border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.dept-banner-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-0.01em}
+.dept-banner-sub{font-size:12px;opacity:0.7;margin-top:2px}
+.dept-banner-stat{text-align:right}
+.dept-banner-stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:700}
+.dept-banner-stat-label{font-size:10px;opacity:0.65;margin-top:2px}
+.dept-camp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dept-camp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:all var(--transition)}
+.dept-camp-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.dept-camp-card-header{padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.dept-camp-card-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.3;flex:1}
+.dept-camp-card-body{padding:0 16px 14px;font-size:11px;color:var(--text-3);display:flex;gap:14px;flex-wrap:wrap}
+.dept-camp-card-stat{display:flex;flex-direction:column;gap:1px}
+.dept-camp-card-stat strong{font-size:15px;font-weight:700;font-family:'Syne',sans-serif;color:var(--text)}
+.dept-camp-card-stat span{font-size:9.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em}
+.dept-camp-card-footer{padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3);background:var(--bg)}
+
+/* DETAIL PANEL */
+.detail-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.45);z-index:50;backdrop-filter:blur(2px)}
+.detail-overlay.open{display:block}
+.detail-panel{position:fixed;right:0;top:0;bottom:0;width:560px;background:var(--surface);box-shadow:-8px 0 40px rgba(15,20,35,0.2);z-index:51;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1)}
+.detail-panel.open{transform:translateX(0)}
+.dp-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-shrink:0}
+.dp-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text);line-height:1.25}
+.dp-close{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:14px;color:var(--text-3);flex-shrink:0}
+.dp-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.dp-body{flex:1;overflow-y:auto;padding:20px 24px}
+.dp-section{margin-bottom:22px}
+.dp-section-title{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.dp-row{display:flex;gap:10px;margin-bottom:8px;font-size:12px}
+.dp-label{min-width:110px;color:var(--text-3);font-weight:500}
+.dp-val{color:var(--text);font-weight:500;flex:1}
+.dp-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.dp-metric{background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center;border:1px solid var(--border)}
+.dp-metric-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--text)}
+.dp-metric-label{font-size:9.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-top:3px}
+.dp-timeline{position:relative;padding-left:16px;border-left:2px solid var(--border)}
+.dp-tl-item{margin-bottom:14px;position:relative}
+.dp-tl-dot{position:absolute;left:-20px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--navy);border:2px solid var(--surface)}
+.dp-tl-date{font-size:10px;color:var(--text-3);font-weight:600;margin-bottom:2px}
+.dp-tl-label{font-size:12px;color:var(--text);font-weight:500}
+
+/* HEALTH DAYS */
+.hd-month{margin-bottom:24px}
+.hd-month-header{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);padding:8px 0;margin-bottom:10px;border-bottom:2px solid var(--navy);display:flex;align-items:center;gap:8px;text-transform:uppercase}
+.hd-month-count{font-size:10px;color:var(--text-3);font-weight:400}
+.hd-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px}
+.hd-date{min-width:80px;font-size:11px;font-weight:700;color:var(--text-3)}
+.hd-name{flex:1}
+.hd-name-en{font-weight:600;color:var(--text)}
+.hd-name-ar{font-size:10px;color:var(--text-3);font-family:'IBM Plex Sans Arabic',sans-serif;margin-top:1px}
+
+/* EVENTS */
+.events-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.event-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+.event-card-top{padding:16px;border-bottom:1px solid var(--border)}
+.event-card-date{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;line-height:1}
+.event-card-month{font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px}
+.event-card-body{padding:14px 16px}
+.event-card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px;line-height:1.3}
+.event-card-desc{font-size:11px;color:var(--text-3);line-height:1.5;margin-bottom:10px}
+.event-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
+
+.lib-controls{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.lib-search{flex:1;min-width:180px;font-size:12px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;background:var(--surface);color:var(--text)}
+.scrollable-x{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img class="sidebar-logo-img" src="logo.jpg" alt="IMC">
+      <div class="sidebar-logo-text">Marketing<br>Strategy 2026</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" onclick="nav('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</div>
+      <div class="nav-item" onclick="nav('timeline',this)"><span class="nav-icon">◎</span> Timeline</div>
+      <div class="nav-item" onclick="nav('smcalendar',this)"><span class="nav-icon">▤</span> SM Calendar</div>
+      <div class="nav-section">Campaigns</div>
+      <div class="nav-item" onclick="nav('campaigns',this)"><span class="nav-icon">◈</span> All Campaigns</div>
+      <div class="nav-item" onclick="nav('events',this)"><span class="nav-icon">◆</span> Events</div>
+      <div class="nav-item" onclick="nav('deptcampaigns',this)"><span class="nav-icon">▣</span> Dept Campaigns</div>
+      <div class="nav-item" onclick="nav('healthdays',this)"><span class="nav-icon">♡</span> Health Days</div>
+      <div class="nav-item" onclick="nav('library',this)"><span class="nav-icon">▨</span> Content Library</div>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="sync-dot"></span>Live · Firebase<br>
+      Last update: <span id="sync-time">—</span><br>
+      <span style="opacity:0.45">IMC Marketing Strategy 2026</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="topbar-title">Dashboard</div>
+        <div class="page-sub" id="topbar-sub">Performance overview — current month</div>
+      </div>
+      <div class="topbar-right">
+        <div class="date-range-wrap" id="dash-daterange" style="display:none">
+          <span>From</span><input type="date" id="date-from">
+          <span>to</span><input type="date" id="date-to">
+          <button class="btn btn-sm" onclick="renderDashboard()">Apply</button>
+        </div>
+        <button class="btn btn-primary" onclick="window.print()">Export</button>
+      </div>
+    </div>
+    <div class="content-area">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="metrics-grid metrics-grid-wide" id="dash-metrics-row1">
+          <div class="metric-card" style="--accent:var(--navy)"><div class="metric-label">Instagram Reach</div><div class="metric-icon">📸</div><div class="metric-value" id="m-reach">—</div><div class="metric-delta" id="m-reach-d"></div></div>
+          <div class="metric-card" style="--accent:var(--blue)"><div class="metric-label">Total Impressions</div><div class="metric-icon">👁</div><div class="metric-value" id="m-imp">—</div><div class="metric-delta" id="m-imp-d"></div></div>
+          <div class="metric-card" style="--accent:var(--teal)"><div class="metric-label">Engagements</div><div class="metric-icon">💬</div><div class="metric-value" id="m-eng">—</div><div class="metric-delta" id="m-eng-d"></div></div>
+          <div class="metric-card" style="--accent:var(--green)"><div class="metric-label">Website Visits</div><div class="metric-icon">🌐</div><div class="metric-value" id="m-web">—</div><div class="metric-delta" id="m-web-d"></div></div>
+          <div class="metric-card" style="--accent:var(--gold)"><div class="metric-label">Engagement Rate</div><div class="metric-icon">📈</div><div class="metric-value" id="m-engr">—</div><div class="metric-delta" id="m-engr-d"></div></div>
+        </div>
+        <div class="metrics-grid" id="dash-metrics-row2">
+          <div class="metric-card" style="--accent:#E1306C"><div class="metric-label">Instagram Followers</div><div class="metric-icon">📷</div><div class="metric-value" id="m-ig">—</div><div class="metric-delta" id="m-ig-d"></div></div>
+          <div class="metric-card" style="--accent:#000"><div class="metric-label">TikTok Views</div><div class="metric-icon">🎵</div><div class="metric-value" id="m-tiktok">—</div><div class="metric-delta" id="m-tiktok-d"></div></div>
+          <div class="metric-card" style="--accent:#1DA1F2"><div class="metric-label">X Reach</div><div class="metric-icon">𝕏</div><div class="metric-value" id="m-x">—</div><div class="metric-delta" id="m-x-d"></div></div>
+          <div class="metric-card" style="--accent:#0A66C2"><div class="metric-label">LinkedIn Reach</div><div class="metric-icon">💼</div><div class="metric-value" id="m-li">—</div><div class="metric-delta" id="m-li-d"></div></div>
+        </div>
+        <div class="two-col">
+          <div class="metric-card" style="--accent:var(--purple)"><div class="metric-label">SM Messages Received</div><div class="metric-icon">✉️</div><div class="metric-value" id="m-msg">—</div><div class="metric-delta" id="m-msg-d"></div></div>
+          <div class="metric-card" style="--accent:var(--orange)"><div class="metric-label">PR Mentions</div><div class="metric-icon">📰</div><div class="metric-value" id="m-pr">—</div><div class="metric-delta" id="m-pr-d"></div></div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Monthly Social Media Performance</div></div>
+            <div class="chart-container"><canvas id="perfChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Website Performance — Monthly Visitors</div></div>
+            <div class="chart-container"><canvas id="webChart"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Active & Upcoming Campaigns</div><span class="card-link" onclick="nav('campaigns',document.querySelectorAll('.nav-item')[3])">View all →</span></div>
+          <div id="dash-campaigns"><div class="loading">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="page" id="page-timeline">
+        <div class="timeline-wrap" id="timeline-container"><div class="loading">Loading timeline...</div></div>
+      </div>
+
+      <!-- SM CALENDAR -->
+      <div class="page" id="page-smcalendar">
+        <div class="cal-controls">
+          <select class="cal-select" id="cal-month" onchange="renderCalendar()"></select>
+          <select class="cal-select" id="cal-dept" onchange="renderCalendar()"><option value="">All Departments</option></select>
+          <select class="cal-select" id="cal-entity" onchange="renderCalendar()">
+            <option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option>
+          </select>
+          <select class="cal-select" id="cal-channel" onchange="renderCalendar()">
+            <option value="">All Channels</option><option>Instagram</option><option>TikTok</option><option>Facebook</option><option>X</option><option>LinkedIn</option><option>Print</option>
+          </select>
+        </div>
+        <div class="cal-grid-wrap">
+          <div class="cal-weekdays">
+            <div class="cal-wd">Sun</div><div class="cal-wd">Mon</div><div class="cal-wd">Tue</div><div class="cal-wd">Wed</div><div class="cal-wd">Thu</div><div class="cal-wd">Fri</div><div class="cal-wd">Sat</div>
+          </div>
+          <div class="cal-days" id="cal-days"><div class="loading">Loading calendar...</div></div>
+        </div>
+        <div class="cal-legend" id="cal-legend"></div>
+      </div>
+
+      <!-- ALL CAMPAIGNS -->
+      <div class="page" id="page-campaigns">
+        <div class="cal-controls" style="margin-bottom:16px">
+          <input class="lib-search" style="flex:1;min-width:160px;max-width:280px" type="text" placeholder="Search campaigns..." oninput="renderCampaigns(this.value)">
+          <select class="cal-select" id="camp-entity-filter" onchange="renderCampaigns()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="camp-status-filter" onchange="renderCampaigns()"><option value="">All Status</option><option>Planned</option><option>In Production</option><option>Ready</option><option>Published</option><option>Cancelled</option></select>
+        </div>
+        <div class="scrollable-x">
+          <table class="camp-table">
+            <thead><tr><th>Campaign Name</th><th>Department</th><th>Entity</th><th>Dates</th><th>Channels</th><th>Reach</th><th>Impressions</th><th>Engagements</th><th>Status</th><th>Assigned To</th><th>Post Link</th></tr></thead>
+            <tbody id="camp-tbody"><tr><td colspan="11" class="loading">Loading campaigns...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- EVENTS -->
+      <div class="page" id="page-events">
+        <div class="cal-controls" style="margin-bottom:16px">
+          <select class="cal-select" id="evt-entity-filter" onchange="renderEvents()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="evt-status-filter" onchange="renderEvents()"><option value="">All Status</option><option>Upcoming</option><option>Live</option><option>Past</option></select>
+        </div>
+        <div class="events-grid" id="events-grid"><div class="loading">Loading events...</div></div>
+      </div>
+
+      <!-- DEPT CAMPAIGNS -->
+      <div class="page" id="page-deptcampaigns">
+        <div class="dept-tabs" id="dept-tabs"></div>
+        <div id="dept-views"></div>
+      </div>
+
+      <!-- HEALTH DAYS -->
+      <div class="page" id="page-healthdays">
+        <div class="lib-controls">
+          <input class="lib-search" type="text" placeholder="Search health days..." oninput="renderHealthDays(this.value)">
+          <select class="cal-select" id="hd-type-filter" onchange="renderHealthDays()"><option value="">All Types</option><option value="MOH Health Day">MOH Health Days</option><option value="Saudi Occasion">Saudi Occasions</option><option value="Islamic Occasion">Islamic Occasions</option><option value="IMC Campaign">IMC Campaigns</option></select>
+          <select class="cal-select" id="hd-dept-filter" onchange="renderHealthDays()"><option value="">All Departments</option></select>
+        </div>
+        <div id="hd-container"><div class="loading">Loading health days...</div></div>
+      </div>
+
+      <!-- CONTENT LIBRARY -->
+      <div class="page" id="page-library">
+        <div class="lib-controls">
+          <input class="lib-search" type="text" placeholder="Search by title, department, keyword..." oninput="renderLibrary(this.value)">
+          <select class="cal-select" id="lib-dept-filter" onchange="renderLibrary()"><option value="">All Departments</option></select>
+          <select class="cal-select" id="lib-type-filter" onchange="renderLibrary()"><option value="">All Types</option><option>Post</option><option>Reel</option><option>Video</option><option>Story</option><option>Carousel</option></select>
+          <select class="cal-select" id="lib-channel-filter" onchange="renderLibrary()"><option value="">All Channels</option><option>Instagram</option><option>TikTok</option><option>Facebook</option><option>LinkedIn</option><option>X</option></select>
+          <select class="cal-select" id="lib-status-filter" onchange="renderLibrary()"><option value="">All Status</option><option>Published</option><option>Ready</option><option>In Production</option><option>Planned</option></select>
+        </div>
+        <div class="scrollable-x">
+          <table class="camp-table">
+            <thead><tr><th>#</th><th>Title</th><th>Department</th><th>Channel</th><th>Type</th><th>Date Published</th><th>Reach</th><th>Engagements</th><th>Status</th><th>Post Link</th></tr></thead>
+            <tbody id="lib-tbody"><tr><td colspan="10" class="loading">Loading content library...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail()"></div>
+<div class="detail-panel" id="detail-panel">
+  <div class="dp-header">
+    <div><div class="dp-title" id="dp-title">Campaign</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap" id="dp-badges"></div></div>
+    <button class="dp-close" onclick="closeDetail()">✕</button>
+  </div>
+  <div class="dp-body" id="dp-body"></div>
+</div>
+
+<script type="module">
+import {
+  watchInitiatives, watchMetrics,
+  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG
+} from './firebase-data.js';
+
+// ── STATE ──────────────────────────────────────────────────────────────
+let ALL = [];      // all initiatives
+let METRICS = [];
+
+const PAGE_META = {
+  dashboard:     {title:'Dashboard', sub:'Performance overview — current month'},
+  timeline:      {title:'Strategy Timeline', sub:'Monthly department focus — executive view'},
+  smcalendar:    {title:'SM Calendar', sub:'Social media content calendar'},
+  campaigns:     {title:'All Campaigns', sub:'Full campaign registry — performance & reach'},
+  events:        {title:'Events', sub:'Seminars, health talks, and community events'},
+  deptcampaigns: {title:'Department Campaigns', sub:'Click any campaign for the full brief, timeline & performance'},
+  healthdays:    {title:'Health Days Calendar', sub:'Saudi MOH health days, Islamic and national occasions'},
+  library:       {title:'Content Library', sub:'Browse and link to all published content'},
+};
+
+window.nav = function(id, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  const m = PAGE_META[id];
+  document.getElementById('topbar-title').textContent = m.title;
+  document.getElementById('topbar-sub').textContent = m.sub;
+  document.getElementById('dash-daterange').style.display = id==='dashboard'?'flex':'none';
+  renderAll();
+}
+
+function initDates() {
+  const now = new Date();
+  document.getElementById('date-from').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  document.getElementById('date-to').value = now.toISOString().split('T')[0];
+}
+
+function populateFilters() {
+  const deptOptionsHtml = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  ['cal-dept','hd-dept-filter','lib-dept-filter'].forEach(id=>{
+    document.getElementById(id).innerHTML += deptOptionsHtml;
+  });
+  // month select for calendar: generate 12 months starting from current
+  const now = new Date();
+  const monthSel = document.getElementById('cal-month');
+  for(let i=-1;i<11;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+    const opt = document.createElement('option');
+    opt.value = `${d.getMonth()}-${d.getFullYear()}`;
+    opt.textContent = d.toLocaleString('en',{month:'long',year:'numeric'});
+    if(i===0) opt.selected = true;
+    monthSel.appendChild(opt);
+  }
+  document.getElementById('cal-legend').innerHTML = DEPARTMENTS.map(d=>
+    `<span class="leg"><span class="leg-dot" style="background:${DEPT_BG[d]||'#EEF0FF'}"></span>${d}</span>`
+  ).join('') + `<span class="leg"><span class="leg-dot" style="background:#FFF6E0"></span>Health Day</span>`;
+}
+
+// ── DATA LOAD ─────────────────────────────────────────────────────────
+watchInitiatives(data => {
+  ALL = data;
+  document.getElementById('sync-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  renderAll();
+});
+watchMetrics(data => {
+  METRICS = data;
+  renderAll();
+});
+
+function renderAll() {
+  const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+  if(!activePage) return;
+  if(activePage==='dashboard') renderDashboard();
+  if(activePage==='timeline') renderTimeline();
+  if(activePage==='smcalendar') renderCalendar();
+  if(activePage==='campaigns') renderCampaigns();
+  if(activePage==='events') renderEvents();
+  if(activePage==='deptcampaigns') renderDeptCampaigns();
+  if(activePage==='healthdays') renderHealthDays();
+  if(activePage==='library') renderLibrary();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────
+function fmt(n) {
+  const num = parseFloat(n);
+  if(isNaN(num)) return '—';
+  if(num>=1000000) return (num/1000000).toFixed(1)+'M';
+  if(num>=1000) return (num/1000).toFixed(0)+'K';
+  return num.toLocaleString();
+}
+function statusBadge(s) {
+  const map={'Planned':'b-planned','In Production':'b-production','Ready':'b-ready','Published':'b-published','Cancelled':'b-cancelled'};
+  return `<span class="badge ${map[s]||'b-planned'}">${s||'Planned'}</span>`;
+}
+function entityBadge(arr) {
+  if(!arr || !arr.length) return '';
+  const map={'IMC':'ent-imc','Makkah':'ent-makkah','TFC':'ent-tfc','JP':'ent-jp','RSM':'ent-rsm'};
+  return arr.map(e=>`<span class="badge ${map[e]||'ent-imc'}">${e}</span>`).join(' ');
+}
+function deptStyle(d) {
+  return {bg: DEPT_BG[d]||'#EEF0FF', t: DEPT_COLORS[d]||'#2E3BAA'};
+}
+function getMetric(name) { return METRICS.find(m=>m.metricName===name)||null; }
+function metricDelta(m) {
+  if(!m) return '';
+  const cur=m.currentValue, prev=m.previousValue;
+  if(!cur || !prev) return '';
+  const pct = Math.round((cur-prev)/prev*100);
+  return pct>=0 ? `<span class="up">▲ ${pct}% vs last period</span>` : `<span class="down">▼ ${Math.abs(pct)}% vs last period</span>`;
+}
+function eventStatus(start, end) {
+  const today = new Date().setHours(0,0,0,0);
+  const s = start ? new Date(start).setHours(0,0,0,0) : null;
+  const e = end ? new Date(end).setHours(0,0,0,0) : s;
+  if(s===null) return 'Upcoming';
+  if(today < s) return 'Upcoming';
+  if(today > e) return 'Past';
+  return 'Live';
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────
+let chartPerf=null, chartWeb=null;
+function renderDashboard() {
+  const pairs = [
+    ['m-reach','Instagram Reach'],['m-imp','Instagram Impressions'],['m-eng','Instagram Engagements'],
+    ['m-web','Website Visits'],['m-engr','Instagram Engagement Rate'],['m-ig','Instagram Followers'],
+    ['m-tiktok','TikTok Views'],['m-x','X Reach'],['m-li','LinkedIn Reach'],
+    ['m-msg','SM Messages Received'],['m-pr','PR Mentions'],
+  ];
+  pairs.forEach(([vid,name])=>{
+    const m = getMetric(name);
+    document.getElementById(vid).textContent = m ? fmt(m.currentValue)+(m.unit==='Percentage'?'%':'') : '—';
+    document.getElementById(vid+'-d').innerHTML = metricDelta(m);
+  });
+
+  const shown = ALL.filter(i=>i.type==='Campaign' && ['In Production','Ready','Published','Planned'].includes(i.status)).slice(0,6);
+  document.getElementById('dash-campaigns').innerHTML = shown.length
+    ? shown.map(c=>`<div class="camp-row">
+        <div class="camp-dot" style="background:${deptStyle(c.department).t}"></div>
+        <span class="camp-name">${c.title}</span>
+        <span class="camp-dept">${c.department||''}</span>
+        <span style="margin-left:4px">${entityBadge(c.entity)}</span>
+        ${statusBadge(c.status)}
+      </div>`).join('')
+    : '<div class="empty-state"><div class="empty-state-icon">📋</div>No campaigns yet — add one in the admin panel</div>';
+
+  const labels=['Jan','Feb','Mar','Apr','May','Jun'];
+  const imp = getMetric('Instagram Impressions');
+  const eng = getMetric('Instagram Engagements');
+  const web = getMetric('Website Visits');
+  const impData=[180000,210000,290000,255000,300000,(imp?.currentValue)||310000];
+  const engData=[6000,7200,9100,8400,9200,(eng?.currentValue)||9840];
+  const visData=[8200,9400,11300,10200,11800,(web?.currentValue)||12400];
+
+  if(chartPerf) chartPerf.destroy();
+  chartPerf = new Chart(document.getElementById('perfChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Impressions',data:impData,backgroundColor:'#00539B',borderRadius:3,yAxisID:'y'},
+      {label:'Engagements',data:engData,backgroundColor:'#00A3D9',borderRadius:3,yAxisID:'y2'},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}}},y2:{position:'right',ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{display:false}}}}
+  });
+  if(chartWeb) chartWeb.destroy();
+  chartWeb = new Chart(document.getElementById('webChart'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Visitors',data:visData,borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.1)',tension:0.4,fill:true,pointRadius:3,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}}}}}
+  });
+}
+
+// ── TIMELINE ─────────────────────────────────────────────────────────
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function renderTimeline() {
+  const now = new Date();
+  const container = document.getElementById('timeline-container');
+  const monthMap = {};
+  ALL.forEach(i => {
+    if(!i.startDate) return;
+    const d = new Date(i.startDate);
+    if(isNaN(d)) return;
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!monthMap[key]) monthMap[key]=[];
+    monthMap[key].push(i);
+  });
+  let months = Object.keys(monthMap).sort();
+  if(!months.length) {
+    for(let i=0;i<6;i++){
+      const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+  }
+  let html = '<div class="timeline-spine"></div>';
+  months.forEach(key=>{
+    const [y,m] = key.split('-').map(Number);
+    const monthDate = new Date(y,m-1,1);
+    const isCurrent = monthDate.getMonth()===now.getMonth() && monthDate.getFullYear()===now.getFullYear();
+    const isPastMonth = monthDate < new Date(now.getFullYear(), now.getMonth(), 1);
+    const items = monthMap[key]||[];
+    const deptCount={};
+    items.forEach(i=>{ if(i.department){ deptCount[i.department]=(deptCount[i.department]||0)+1; } });
+    const focusDepts = Object.entries(deptCount).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([d])=>d);
+    html += `<div class="tl-month${isCurrent?' current':''}${isPastMonth?' past':''}">
+      <div class="tl-month-label"><div class="tl-month-name">${MONTH_NAMES[m-1].substring(0,3)}</div><div class="tl-month-year">${y}</div></div>
+      <div class="tl-dot"></div>
+      <div class="tl-content">
+        ${focusDepts.length?`<div class="tl-dept-list">${focusDepts.map(d=>`<div class="tl-dept-chip"><div class="tl-dept-chip-dot" style="background:${deptStyle(d).t}"></div>${d}</div>`).join('')}</div>`:''}
+        <div class="tl-campaigns-wrap">
+          ${items.length ? items.map(i=>`<div class="tl-camp-row">
+            <div class="tl-camp-row-dot" style="background:${deptStyle(i.department).t}"></div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span class="tl-camp-row-name">${i.title}</span>${statusBadge(i.status)}${entityBadge(i.entity)}
+              </div>
+              ${i.objective?`<div class="tl-camp-row-desc">${i.objective}</div>`:''}
+            </div>
+            <div class="tl-camp-row-meta">${i.endDate?'→ '+i.endDate:''}</div>
+          </div>`).join('') : '<div class="tl-no-camps">No initiatives scheduled</div>'}
+        </div>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+// ── SM CALENDAR (type=Content) ──────────────────────────────────────
+function renderCalendar() {
+  const [m,y] = document.getElementById('cal-month').value.split('-').map(Number);
+  const deptF = document.getElementById('cal-dept').value;
+  const entityF = document.getElementById('cal-entity').value;
+  const chanF = document.getElementById('cal-channel').value;
+  const first = new Date(y,m,1), last = new Date(y,m+1,0), today = new Date();
+
+  const items = ALL.filter(i=> i.type==='Content' || i.type==='Health Day');
+
+  let html='';
+  for(let i=0;i<first.getDay();i++) html+=`<div class="cal-cell other-month"></div>`;
+  for(let d=1;d<=last.getDate();d++){
+    const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = today.getFullYear()===y && today.getMonth()===m && today.getDate()===d;
+    const dayItems = items.filter(i=>{
+      if((i.startDate||'')!==dateStr) return false;
+      if(deptF && i.department!==deptF) return false;
+      if(entityF && !(i.entity||[]).includes(entityF)) return false;
+      if(chanF && !(i.channels||[]).includes(chanF)) return false;
+      return true;
+    });
+    html += `<div class="cal-cell${isToday?' today':''}">
+      <div class="cal-day-num">${d}</div>
+      ${dayItems.slice(0,3).map(i=>{
+        const ds = i.type==='Health Day' ? {bg:'#FFF6E0',t:'#7A4A00'} : deptStyle(i.department);
+        return `<div class="cal-ev" style="background:${ds.bg};color:${ds.t}" title="${i.title}">${i.title}</div>`;
+      }).join('')}
+      ${dayItems.length>3?`<div style="font-size:9px;color:var(--text-3);padding:1px 4px">+${dayItems.length-3} more</div>`:''}
+    </div>`;
+  }
+  const rem=7-((first.getDay()+last.getDate())%7);
+  if(rem<7) for(let i=0;i<rem;i++) html+=`<div class="cal-cell other-month"></div>`;
+  document.getElementById('cal-days').innerHTML=html;
+}
+
+// ── ALL CAMPAIGNS (type=Campaign) ───────────────────────────────────
+function renderCampaigns(filter='') {
+  const entityF = document.getElementById('camp-entity-filter').value;
+  const statusF = document.getElementById('camp-status-filter').value;
+  const q = filter.toLowerCase();
+  const data = ALL.filter(i=>{
+    if(i.type!=='Campaign') return false;
+    if(entityF && !(i.entity||[]).includes(entityF)) return false;
+    if(statusF && i.status!==statusF) return false;
+    if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById('camp-tbody').innerHTML = data.length
+    ? data.map(c=>{
+        const ds = deptStyle(c.department);
+        return `<tr>
+          <td style="font-weight:600">${c.title}</td>
+          <td><span class="badge" style="background:${ds.bg};color:${ds.t}">${c.department||''}</span></td>
+          <td>${entityBadge(c.entity)}</td>
+          <td style="font-size:10px;color:var(--text-3);white-space:nowrap">${c.startDate||''}${c.endDate?' → '+c.endDate:''}</td>
+          <td style="font-size:10px;color:var(--text-3)">${(c.channels||[]).join(', ')}</td>
+          <td style="font-weight:600">${c.reach?fmt(c.reach):'—'}</td>
+          <td style="font-weight:600">${c.impressions?fmt(c.impressions):'—'}</td>
+          <td style="font-weight:600">${c.engagements?fmt(c.engagements):'—'}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td style="font-size:10px;color:var(--text-3)">${c.assignedTo||''}</td>
+          <td>${c.postLink?`<a class="post-link" href="${c.postLink}" target="_blank" rel="noopener">🔗 View Post</a>`:'—'}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="11" class="loading" style="padding:20px">No campaigns found</td></tr>';
+}
+
+// ── EVENTS (type=Event) ─────────────────────────────────────────────
+function renderEvents() {
+  const entityF = document.getElementById('evt-entity-filter').value;
+  const statusF = document.getElementById('evt-status-filter').value;
+  let data = ALL.filter(i=>i.type==='Event').map(e=>({...e, computedStatus: eventStatus(e.startDate, e.endDate)}));
+  if(entityF) data = data.filter(e=>(e.entity||[]).includes(entityF));
+  if(statusF) data = data.filter(e=>e.computedStatus===statusF);
+  const statusClass = {'Upcoming':'b-upcoming','Live':'b-live','Past':'b-past'};
+  document.getElementById('events-grid').innerHTML = data.length
+    ? data.map(e=>{
+        const d = e.startDate ? new Date(e.startDate) : null;
+        const ds = deptStyle(e.department);
+        return `<div class="event-card">
+          <div class="event-card-top" style="background:${ds.bg}">
+            <div class="event-card-date" style="color:${ds.t}">${d?d.getDate():'—'}</div>
+            <div class="event-card-month" style="color:${ds.t}">${d?d.toLocaleString('en',{month:'short',year:'numeric'}):''}</div>
+          </div>
+          <div class="event-card-body">
+            <div class="event-card-title">${e.title}</div>
+            <div class="event-card-desc">${e.objective||''}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span class="badge" style="background:${ds.bg};color:${ds.t}">${e.department||''}</span>
+              ${entityBadge(e.entity)}
+              <span class="badge ${statusClass[e.computedStatus]}">${e.computedStatus}</span>
+            </div>
+            ${e.postLink?`<div style="margin-top:8px"><a class="post-link" href="${e.postLink}" target="_blank">🔗 View Campaign</a></div>`:''}
+          </div>
+          <div class="event-card-footer"><span>${(e.channels||[]).join(', ')||'Multi-channel'}</span><span>${e.assignedTo||''}</span></div>
+        </div>`;
+      }).join('')
+    : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📅</div>No events found</div>';
+}
+
+// ── DEPT CAMPAIGNS ───────────────────────────────────────────────────
+let deptTabsBuilt = false;
+function renderDeptCampaigns() {
+  if(!deptTabsBuilt) {
+    document.getElementById('dept-tabs').innerHTML = DEPARTMENTS.map((d,i)=>
+      `<div class="dept-tab${i===0?' active':''}" onclick="switchDept(${i},this)">${d.replace("'s Health",'').replace(' & Chronic','').replace(' & Plastics','')}</div>`
+    ).join('');
+    deptTabsBuilt = true;
+  }
+  document.getElementById('dept-views').innerHTML = DEPARTMENTS.map((dept,i)=>{
+    const ds = deptStyle(dept);
+    const camps = ALL.filter(c=>c.type==='Campaign' && c.department===dept);
+    const pubCamps = camps.filter(c=>c.status==='Published');
+    const totalReach = pubCamps.reduce((s,c)=>s+(c.reach||0),0);
+    return `<div class="dept-view${i===0?' active':''}" id="dept-view-${i}">
+      <div class="dept-banner" style="background:${ds.bg};color:${ds.t}">
+        <div><div class="dept-banner-title">${dept}</div><div class="dept-banner-sub">${camps.length} campaign${camps.length!==1?'s':''} · ${pubCamps.length} published</div></div>
+        ${totalReach?`<div class="dept-banner-stat"><div class="dept-banner-stat-val">${fmt(totalReach)}</div><div class="dept-banner-stat-label">Total Reach</div></div>`:''}
+      </div>
+      <div class="dept-camp-grid">
+        ${camps.length ? camps.map(c=>`<div class="dept-camp-card" onclick='openDetail(${JSON.stringify(c).replace(/'/g,"&apos;")})'>
+          <div class="dept-camp-card-header" style="background:${ds.bg}"><div class="dept-camp-card-name" style="color:${ds.t}">${c.title}</div>${statusBadge(c.status)}</div>
+          <div style="padding:10px 16px 6px;display:flex;gap:6px;flex-wrap:wrap">${entityBadge(c.entity)}</div>
+          ${(c.reach||c.engagements||c.impressions)?`<div class="dept-camp-card-body">
+            ${c.reach?`<div class="dept-camp-card-stat"><strong>${fmt(c.reach)}</strong><span>Reach</span></div>`:''}
+            ${c.impressions?`<div class="dept-camp-card-stat"><strong>${fmt(c.impressions)}</strong><span>Impressions</span></div>`:''}
+            ${c.engagements?`<div class="dept-camp-card-stat"><strong>${fmt(c.engagements)}</strong><span>Engagements</span></div>`:''}
+          </div>`:''}
+          <div class="dept-camp-card-footer"><span>${c.startDate||'—'}${c.endDate?' → '+c.endDate:''}</span><span>${(c.channels||[]).join(', ')}</span></div>
+        </div>`).join('') : `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📋</div>No campaigns for this department yet</div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+window.switchDept = function(i, el) {
+  document.querySelectorAll('.dept-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.dept-view').forEach(v=>v.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('dept-view-'+i).classList.add('active');
+}
+
+// ── DETAIL PANEL ─────────────────────────────────────────────────────
+window.openDetail = function(c) {
+  document.getElementById('dp-title').textContent = c.title||'Campaign';
+  const ds = deptStyle(c.department);
+  document.getElementById('dp-badges').innerHTML = statusBadge(c.status)+' '+entityBadge(c.entity)+` <span class="badge" style="background:${ds.bg};color:${ds.t}">${c.department||''}</span>`;
+  document.getElementById('dp-body').innerHTML = `
+    <div class="dp-section">
+      <div class="dp-section-title">Campaign Brief</div>
+      <div class="dp-row"><span class="dp-label">Objective</span><span class="dp-val">${c.objective||'—'}</span></div>
+      <div class="dp-row"><span class="dp-label">Channels</span><span class="dp-val">${(c.channels||[]).join(', ')||'—'}</span></div>
+      <div class="dp-row"><span class="dp-label">Assigned To</span><span class="dp-val">${c.assignedTo||'—'}</span></div>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">Timeline</div>
+      <div class="dp-timeline">
+        <div class="dp-tl-item"><div class="dp-tl-dot"></div><div class="dp-tl-date">Start</div><div class="dp-tl-label">${c.startDate||'TBD'}</div></div>
+        ${c.endDate?`<div class="dp-tl-item"><div class="dp-tl-dot" style="background:var(--green)"></div><div class="dp-tl-date">End</div><div class="dp-tl-label">${c.endDate}</div></div>`:''}
+      </div>
+    </div>
+    ${(c.reach||c.impressions||c.engagements)?`<div class="dp-section">
+      <div class="dp-section-title">Performance</div>
+      <div class="dp-metrics">
+        ${c.reach?`<div class="dp-metric"><div class="dp-metric-val">${fmt(c.reach)}</div><div class="dp-metric-label">Reach</div></div>`:''}
+        ${c.impressions?`<div class="dp-metric"><div class="dp-metric-val">${fmt(c.impressions)}</div><div class="dp-metric-label">Impressions</div></div>`:''}
+        ${c.engagements?`<div class="dp-metric"><div class="dp-metric-val">${fmt(c.engagements)}</div><div class="dp-metric-label">Engagements</div></div>`:''}
+      </div>
+    </div>`:''}
+    ${c.postLink?`<div class="dp-section"><div class="dp-section-title">Published Content</div><a class="post-link" href="${c.postLink}" target="_blank">🔗 View Published Post</a></div>`:''}
+  `;
+  document.getElementById('detail-overlay').classList.add('open');
+  document.getElementById('detail-panel').classList.add('open');
+}
+window.closeDetail = function() {
+  document.getElementById('detail-overlay').classList.remove('open');
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+// ── HEALTH DAYS (type=Health Day) ───────────────────────────────────
+function renderHealthDays(filter='') {
+  const typeF = document.getElementById('hd-type-filter').value;
+  const deptF = document.getElementById('hd-dept-filter').value;
+  const q = filter.toLowerCase();
+  const data = ALL.filter(i=>{
+    if(i.type!=='Health Day') return false;
+    if(typeF && i.hdCategory!==typeF) return false;
+    if(deptF && i.department!==deptF) return false;
+    if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const byMonth = {};
+  data.forEach(h=>{
+    const d = h.startDate ? new Date(h.startDate) : null;
+    const m = d ? MONTH_NAMES[d.getMonth()] : 'Unknown';
+    if(!byMonth[m]) byMonth[m]=[];
+    byMonth[m].push(h);
+  });
+  document.getElementById('hd-container').innerHTML = Object.keys(byMonth).length
+    ? Object.entries(byMonth).map(([month,days])=>`
+      <div class="hd-month">
+        <div class="hd-month-header">${month} <span class="hd-month-count">${days.length} day${days.length!==1?'s':''}</span></div>
+        ${days.map(h=>{
+          const t = h.hdCategory||'MOH Health Day';
+          const tc = t==='Saudi Occasion'||t==='Islamic Occasion' ? 'b-occasion' : t==='IMC Campaign' ? 'b-imc' : 'b-moh';
+          const ds = deptStyle(h.department);
+          return `<div class="hd-row">
+            <span class="hd-date">${(h.startDate||'').substring(5)||''}</span>
+            <div class="hd-name"><div class="hd-name-en">${h.title||''}</div><div class="hd-name-ar">${h.nameAr||''}</div></div>
+            <span class="badge ${tc}" style="margin-left:8px">${t}</span>
+            <span class="badge" style="background:${ds.bg};color:${ds.t};margin-left:6px">${h.department||''}</span>
+          </div>`;
+        }).join('')}
+      </div>`).join('')
+    : '<div class="empty-state"><div class="empty-state-icon">📅</div>No health days found</div>';
+}
+
+// ── CONTENT LIBRARY (type=Content) ──────────────────────────────────
+function renderLibrary(filter='') {
+  const deptF = document.getElementById('lib-dept-filter').value;
+  const typeF = document.getElementById('lib-type-filter').value;
+  const chanF = document.getElementById('lib-channel-filter').value;
+  const statF = document.getElementById('lib-status-filter').value;
+  const q = filter.toLowerCase();
+  const data = ALL.filter(i=>{
+    if(i.type!=='Content') return false;
+    if(deptF && i.department!==deptF) return false;
+    if(typeF && i.contentType!==typeF) return false;
+    if(chanF && !(i.channels||[]).includes(chanF)) return false;
+    if(statF && i.status!==statF) return false;
+    if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById('lib-tbody').innerHTML = data.length
+    ? data.map((c,idx)=>{
+        const ds = deptStyle(c.department);
+        return `<tr>
+          <td style="color:var(--text-3);font-size:11px">${idx+1}</td>
+          <td style="font-weight:600;max-width:220px">${c.title}</td>
+          <td><span class="badge" style="background:${ds.bg};color:${ds.t}">${c.department||'—'}</span></td>
+          <td style="font-size:11px;color:var(--text-2)">${(c.channels||[]).join(', ')||'—'}</td>
+          <td style="font-size:11px;color:var(--text-2)">${c.contentType||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${c.startDate||'—'}</td>
+          <td style="font-weight:600">${c.reach?fmt(c.reach):'—'}</td>
+          <td style="font-weight:600">${c.engagements?fmt(c.engagements):'—'}</td>
+          <td>${statusBadge(c.status)}</td>
+          <td>${c.postLink?`<a class="post-link" href="${c.postLink}" target="_blank" rel="noopener">🔗 View Post</a>`:'—'}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="10" class="empty-state">No content found</td></tr>';
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────
+initDates();
+populateFilters();
+</script>
+</body>
+</html>
