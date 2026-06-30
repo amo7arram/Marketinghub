@@ -5,8 +5,8 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-  getDocs, onSnapshot, query, orderBy, Timestamp
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc,
+  getDocs, onSnapshot, query, orderBy, where, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -40,6 +40,13 @@ export function logout() {
 }
 export function watchAuth(callback) {
   return onAuthStateChanged(auth, callback);
+}
+
+// Looks up this user's role from the 'roles' collection (doc ID = user UID).
+// Returns 'admin', 'coordinator', or null if no role has been assigned.
+export async function getUserRole(uid) {
+  const snap = await getDoc(doc(db, "roles", uid));
+  return snap.exists() ? snap.data().role : null;
 }
 
 // ── INITIATIVES CRUD ────────────────────────────────────────────────────
@@ -138,6 +145,25 @@ export function addRequest(data) {
 
 export function deleteRequest(id) {
   return deleteDoc(doc(db, REQUESTS, id));
+}
+
+export function updateRequest(id, data) {
+  return updateDoc(doc(db, REQUESTS, id), data);
+}
+
+export const DAILY_REQUEST_LIMIT = 5;
+
+// Returns how many requests this email has submitted since midnight today
+export async function getTodayRequestCount(email) {
+  const startOfDay = new Date();
+  startOfDay.setHours(0,0,0,0);
+  const q = query(
+    collection(db, REQUESTS),
+    where("submittedBy", "==", email),
+    where("createdAt", ">=", Timestamp.fromDate(startOfDay))
+  );
+  const snap = await getDocs(q);
+  return snap.size;
 }
 
 export const REQUEST_TYPES = [

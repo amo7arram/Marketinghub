@@ -62,6 +62,8 @@ table{width:100%;border-collapse:collapse;background:var(--surface);border-radiu
 th{background:var(--navy);color:#fff;padding:10px 12px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
 td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
 tr:hover td{background:var(--bg)}
+tr.row-done td{background:#EAF8F0}
+tr.row-done:hover td{background:#DCF2E5}
 .row-actions{display:flex;gap:6px}
 .badge{display:inline-flex;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px}
 .b-planned{background:#E4EDFF;color:#1649A3}
@@ -158,17 +160,27 @@ tr:hover td{background:var(--bg)}
         <button class="btn btn-primary" onclick="openForm()">+ New Initiative</button>
       </div>
       <table>
-        <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th>Dates</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
     <!-- REQUESTS PAGE -->
     <div class="page" id="page-requests">
-      <div class="toolbar"><div style="font-size:12px;color:var(--text-3)">Submitted via the coordinator request form — read-only log</div></div>
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select" id="req-dept-filter" onchange="renderRequestsTable()"><option value="">All Departments</option></select>
+          <select class="filter-select" id="req-type-filter" onchange="renderRequestsTable()"><option value="">All Request Types</option></select>
+          <select class="filter-select" id="req-status-filter" onchange="renderRequestsTable()"><option value="">All</option><option value="pending">Pending</option><option value="done">Done</option></select>
+        </div>
+        <div style="font-size:12px;color:var(--text-3)">Submitted via the coordinator request form</div>
+      </div>
       <table>
-        <thead><tr><th>Submitted</th><th>Title</th><th>Department</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th></th></tr></thead>
-        <tbody id="requests-table-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        <thead><tr>
+          <th onclick="toggleReqSort()" style="cursor:pointer;user-select:none">Submitted <span id="req-sort-arrow">↓</span></th>
+          <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th></th>
+        </tr></thead>
+        <tbody id="requests-table-body"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -304,11 +316,11 @@ tr:hover td{background:var(--bg)}
 
 <script type="module">
 import {
-  login, logout, watchAuth,
+  login, logout, watchAuth, getUserRole,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
   getMetrics, watchMetrics, addMetric, updateMetric, deleteMetric,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
-  watchRequests, deleteRequest,
+  watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, HEALTH_DAY_CATEGORIES
 } from './firebase-data.js';
 
@@ -327,6 +339,8 @@ let unsubInitiatives = null;
 let unsubMetrics = null;
 let unsubResources = null;
 let unsubRequests = null;
+let dateSortDir = null; // null = no sort, 'asc', 'desc'
+let reqSortDir = 'desc'; // requests default newest-first
 
 // ── AUTH ───────────────────────────────────────────────────────────────
 window.doLogin = async function() {
@@ -345,8 +359,15 @@ window.doLogout = async function() {
   await logout();
 }
 
-watchAuth(user => {
+watchAuth(async user => {
   if(user) {
+    const role = await getUserRole(user.uid);
+    if(role !== 'admin') {
+      document.getElementById('login-error').textContent = 'This account does not have admin access.';
+      document.getElementById('login-error').style.display = 'block';
+      await logout();
+      return;
+    }
     document.getElementById('login-wrap').style.display = 'none';
     document.getElementById('app').classList.add('active');
     document.getElementById('user-email').textContent = user.email;
@@ -396,6 +417,9 @@ function populateStaticSelects() {
 
   const rType = document.getElementById('r-type');
   rType.innerHTML = RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
+
+  document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
 
   document.getElementById('type-switcher').innerHTML = TYPES.map(t=>
     `<div class="type-btn" data-type="${t}" onclick="selectType('${t}')">${t}</div>`
@@ -547,19 +571,33 @@ window.removeInitiative = async function(id, title) {
 // ── RENDER TABLE ──────────────────────────────────────────────────────
 const STATUS_CLASS = {'Planned':'b-planned','In Production':'b-production','Ready':'b-ready','Published':'b-published','Cancelled':'b-cancelled'};
 
+window.toggleSort = function() {
+  dateSortDir = dateSortDir==='asc' ? 'desc' : 'asc';
+  document.getElementById('sort-arrow').textContent = dateSortDir==='asc' ? '↑' : '↓';
+  renderTable();
+}
+
 window.renderTable = function() {
   const typeF = document.getElementById('f-type').value;
   const deptF = document.getElementById('f-dept').value;
   const statusF = document.getElementById('f-status').value;
   const q = document.getElementById('f-search').value.toLowerCase();
 
-  const filtered = ALL_INITIATIVES.filter(i=>{
+  let filtered = ALL_INITIATIVES.filter(i=>{
     if(typeF && i.type!==typeF) return false;
     if(deptF && i.department!==deptF) return false;
     if(statusF && i.status!==statusF) return false;
     if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
     return true;
   });
+
+  if(dateSortDir) {
+    filtered = [...filtered].sort((a,b)=>{
+      const da = a.startDate || '';
+      const db = b.startDate || '';
+      return dateSortDir==='asc' ? da.localeCompare(db) : db.localeCompare(da);
+    });
+  }
 
   document.getElementById('table-body').innerHTML = filtered.length
     ? filtered.map(i=>`
@@ -694,29 +732,71 @@ window.renderResourcesTable = function() {
     : '<tr><td colspan="5" class="empty">No resources found</td></tr>';
 }
 
-// ── REQUESTS (read-only log + delete) ──────────────────────────────────
+// ── REQUESTS (filters, sort, mark done, delete) ─────────────────────────
 const PRIORITY_CLASS = {'Urgent':'b-cancelled','High':'b-production','Normal':'b-ready'};
+
+window.toggleReqSort = function() {
+  reqSortDir = reqSortDir==='asc' ? 'desc' : 'asc';
+  document.getElementById('req-sort-arrow').textContent = reqSortDir==='asc' ? '↑' : '↓';
+  renderRequestsTable();
+}
+
 window.removeRequest = async function(id, title) {
   if(!confirm(`Delete request "${title}" from the log?`)) return;
   try { await deleteRequest(id); showToast('Request removed'); }
   catch(e) { showToast('Delete failed: ' + e.message, true); }
 }
+
+window.markRequestDone = async function(id) {
+  try { await updateRequest(id, { done: true }); showToast('Marked as done'); }
+  catch(e) { showToast('Update failed: ' + e.message, true); }
+}
+window.markRequestPending = async function(id) {
+  try { await updateRequest(id, { done: false }); showToast('Marked as pending'); }
+  catch(e) { showToast('Update failed: ' + e.message, true); }
+}
+
 window.renderRequestsTable = function() {
-  document.getElementById('requests-table-body').innerHTML = ALL_REQUESTS.length
-    ? ALL_REQUESTS.map(r=>{
+  const deptF = document.getElementById('req-dept-filter').value;
+  const typeF = document.getElementById('req-type-filter').value;
+  const statusF = document.getElementById('req-status-filter').value;
+
+  let filtered = ALL_REQUESTS.filter(r=>{
+    if(deptF && r.department!==deptF) return false;
+    if(typeF && r.type!==typeF) return false;
+    if(statusF==='done' && !r.done) return false;
+    if(statusF==='pending' && r.done) return false;
+    return true;
+  });
+
+  filtered = [...filtered].sort((a,b)=>{
+    const da = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+    const db = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+    return reqSortDir==='asc' ? da-db : db-da;
+  });
+
+  document.getElementById('requests-table-body').innerHTML = filtered.length
+    ? filtered.map(r=>{
         const submitted = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-GB') : '—';
-        return `<tr>
+        return `<tr class="${r.done?'row-done':''}">
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${submitted}</td>
+          <td style="font-size:11px;color:var(--text-3)">${r.submittedBy||'—'}</td>
+          <td style="font-size:11px">${r.requesterName||'—'}${r.email?`<br><span style="color:var(--text-3)">${r.email}</span>`:''}</td>
           <td style="font-weight:600">${r.title||''}</td>
           <td>${r.department||''}</td>
           <td style="font-size:11px">${r.type||''}</td>
           <td><span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${r.priority||'Normal'}</span></td>
           <td style="font-size:11px;color:var(--text-3)">${r.deadline||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3);max-width:220px">${r.description||''}</td>
-          <td><button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button></td>
+          <td style="font-size:11px;color:var(--text-3);max-width:200px">${r.description||''}</td>
+          <td class="row-actions">
+            ${r.done
+              ? `<button class="btn btn-sm" onclick="markRequestPending('${r.id}')">Undo</button>`
+              : `<button class="btn btn-sm" style="color:var(--green);border-color:var(--green)" onclick="markRequestDone('${r.id}')">✓ Mark Done</button>`}
+            <button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button>
+          </td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="8" class="empty">No requests submitted yet</td></tr>';
+    : '<tr><td colspan="10" class="empty">No requests found</td></tr>';
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
