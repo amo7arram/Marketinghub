@@ -20,8 +20,7 @@ html,body{height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg
 /* ── LOGIN ── */
 .login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy),#003766)}
 .login-card{background:var(--surface);border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
-.login-logo{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy);margin-bottom:2px}
-.login-logo span{color:var(--gold)}
+.login-logo-img{width:140px;margin-bottom:10px}
 .login-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
 .login-field{margin-bottom:14px}
 .login-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
@@ -106,7 +105,7 @@ tr:hover td{background:var(--bg)}
 <!-- ── LOGIN ── -->
 <div class="login-wrap" id="login-wrap">
   <div class="login-card">
-    <div class="login-logo">IMC<span> 2026</span></div>
+    <img class="login-logo-img" src="logo.jpg" alt="IMC">
     <div class="login-sub">Marketing Strategy Admin Panel</div>
     <div class="login-error" id="login-error"></div>
     <div class="login-field">
@@ -188,7 +187,11 @@ tr:hover td{background:var(--bg)}
       <div class="field-section-title">Core Details</div>
       <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="fld-title"></div>
       <div class="field-row">
-        <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="fld-department"></select></div>
+        <div class="field-group">
+          <label class="field-label">Department</label>
+          <select class="field-select" id="fld-department" onchange="toggleOtherDept()"></select>
+          <input class="field-input" id="fld-department-other" placeholder="Enter department name" style="margin-top:8px;display:none">
+        </div>
         <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-status"></select></div>
       </div>
       <div class="field-group"><label class="field-label">Entity (select all that apply)</label><div class="chip-select" id="fld-entity"></div></div>
@@ -322,7 +325,7 @@ function populateStaticSelects() {
   DEPARTMENTS.forEach(d => deptFilter.innerHTML += `<option>${d}</option>`);
 
   const fldDept = document.getElementById('fld-department');
-  fldDept.innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  fldDept.innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('') + '<option value="Other">Other (specify)</option>';
 
   const fldStatus = document.getElementById('fld-status');
   fldStatus.innerHTML = STATUSES.map(s=>`<option>${s}</option>`).join('');
@@ -344,6 +347,11 @@ function populateStaticSelects() {
   document.getElementById('fld-channels').innerHTML = CHANNELS.map(c=>
     `<div class="chip" data-val="${c}" onclick="toggleChip(this,'channels')">${c}</div>`
   ).join('');
+}
+
+window.toggleOtherDept = function() {
+  const isOther = document.getElementById('fld-department').value === 'Other';
+  document.getElementById('fld-department-other').style.display = isOther ? '' : 'none';
 }
 
 window.toggleChip = function(el, group) {
@@ -386,7 +394,11 @@ window.openForm = function(initiative=null) {
   selectType(initiative ? initiative.type : 'Campaign');
 
   document.getElementById('fld-title').value = initiative?.title || '';
-  document.getElementById('fld-department').value = initiative?.department || DEPARTMENTS[0];
+  const knownDept = initiative?.department || DEPARTMENTS[0];
+  const isCustomDept = initiative && initiative.department && !DEPARTMENTS.includes(initiative.department);
+  document.getElementById('fld-department').value = isCustomDept ? 'Other' : knownDept;
+  document.getElementById('fld-department-other').value = isCustomDept ? initiative.department : '';
+  toggleOtherDept();
   document.getElementById('fld-status').value = initiative?.status || 'Planned';
   document.getElementById('fld-nameAr').value = initiative?.nameAr || '';
   document.getElementById('fld-startDate').value = initiative?.startDate || '';
@@ -415,10 +427,17 @@ window.saveInitiative = async function() {
   const title = document.getElementById('fld-title').value.trim();
   if(!title) { showToast('Title is required', true); return; }
 
+  const deptSelectVal = document.getElementById('fld-department').value;
+  const deptFinal = deptSelectVal === 'Other'
+    ? document.getElementById('fld-department-other').value.trim()
+    : deptSelectVal;
+
+  if(deptSelectVal === 'Other' && !deptFinal) { showToast('Please enter the department name', true); return; }
+
   const data = {
     type: currentType,
     title,
-    department: document.getElementById('fld-department').value,
+    department: deptFinal,
     status: document.getElementById('fld-status').value,
     entity: selectedEntities,
     nameAr: document.getElementById('fld-nameAr').value.trim(),
