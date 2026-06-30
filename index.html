@@ -242,6 +242,19 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .res-card-type{font-size:10px;font-weight:600;color:var(--text-3)}
 .res-download-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#fff;background:var(--navy);padding:6px 12px;border-radius:20px;text-decoration:none}
 .res-download-btn:hover{background:#003f7a}
+
+/* EMBED PREVIEW MODAL */
+.embed-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.6);z-index:100;align-items:center;justify-content:center;padding:30px}
+.embed-overlay.open{display:flex}
+.embed-modal{background:var(--surface);border-radius:14px;max-width:480px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg);position:relative}
+.embed-modal-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.embed-modal-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:380px}
+.embed-modal-close{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:13px;color:var(--text-3);flex-shrink:0}
+.embed-modal-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.embed-modal-body{padding:16px;display:flex;justify-content:center;min-height:200px}
+.embed-loading{text-align:center;padding:60px 20px;color:var(--text-3);font-size:12px}
+.preview-btn{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#fff;background:var(--purple);text-decoration:none;border-radius:4px;padding:2px 7px;font-weight:500;border:none;cursor:pointer;font-family:inherit;margin-left:5px}
+.preview-btn:hover{background:#5a4bd6}
 </style>
 </head>
 <body>
@@ -364,7 +377,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         </div>
         <div class="scrollable-x">
           <table class="camp-table">
-            <thead><tr><th>Campaign Name</th><th>Department</th><th>Entity</th><th>Dates</th><th>Channels</th><th>Reach</th><th>Impressions</th><th>Engagements</th><th>Status</th><th>Assigned To</th><th>Post Link</th></tr></thead>
+            <thead><tr><th>Campaign Name</th><th>Department</th><th>Entity</th><th onclick="toggleCampSort()" style="cursor:pointer;user-select:none">Dates <span id="camp-sort-arrow">↕</span></th><th>Channels</th><th>Reach</th><th>Impressions</th><th>Engagements</th><th>Status</th><th>Assigned To</th><th>Post Link</th></tr></thead>
             <tbody id="camp-tbody"><tr><td colspan="11" class="loading">Loading campaigns...</td></tr></tbody>
           </table>
         </div>
@@ -434,6 +447,16 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
   <div class="dp-body" id="dp-body"></div>
 </div>
 
+<div class="embed-overlay" id="embed-overlay" onclick="closeEmbed(event)">
+  <div class="embed-modal" onclick="event.stopPropagation()">
+    <div class="embed-modal-header">
+      <div class="embed-modal-title" id="embed-modal-title">Post Preview</div>
+      <button class="embed-modal-close" onclick="closeEmbed()">✕</button>
+    </div>
+    <div class="embed-modal-body" id="embed-modal-body"></div>
+  </div>
+</div>
+
 <script type="module">
 import {
   watchInitiatives, watchMetrics, watchResources,
@@ -445,6 +468,7 @@ let RESOURCES = [];
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL = [];      // all initiatives
 let METRICS = [];
+let campSortDir = null; // null, 'asc', 'desc'
 
 const PAGE_META = {
   dashboard:     {title:'Dashboard', sub:'Performance overview — current month'},
@@ -758,17 +782,30 @@ window.renderCalendar = function() {
 }
 
 // ── ALL CAMPAIGNS (type=Campaign) ───────────────────────────────────
+window.toggleCampSort = function() {
+  campSortDir = campSortDir==='asc' ? 'desc' : 'asc';
+  document.getElementById('camp-sort-arrow').textContent = campSortDir==='asc' ? '↑' : '↓';
+  renderCampaigns();
+}
+
 window.renderCampaigns = function(filter='') {
   const entityF = document.getElementById('camp-entity-filter').value;
   const statusF = document.getElementById('camp-status-filter').value;
   const q = filter.toLowerCase();
-  const data = ALL.filter(i=>{
+  let data = ALL.filter(i=>{
     if(i.type!=='Campaign') return false;
     if(entityF && !(i.entity||[]).includes(entityF)) return false;
     if(statusF && i.status!==statusF) return false;
     if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
     return true;
   });
+  if(campSortDir) {
+    data = [...data].sort((a,b)=>{
+      const da = a.startDate || '';
+      const db = b.startDate || '';
+      return campSortDir==='asc' ? da.localeCompare(db) : db.localeCompare(da);
+    });
+  }
   document.getElementById('camp-tbody').innerHTML = data.length
     ? data.map(c=>{
         const ds = deptStyle(c.department);
@@ -967,7 +1004,7 @@ window.renderLibrary = function(filter='') {
           <td style="font-weight:600">${c.reach?fmt(c.reach):'—'}</td>
           <td style="font-weight:600">${c.engagements?fmt(c.engagements):'—'}</td>
           <td>${statusBadge(c.status)}</td>
-          <td>${c.postLink?`<a class="post-link" href="${c.postLink}" target="_blank" rel="noopener">🔗 View Post</a>`:'—'}</td>
+          <td>${c.postLink?`<a class="post-link" href="${c.postLink}" target="_blank" rel="noopener">🔗 View Post</a>${detectPlatform(c.postLink)?`<button class="preview-btn" onclick='openEmbed(${JSON.stringify(c.postLink)},${JSON.stringify(c.title||"")})'>▶ Preview</button>`:''}`:'—'}</td>
         </tr>`;
       }).join('')
     : '<tr><td colspan="10" class="empty-state">No content found</td></tr>';
@@ -1008,6 +1045,63 @@ window.renderResources = function(filter='') {
         </div>`;
       }).join('')
     : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🎨</div>No brand resources yet — add them in the admin panel</div>';
+}
+
+// ── EMBED PREVIEW (Instagram + TikTok only) ─────────────────────────────
+function detectPlatform(url) {
+  if(!url) return null;
+  const u = url.toLowerCase();
+  if(u.includes('instagram.com')) return 'instagram';
+  if(u.includes('tiktok.com')) return 'tiktok';
+  return null;
+}
+
+window.openEmbed = function(url, title) {
+  const platform = detectPlatform(url);
+  if(!platform) return;
+  document.getElementById('embed-modal-title').textContent = title || 'Post Preview';
+  const body = document.getElementById('embed-modal-body');
+  body.innerHTML = '<div class="embed-loading">Loading preview...</div>';
+  document.getElementById('embed-overlay').classList.add('open');
+
+  if(platform === 'instagram') {
+    body.innerHTML = `<blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14" style="margin:0;width:100%"></blockquote>`;
+    loadScriptOnce('ig-embed-script', 'https://www.instagram.com/embed.js', () => {
+      if(window.instgrm) window.instgrm.Embeds.process();
+      // Instagram's processor sometimes misses the first pass — give it a second try after layout settles
+      setTimeout(() => { if(window.instgrm) window.instgrm.Embeds.process(); }, 600);
+    });
+  } else if(platform === 'tiktok') {
+    body.innerHTML = `<blockquote class="tiktok-embed" cite="${url}" style="max-width:325px;min-width:280px;margin:0"><section></section></blockquote>`;
+    // TikTok's embed script only auto-scans once on load, so re-inject a fresh script tag each time to force a re-scan
+    const old = document.getElementById('tt-embed-script');
+    if(old) old.remove();
+    const s = document.createElement('script');
+    s.id = 'tt-embed-script';
+    s.src = 'https://www.tiktok.com/embed.js';
+    s.async = true;
+    document.body.appendChild(s);
+  }
+}
+
+window.closeEmbed = function(e) {
+  if(e && e.target !== document.getElementById('embed-overlay')) return;
+  document.getElementById('embed-overlay').classList.remove('open');
+  document.getElementById('embed-modal-body').innerHTML = '';
+}
+
+function loadScriptOnce(id, src, onReady) {
+  const existing = document.getElementById(id);
+  if(existing) {
+    onReady();
+    return;
+  }
+  const s = document.createElement('script');
+  s.id = id;
+  s.src = src;
+  s.async = true;
+  s.onload = onReady;
+  document.body.appendChild(s);
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────
