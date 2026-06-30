@@ -214,6 +214,34 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .lib-controls{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
 .lib-search{flex:1;min-width:180px;font-size:12px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;background:var(--surface);color:var(--text)}
 .scrollable-x{overflow-x:auto}
+
+/* SEARCH */
+.search-wrap{position:relative;width:280px}
+.search-input{width:100%;font-size:12.5px;padding:8px 12px 8px 32px;border:1px solid var(--border-strong);border-radius:20px;font-family:inherit;background:var(--surface-2)}
+.search-input:focus{outline:none;border-color:var(--navy);background:var(--surface)}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text-3);pointer-events:none}
+.search-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);max-height:380px;overflow-y:auto;z-index:60}
+.search-results.open{display:block}
+.search-result-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border)}
+.search-result-item:last-child{border:none}
+.search-result-item:hover{background:var(--bg)}
+.search-result-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.search-result-title{font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-result-meta{font-size:10px;color:var(--text-3);white-space:nowrap}
+.search-empty{padding:16px;text-align:center;font-size:11px;color:var(--text-3)}
+
+/* BRAND RESOURCES */
+.resources-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.res-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column;transition:all var(--transition)}
+.res-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.res-card-top{padding:18px 18px 14px;flex:1}
+.res-card-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:12px}
+.res-card-title{font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.35}
+.res-card-desc{font-size:11.5px;color:var(--text-3);line-height:1.55}
+.res-card-footer{padding:12px 18px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between}
+.res-card-type{font-size:10px;font-weight:600;color:var(--text-3)}
+.res-download-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#fff;background:var(--navy);padding:6px 12px;border-radius:20px;text-decoration:none}
+.res-download-btn:hover{background:#003f7a}
 </style>
 </head>
 <body>
@@ -234,6 +262,8 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <div class="nav-item" onclick="nav('deptcampaigns',this)"><span class="nav-icon">▣</span> Dept Campaigns</div>
       <div class="nav-item" onclick="nav('healthdays',this)"><span class="nav-icon">♡</span> Health Days</div>
       <div class="nav-item" onclick="nav('library',this)"><span class="nav-icon">▨</span> Content Library</div>
+      <div class="nav-section">Resources</div>
+      <div class="nav-item" onclick="nav('resources',this)"><span class="nav-icon">🎨</span> Brand Resources</div>
     </nav>
     <div class="sidebar-footer">
       <span class="sync-dot"></span>Live · Firebase<br>
@@ -249,6 +279,11 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         <div class="page-sub" id="topbar-sub">Performance overview — current month</div>
       </div>
       <div class="topbar-right">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" type="text" id="global-search" placeholder="Search campaigns, content, events..." oninput="onSearchInput(this.value)" onfocus="onSearchInput(this.value)">
+          <div class="search-results" id="search-results"></div>
+        </div>
         <div class="date-range-wrap" id="dash-daterange" style="display:none">
           <span>From</span><input type="date" id="date-from">
           <span>to</span><input type="date" id="date-to">
@@ -377,6 +412,15 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         </div>
       </div>
 
+      <!-- BRAND RESOURCES -->
+      <div class="page" id="page-resources">
+        <div class="cal-controls" style="margin-bottom:16px">
+          <input class="lib-search" style="flex:1;min-width:160px;max-width:280px" type="text" placeholder="Search resources..." oninput="renderResources(this.value)">
+          <select class="cal-select" id="res-type-filter" onchange="renderResources()"><option value="">All Types</option></select>
+        </div>
+        <div class="resources-grid" id="resources-grid"><div class="loading">Loading resources...</div></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -392,9 +436,11 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 
 <script type="module">
 import {
-  watchInitiatives, watchMetrics,
-  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG
+  watchInitiatives, watchMetrics, watchResources,
+  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES
 } from './firebase-data.js';
+
+let RESOURCES = [];
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL = [];      // all initiatives
@@ -409,6 +455,7 @@ const PAGE_META = {
   deptcampaigns: {title:'Department Campaigns', sub:'Click any campaign for the full brief, timeline & performance'},
   healthdays:    {title:'Health Days Calendar', sub:'Saudi MOH health days, Islamic and national occasions'},
   library:       {title:'Content Library', sub:'Browse and link to all published content'},
+  resources:     {title:'Brand Resources', sub:'Logos, templates, and brand guidelines to download'},
 };
 
 window.nav = function(id, el) {
@@ -422,6 +469,56 @@ window.nav = function(id, el) {
   document.getElementById('dash-daterange').style.display = id==='dashboard'?'flex':'none';
   renderAll();
 }
+
+// ── GLOBAL SEARCH ────────────────────────────────────────────────────
+const TYPE_PAGE_MAP = {
+  'Campaign': {page:'campaigns', navIndex:3, icon:'◈'},
+  'Event': {page:'events', navIndex:4, icon:'◆'},
+  'Content': {page:'library', navIndex:7, icon:'▨'},
+  'Health Day': {page:'healthdays', navIndex:6, icon:'♡'},
+};
+
+window.onSearchInput = function(q) {
+  const resultsEl = document.getElementById('search-results');
+  const query = q.trim().toLowerCase();
+  if(!query) { resultsEl.classList.remove('open'); return; }
+
+  const matches = ALL.filter(i =>
+    (i.title||'').toLowerCase().includes(query) ||
+    (i.department||'').toLowerCase().includes(query) ||
+    (i.objective||'').toLowerCase().includes(query) ||
+    (i.type||'').toLowerCase().includes(query)
+  ).slice(0, 10);
+
+  resultsEl.innerHTML = matches.length
+    ? matches.map(m => {
+        const ds = deptStyle(m.department);
+        const typeInfo = TYPE_PAGE_MAP[m.type] || {page:'dashboard', icon:'•'};
+        return `<div class="search-result-item" onclick='goToResult(${JSON.stringify(m).replace(/'/g,"&apos;")})'>
+          <div class="search-result-dot" style="background:${ds.t}"></div>
+          <span class="search-result-title">${m.title}</span>
+          <span class="search-result-meta">${typeInfo.icon} ${m.type||''} · ${m.department||''}</span>
+        </div>`;
+      }).join('')
+    : '<div class="search-empty">No matches found</div>';
+  resultsEl.classList.add('open');
+}
+
+window.goToResult = function(item) {
+  document.getElementById('search-results').classList.remove('open');
+  document.getElementById('global-search').value = '';
+  const typeInfo = TYPE_PAGE_MAP[item.type];
+  if(!typeInfo) return;
+  const navItem = document.querySelectorAll('.nav-item')[typeInfo.navIndex];
+  nav(typeInfo.page, navItem);
+  if(item.type==='Campaign') { setTimeout(()=>openDetail(item), 150); }
+}
+
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.search-wrap')) {
+    document.getElementById('search-results').classList.remove('open');
+  }
+});
 
 function initDates() {
   const now = new Date();
@@ -448,6 +545,7 @@ function populateFilters() {
   document.getElementById('cal-legend').innerHTML = DEPARTMENTS.map(d=>
     `<span class="leg"><span class="leg-dot" style="background:${DEPT_BG[d]||'#EEF0FF'}"></span>${d}</span>`
   ).join('') + `<span class="leg"><span class="leg-dot" style="background:#FFF6E0"></span>Health Day</span>`;
+  document.getElementById('res-type-filter').innerHTML += RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
 }
 
 // ── DATA LOAD ─────────────────────────────────────────────────────────
@@ -458,6 +556,10 @@ watchInitiatives(data => {
 });
 watchMetrics(data => {
   METRICS = data;
+  renderAll();
+});
+watchResources(data => {
+  RESOURCES = data;
   renderAll();
 });
 
@@ -472,6 +574,7 @@ function renderAll() {
   if(activePage==='deptcampaigns') renderDeptCampaigns();
   if(activePage==='healthdays') renderHealthDays();
   if(activePage==='library') renderLibrary();
+  if(activePage==='resources') renderResources();
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────────
@@ -514,7 +617,7 @@ function eventStatus(start, end) {
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────
 let chartPerf=null, chartWeb=null;
-function renderDashboard() {
+window.renderDashboard = function() {
   const pairs = [
     ['m-reach','Instagram Reach'],['m-imp','Instagram Impressions'],['m-eng','Instagram Engagements'],
     ['m-web','Website Visits'],['m-engr','Instagram Engagement Rate'],['m-ig','Instagram Followers'],
@@ -619,7 +722,7 @@ function renderTimeline() {
 }
 
 // ── SM CALENDAR (type=Content) ──────────────────────────────────────
-function renderCalendar() {
+window.renderCalendar = function() {
   const [m,y] = document.getElementById('cal-month').value.split('-').map(Number);
   const deptF = document.getElementById('cal-dept').value;
   const entityF = document.getElementById('cal-entity').value;
@@ -655,7 +758,7 @@ function renderCalendar() {
 }
 
 // ── ALL CAMPAIGNS (type=Campaign) ───────────────────────────────────
-function renderCampaigns(filter='') {
+window.renderCampaigns = function(filter='') {
   const entityF = document.getElementById('camp-entity-filter').value;
   const statusF = document.getElementById('camp-status-filter').value;
   const q = filter.toLowerCase();
@@ -687,7 +790,7 @@ function renderCampaigns(filter='') {
 }
 
 // ── EVENTS (type=Event) ─────────────────────────────────────────────
-function renderEvents() {
+window.renderEvents = function() {
   const entityF = document.getElementById('evt-entity-filter').value;
   const statusF = document.getElementById('evt-status-filter').value;
   let data = ALL.filter(i=>i.type==='Event').map(e=>({...e, computedStatus: eventStatus(e.startDate, e.endDate)}));
@@ -798,7 +901,7 @@ window.closeDetail = function() {
 }
 
 // ── HEALTH DAYS (type=Health Day) ───────────────────────────────────
-function renderHealthDays(filter='') {
+window.renderHealthDays = function(filter='') {
   const typeF = document.getElementById('hd-type-filter').value;
   const deptF = document.getElementById('hd-dept-filter').value;
   const q = filter.toLowerCase();
@@ -836,7 +939,7 @@ function renderHealthDays(filter='') {
 }
 
 // ── CONTENT LIBRARY (type=Content) ──────────────────────────────────
-function renderLibrary(filter='') {
+window.renderLibrary = function(filter='') {
   const deptF = document.getElementById('lib-dept-filter').value;
   const typeF = document.getElementById('lib-type-filter').value;
   const chanF = document.getElementById('lib-channel-filter').value;
@@ -868,6 +971,43 @@ function renderLibrary(filter='') {
         </tr>`;
       }).join('')
     : '<tr><td colspan="10" class="empty-state">No content found</td></tr>';
+}
+
+// ── BRAND RESOURCES ──────────────────────────────────────────────────
+const RES_TYPE_ICONS = {
+  'Social Media':'📱','Print':'🖨️','Stationery':'✉️','Logo & Brand Mark':'🎨',
+  'Presentation Template':'📊','Guideline Document':'📘','Other':'📁'
+};
+const RES_TYPE_COLORS = {
+  'Social Media':{bg:'#E4EDFF',t:'#1649A3'},'Print':{bg:'#FFF0D4',t:'#9B5800'},
+  'Stationery':{bg:'#E4F8F0',t:'#0E7A55'},'Logo & Brand Mark':{bg:'#EEEAFF',t:'#4535B0'},
+  'Presentation Template':{bg:'#FFE8E8',t:'#992020'},'Guideline Document':{bg:'#E4F0FF',t:'#0F4D99'},
+  'Other':{bg:'#F0F2F7',t:'#3D4460'}
+};
+window.renderResources = function(filter='') {
+  const typeF = document.getElementById('res-type-filter').value;
+  const q = filter.toLowerCase();
+  const data = RESOURCES.filter(r=>{
+    if(typeF && r.type!==typeF) return false;
+    if(q && !JSON.stringify(r).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById('resources-grid').innerHTML = data.length
+    ? data.map(r=>{
+        const rc = RES_TYPE_COLORS[r.type]||RES_TYPE_COLORS['Other'];
+        return `<div class="res-card">
+          <div class="res-card-top">
+            <div class="res-card-icon" style="background:${rc.bg};color:${rc.t}">${RES_TYPE_ICONS[r.type]||'📁'}</div>
+            <div class="res-card-title">${r.title}</div>
+            <div class="res-card-desc">${r.description||''}</div>
+          </div>
+          <div class="res-card-footer">
+            <span class="res-card-type">${r.type||''}</span>
+            <a class="res-download-btn" href="${r.link}" target="_blank" rel="noopener">⬇ Download</a>
+          </div>
+        </div>`;
+      }).join('')
+    : '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🎨</div>No brand resources yet — add them in the admin panel</div>';
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────

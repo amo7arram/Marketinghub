@@ -28,6 +28,7 @@ export const auth = getAuth(app);
 // ── COLLECTIONS ─────────────────────────────────────────────────────────
 const INITIATIVES = "initiatives";
 const METRICS = "metrics";
+const RESOURCES = "resources";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -95,6 +96,32 @@ export function updateMetric(id, data) {
 export function deleteMetric(id) {
   return deleteDoc(doc(db, METRICS, id));
 }
+
+// ── RESOURCES CRUD (Brand Resources page) ───────────────────────────────
+export async function getResources() {
+  const snap = await getDocs(collection(db, RESOURCES));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export function watchResources(callback) {
+  return onSnapshot(collection(db, RESOURCES), snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export function addResource(data) {
+  return addDoc(collection(db, RESOURCES), { ...data, createdAt: Timestamp.now() });
+}
+
+export function updateResource(id, data) {
+  return updateDoc(doc(db, RESOURCES, id), data);
+}
+
+export function deleteResource(id) {
+  return deleteDoc(doc(db, RESOURCES, id));
+}
+
+export const RESOURCE_TYPES = ["Social Media","Print","Stationery","Logo & Brand Mark","Presentation Template","Guideline Document","Other"];
 
 // ── SHARED CONSTANTS (used by both admin + portal for consistency) ──────
 export const DEPARTMENTS = [

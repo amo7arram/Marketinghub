@@ -136,6 +136,7 @@ tr:hover td{background:var(--bg)}
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('initiatives',this)">Initiatives</div>
+    <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
   </div>
 
@@ -158,6 +159,18 @@ tr:hover td{background:var(--bg)}
       <table>
         <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th>Dates</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- RESOURCES PAGE -->
+    <div class="page" id="page-resources">
+      <div class="toolbar">
+        <div></div>
+        <button class="btn btn-primary" onclick="openResourceForm()">+ New Resource</button>
+      </div>
+      <table>
+        <thead><tr><th>Title</th><th>Type</th><th>Description</th><th>Link</th><th>Actions</th></tr></thead>
+        <tbody id="resources-table-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -257,6 +270,26 @@ tr:hover td{background:var(--bg)}
   </div>
 </div>
 
+<!-- ── RESOURCE FORM MODAL ── -->
+<div class="modal-overlay" id="resource-overlay">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="resource-form-title">New Resource</div>
+      <button class="modal-close" onclick="closeResourceForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="r-title" placeholder="e.g. IMC Logo Pack"></div>
+      <div class="field-group"><label class="field-label">Type</label><select class="field-select" id="r-type"></select></div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" id="r-description" placeholder="Short description of what this resource contains"></textarea></div>
+      <div class="field-group"><label class="field-label">Download Link<span style="color:var(--red)">*</span></label><input class="field-input" id="r-link" placeholder="https://drive.google.com/..."></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeResourceForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveResource()">Save Resource</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -264,19 +297,23 @@ import {
   login, logout, watchAuth,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
   getMetrics, watchMetrics, addMetric, updateMetric, deleteMetric,
+  watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, HEALTH_DAY_CATEGORIES
 } from './firebase-data.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
 let ALL_METRICS = [];
+let ALL_RESOURCES = [];
 let currentType = 'Campaign';
 let editingId = null;
 let editingMetricId = null;
+let editingResourceId = null;
 let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
 let unsubMetrics = null;
+let unsubResources = null;
 
 // ── AUTH ───────────────────────────────────────────────────────────────
 window.doLogin = async function() {
@@ -306,6 +343,7 @@ watchAuth(user => {
     document.getElementById('app').classList.remove('active');
     if(unsubInitiatives) unsubInitiatives();
     if(unsubMetrics) unsubMetrics();
+    if(unsubResources) unsubResources();
   }
 });
 
@@ -313,6 +351,7 @@ function initData() {
   populateStaticSelects();
   unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); });
   unsubMetrics = watchMetrics(data => { ALL_METRICS = data; renderMetricsTable(); });
+  unsubResources = watchResources(data => { ALL_RESOURCES = data; renderResourcesTable(); });
 }
 
 // ── TABS ───────────────────────────────────────────────────────────────
@@ -339,6 +378,9 @@ function populateStaticSelects() {
 
   const fldHd = document.getElementById('fld-hdCategory');
   fldHd.innerHTML = HEALTH_DAY_CATEGORIES.map(h=>`<option>${h}</option>`).join('');
+
+  const rType = document.getElementById('r-type');
+  rType.innerHTML = RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
 
   document.getElementById('type-switcher').innerHTML = TYPES.map(t=>
     `<div class="type-btn" data-type="${t}" onclick="selectType('${t}')">${t}</div>`
@@ -580,6 +622,61 @@ window.renderMetricsTable = function() {
         </td>
       </tr>`).join('')
     : '<tr><td colspan="7" class="empty">No metrics found</td></tr>';
+}
+
+// ── RESOURCES ─────────────────────────────────────────────────────────
+window.openResourceForm = function(resource=null) {
+  editingResourceId = resource ? resource.id : null;
+  document.getElementById('resource-form-title').textContent = resource ? 'Edit Resource' : 'New Resource';
+  document.getElementById('r-title').value = resource?.title || '';
+  document.getElementById('r-type').value = resource?.type || RESOURCE_TYPES[0];
+  document.getElementById('r-description').value = resource?.description || '';
+  document.getElementById('r-link').value = resource?.link || '';
+  document.getElementById('resource-overlay').classList.add('open');
+}
+window.closeResourceForm = function() {
+  document.getElementById('resource-overlay').classList.remove('open');
+}
+window.saveResource = async function() {
+  const title = document.getElementById('r-title').value.trim();
+  const link = document.getElementById('r-link').value.trim();
+  if(!title) { showToast('Title is required', true); return; }
+  if(!link) { showToast('Download link is required', true); return; }
+  const data = {
+    title,
+    type: document.getElementById('r-type').value,
+    description: document.getElementById('r-description').value.trim(),
+    link,
+  };
+  try {
+    if(editingResourceId) { await updateResource(editingResourceId, data); showToast('Resource updated'); }
+    else { await addResource(data); showToast('Resource created'); }
+    closeResourceForm();
+  } catch(e) { showToast('Save failed: ' + e.message, true); }
+}
+window.editResource = function(id) {
+  const r = ALL_RESOURCES.find(x=>x.id===id);
+  if(r) openResourceForm(r);
+}
+window.removeResource = async function(id, title) {
+  if(!confirm(`Delete resource "${title}"?`)) return;
+  try { await deleteResource(id); showToast('Resource deleted'); }
+  catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+window.renderResourcesTable = function() {
+  document.getElementById('resources-table-body').innerHTML = ALL_RESOURCES.length
+    ? ALL_RESOURCES.map(r=>`
+      <tr>
+        <td style="font-weight:600">${r.title||''}</td>
+        <td><span class="type-pill">${r.type||''}</span></td>
+        <td style="font-size:11px;color:var(--text-3);max-width:220px">${r.description||'—'}</td>
+        <td><a href="${r.link}" target="_blank" style="font-size:11px;color:var(--navy)">🔗 Link</a></td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editResource('${r.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeResource('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No resources found</td></tr>';
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
