@@ -81,24 +81,72 @@ export function deleteInitiative(id) {
   return deleteDoc(doc(db, INITIATIVES, id));
 }
 
-// ── METRICS CRUD ────────────────────────────────────────────────────────
-export async function getMetrics() {
-  const snap = await getDocs(collection(db, METRICS));
+
+// ── METRICS CRUD (period-based — one document per metric per month) ──────
+// Document ID format: "metricName_YYYY-MM" e.g. "Instagram Reach_2026-06"
+// This preserves full history so the portal can show any past month.
+
+export const METRIC_NAMES = [
+  "Instagram Reach",
+  "Instagram Impressions",
+  "Instagram Engagements",
+  "Instagram Engagement Rate",
+  "Instagram Followers",
+  "TikTok Views",
+  "TikTok Followers",
+  "X Reach",
+  "LinkedIn Reach",
+  "SM Messages Received",
+  "PR Mentions",
+  "Website Visits",
+];
+
+export const METRIC_UNITS = {
+  "Instagram Engagement Rate": "Percentage",
+};
+
+// Fetch all metrics for a specific period e.g. "2026-06"
+export async function getMetricsForPeriod(period) {
+  const snap = await getDocs(
+    query(collection(db, METRICS), where("period", "==", period))
+  );
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-export function watchMetrics(callback) {
-  return onSnapshot(collection(db, METRICS), snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+// Fetch all available periods (distinct months that have data)
+export async function getMetricPeriods() {
+  const snap = await getDocs(collection(db, METRICS));
+  const periods = new Set();
+  snap.docs.forEach(d => { if(d.data().period) periods.add(d.data().period); });
+  return Array.from(periods).sort().reverse(); // newest first
+}
+
+// Fetch all metrics across all periods (for chart history)
+export async function getAllMetrics() {
+  const snap = await getDocs(
+    query(collection(db, METRICS), orderBy("period", "asc"))
+  );
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// Save (upsert) a full month's metrics in one batch
+// data = { period: "2026-06", metrics: { "Instagram Reach": 45000, ... } }
+export async function saveMonthMetrics(period, metricsObj) {
+  const writes = Object.entries(metricsObj).map(([name, value]) => {
+    const docId = `${name}_${period}`.replace(/\s+/g, "_");
+    const unit = METRIC_UNITS[name] || "Number";
+    return updateDoc(doc(db, METRICS, docId), {
+      metricName: name, period, value: Number(value) || 0, unit,
+      updatedAt: Timestamp.now(),
+    }).catch(() =>
+      // doc doesn't exist yet — create it
+      addDoc(collection(db, METRICS), {
+        metricName: name, period, value: Number(value) || 0, unit,
+        updatedAt: Timestamp.now(),
+      })
+    );
   });
-}
-
-export function addMetric(data) {
-  return addDoc(collection(db, METRICS), data);
-}
-
-export function updateMetric(id, data) {
-  return updateDoc(doc(db, METRICS, id), data);
+  return Promise.all(writes);
 }
 
 export function deleteMetric(id) {
