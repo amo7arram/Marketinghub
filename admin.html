@@ -247,7 +247,8 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="field-group" id="fld-channels-wrap"><label class="field-label">Channels</label><div class="chip-select" id="fld-channels"></div></div>
       <div class="field-group" id="fld-contenttype-wrap"><label class="field-label">Content Type</label><select class="field-select" id="fld-contentType"></select></div>
       <div class="field-group" id="fld-hdcategory-wrap"><label class="field-label">Health Day Category</label><select class="field-select" id="fld-hdCategory"></select></div>
-      <div class="field-group" id="fld-postlink-wrap"><label class="field-label">Post Link</label><input class="field-input" id="fld-postLink" placeholder="https://instagram.com/p/..."></div>
+      <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
+      <div class="field-group" id="fld-postlink-wrap"><label class="field-label" id="fld-postlink-label">Post / Content Link</label><input class="field-input" id="fld-postLink" placeholder="https://..."></div>
 
       <div class="field-section-title" id="section-perf">Performance (optional)</div>
       <div class="field-row" id="fld-perf-wrap">
@@ -321,7 +322,7 @@ import {
   getMetrics, watchMetrics, addMetric, updateMetric, deleteMetric,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
-  DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, HEALTH_DAY_CATEGORIES
+  DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, HEALTH_DAY_CATEGORIES
 } from './firebase-data.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
@@ -415,6 +416,9 @@ function populateStaticSelects() {
   const fldHd = document.getElementById('fld-hdCategory');
   fldHd.innerHTML = HEALTH_DAY_CATEGORIES.map(h=>`<option>${h}</option>`).join('');
 
+  const fldPrint = document.getElementById('fld-printType');
+  fldPrint.innerHTML = PRINT_TYPES.map(t=>`<option>${t}</option>`).join('');
+
   const rType = document.getElementById('r-type');
   rType.innerHTML = RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
 
@@ -454,19 +458,24 @@ window.selectType = function(type) {
   document.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
 
   const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
-  show('fld-arabic-wrap', type==='Health Day');
-  show('fld-enddate-wrap', type==='Campaign');
-  show('fld-objective-wrap', true);
-  show('fld-channels-wrap', type==='Campaign' || type==='Event');
-  show('fld-contenttype-wrap', type==='Content');
-  show('fld-hdcategory-wrap', type==='Health Day');
-  show('fld-postlink-wrap', type==='Campaign' || type==='Content' || type==='Event');
-  show('fld-perf-wrap', type==='Campaign' || type==='Content');
-  show('fld-eng-wrap', type==='Campaign' || type==='Content');
-  show('section-perf', type==='Campaign' || type==='Content');
+  show('fld-arabic-wrap',    type==='Health Day');
+  show('fld-enddate-wrap',   type==='Campaign');
+  show('fld-objective-wrap', type !== 'Print');
+  show('fld-channels-wrap',  type==='Campaign' || type==='Event');
+  show('fld-contenttype-wrap', type==='SM Content');
+  show('fld-printtype-wrap', type==='Print');
+  show('fld-hdcategory-wrap',type==='Health Day');
+  show('fld-postlink-wrap',  type==='Campaign' || type==='SM Content' || type==='Event' || type==='Print');
+  show('fld-perf-wrap',      type==='Campaign' || type==='SM Content');
+  show('fld-eng-wrap',       type==='Campaign' || type==='SM Content');
+  show('section-perf',       type==='Campaign' || type==='SM Content');
 
+  // Update contextual labels
   document.getElementById('fld-objective-label').textContent =
-    type==='Health Day' ? 'Notes' : (type==='Event' ? 'Description' : 'Objective / Description');
+    type==='Health Day' ? 'Notes' :
+    type==='Event' ? 'Description' : 'Objective / Description';
+  document.getElementById('fld-postlink-label').textContent =
+    type==='Print' ? 'Link to Content / File' : 'Post Link';
 }
 
 // ── FORM OPEN / CLOSE ────────────────────────────────────────────────────
@@ -490,6 +499,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-endDate').value = initiative?.endDate || '';
   document.getElementById('fld-objective').value = initiative?.objective || '';
   document.getElementById('fld-contentType').value = initiative?.contentType || CONTENT_TYPES[0];
+  document.getElementById('fld-printType').value = initiative?.printType || PRINT_TYPES[0];
   document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
   document.getElementById('fld-reach').value = initiative?.reach || '';
@@ -531,6 +541,7 @@ window.saveInitiative = async function() {
     objective: document.getElementById('fld-objective').value.trim(),
     channels: selectedChannels,
     contentType: document.getElementById('fld-contentType').value,
+    printType: document.getElementById('fld-printType').value,
     hdCategory: document.getElementById('fld-hdCategory').value,
     postLink: document.getElementById('fld-postLink').value.trim(),
     reach: Number(document.getElementById('fld-reach').value) || null,

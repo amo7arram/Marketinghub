@@ -168,7 +168,8 @@ export async function getTodayRequestCount(email) {
 
 export const REQUEST_TYPES = [
   "New Doctor Announcement","Specialty Awareness Campaign","Event / Seminar / Webinar Promotion",
-  "Print Flyer / Poster","Social Media Post (single)","Video / Reel Production",
+  "Print Flyer / Poster","Brochure / Booklet","Sticker / Signage","Countertop Display",
+  "Social Media Post (single)","Video / Reel Production",
   "Seasonal / Occasion Campaign","Patient Education Content","Internal Communication","Other"
 ];
 export const PRIORITIES = ["Normal","High","Urgent"];
@@ -181,8 +182,9 @@ export const DEPARTMENTS = [
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
 export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
-export const TYPES = ["Campaign","Event","Content","Health Day"];
+export const TYPES = ["Campaign","Event","SM Content","Print","Health Day"];
 export const CONTENT_TYPES = ["Post","Reel","Video","Story","Carousel"];
+export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop"];
 export const HEALTH_DAY_CATEGORIES = ["MOH Health Day","Saudi Occasion","Islamic Occasion","IMC Campaign"];
 
 export const DEPT_COLORS = {
