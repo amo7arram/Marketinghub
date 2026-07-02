@@ -5,7 +5,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc,
+  getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, setDoc,
   getDocs, onSnapshot, query, orderBy, where, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
@@ -27,9 +27,11 @@ export const auth = getAuth(app);
 
 // ── COLLECTIONS ─────────────────────────────────────────────────────────
 const INITIATIVES = "initiatives";
-const METRICS = "metrics";
-const RESOURCES = "resources";
-const REQUESTS = "requests";
+const METRICS     = "metrics";
+const RESOURCES   = "resources";
+const REQUESTS    = "requests";
+const EXPENSES    = "expenses";
+const CONFIG      = "config";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -185,6 +187,41 @@ export function deleteResource(id) {
 }
 
 export const RESOURCE_TYPES = ["Social Media","Print","Stationery","Logo & Brand Mark","Presentation Template","Guideline Document","Other"];
+
+// ── EXPENSE TYPES ────────────────────────────────────────────────────────
+export const EXPENSE_TYPES = [
+  "Paid Social","Print Production","Event","Tools & Subscriptions",
+  "Agency / Freelance","Photography / Videography","Outdoor / OOH","Other"
+];
+
+// ── EXPENSES CRUD ────────────────────────────────────────────────────────
+export function watchExpenses(callback) {
+  const q = query(collection(db, EXPENSES), orderBy("date", "desc"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+export function addExpense(data) {
+  return addDoc(collection(db, EXPENSES), { ...data, createdAt: Timestamp.now() });
+}
+export function updateExpense(id, data) {
+  return updateDoc(doc(db, EXPENSES, id), data);
+}
+export function deleteExpense(id) {
+  return deleteDoc(doc(db, EXPENSES, id));
+}
+
+// ── ANNUAL BUDGET CONFIG ─────────────────────────────────────────────────
+// Stored as a single document: config/budget → { annualBudget: number, year: number }
+export async function getAnnualBudget() {
+  const snap = await getDoc(doc(db, CONFIG, "budget"));
+  return snap.exists() ? snap.data() : { annualBudget: 0, year: new Date().getFullYear() };
+}
+export function setAnnualBudget(annualBudget, year) {
+  return setDoc(doc(db, CONFIG, "budget"), { annualBudget, year }, { merge: true });
+}
+
+
 
 // ── REQUESTS CRUD (Coordinator Request Form → log visible in admin) ────
 export function watchRequests(callback) {

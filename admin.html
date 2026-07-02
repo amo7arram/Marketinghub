@@ -64,6 +64,28 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;vertic
 tr:hover td{background:var(--bg)}
 tr.row-done td{background:#EAF8F0}
 tr.row-done:hover td{background:#DCF2E5}
+
+/* BUDGET */
+.budget-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
+.budget-ceiling{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.budget-ceiling label{font-size:12px;font-weight:600;color:var(--text-2)}
+.budget-ceiling input{font-size:15px;font-weight:700;padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);width:180px;font-family:inherit}
+.budget-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.budget-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:var(--shadow)}
+.budget-stat-label{font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.budget-stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);line-height:1}
+.budget-stat-sub{font-size:10px;color:var(--text-3);margin-top:4px}
+.budget-bar-wrap{margin-bottom:6px}
+.budget-bar-track{height:10px;background:var(--border);border-radius:5px;overflow:hidden}
+.budget-bar-fill{height:100%;border-radius:5px;transition:width 0.5s ease;background:var(--navy)}
+.budget-bar-fill.warn{background:var(--orange)}
+.budget-bar-fill.over{background:var(--red)}
+.budget-charts{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px}
+.budget-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow)}
+.budget-card-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px}
+.budget-chart-wrap{position:relative;height:200px}
+.exp-type-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.SAR{font-size:10px;color:var(--text-3);margin-left:3px}
 .row-actions{display:flex;gap:6px}
 .badge{display:inline-flex;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px}
 .b-planned{background:#E4EDFF;color:#1649A3}
@@ -138,6 +160,7 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('initiatives',this)">Initiatives</div>
+    <div class="tab" onclick="switchTab('budget',this)">Budget</div>
     <div class="tab" onclick="switchTab('requests',this)">Requests</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
@@ -163,6 +186,89 @@ tr.row-done:hover td{background:#DCF2E5}
         <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
       </table>
+    </div>
+
+    <!-- BUDGET PAGE -->
+    <div class="page" id="page-budget">
+      <!-- Annual budget setter -->
+      <div class="budget-header">
+        <div class="budget-ceiling">
+          <label>Annual Budget (SAR)</label>
+          <input type="number" id="annual-budget-input" placeholder="e.g. 500000" min="0">
+          <button class="btn btn-primary" onclick="saveAnnualBudget()">Save</button>
+          <span id="budget-save-status" style="font-size:11px;color:var(--green);display:none">✓ Saved</span>
+        </div>
+        <div class="budget-bar-wrap">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-bottom:4px">
+            <span id="budget-bar-label">Total spent</span>
+            <span id="budget-bar-pct">—</span>
+          </div>
+          <div class="budget-bar-track"><div class="budget-bar-fill" id="budget-bar-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <!-- Stats row -->
+      <div class="budget-stats">
+        <div class="budget-stat">
+          <div class="budget-stat-label">Annual Budget</div>
+          <div class="budget-stat-val" id="bs-budget">—</div>
+          <div class="budget-stat-sub">SAR</div>
+        </div>
+        <div class="budget-stat">
+          <div class="budget-stat-label">Total Spent</div>
+          <div class="budget-stat-val" id="bs-spent">—</div>
+          <div class="budget-stat-sub">SAR</div>
+        </div>
+        <div class="budget-stat">
+          <div class="budget-stat-label">Remaining</div>
+          <div class="budget-stat-val" id="bs-remaining">—</div>
+          <div class="budget-stat-sub">SAR</div>
+        </div>
+        <div class="budget-stat">
+          <div class="budget-stat-label">No. of Expenses</div>
+          <div class="budget-stat-val" id="bs-count">—</div>
+          <div class="budget-stat-sub">entries this year</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="budget-charts">
+        <div class="budget-card">
+          <div class="budget-card-title">Monthly Spend (SAR)</div>
+          <div class="budget-chart-wrap"><canvas id="budgetMonthChart"></canvas></div>
+        </div>
+        <div class="budget-card">
+          <div class="budget-card-title">Spend by Type</div>
+          <div class="budget-chart-wrap"><canvas id="budgetTypeChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select" id="exp-type-filter" onchange="renderBudgetTable()">
+            <option value="">All Types</option>
+          </select>
+          <select class="filter-select" id="exp-entity-filter" onchange="renderBudgetTable()">
+            <option value="">All Entities</option>
+          </select>
+          <select class="filter-select" id="exp-month-filter" onchange="renderBudgetTable()">
+            <option value="">All Months</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openExpenseForm()">+ Add Expense</button>
+      </div>
+
+      <!-- Combined table -->
+      <table>
+        <thead><tr>
+          <th onclick="toggleExpSort()" style="cursor:pointer;user-select:none">Date <span id="exp-sort-arrow">↓</span></th>
+          <th>Title</th><th>Type</th><th>Entity</th><th>Description</th>
+          <th>Source</th><th style="text-align:right">Cost (SAR)</th><th></th>
+        </tr></thead>
+        <tbody id="budget-table-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+      </table>
+      <div id="budget-total-row" style="text-align:right;padding:10px 12px;font-size:13px;font-weight:700;color:var(--navy);background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-lg) var(--radius-lg)"></div>
     </div>
 
     <!-- REQUESTS PAGE -->
@@ -261,6 +367,7 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="field-group" id="fld-hdcategory-wrap"><label class="field-label">Health Day Category</label><select class="field-select" id="fld-hdCategory"></select></div>
       <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
       <div class="field-group" id="fld-postlink-wrap"><label class="field-label" id="fld-postlink-label">Post / Content Link</label><input class="field-input" id="fld-postLink" placeholder="https://..."></div>
+      <div class="field-group" id="fld-cost-wrap"><label class="field-label">Cost (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, appears in Budget tab</span></label><input class="field-input" type="number" id="fld-cost" placeholder="0.00" min="0" step="0.01"></div>
 
       <div class="field-section-title" id="section-perf">Performance (optional)</div>
       <div class="field-row" id="fld-perf-wrap">
@@ -274,6 +381,32 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="modal-footer">
       <button class="btn" onclick="closeForm()">Cancel</button>
       <button class="btn btn-primary" onclick="saveInitiative()">Save Initiative</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EXPENSE FORM MODAL ── -->
+<div class="modal-overlay" id="expense-overlay">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="expense-form-title">New Expense</div>
+      <button class="modal-close" onclick="closeExpenseForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="exp-title" placeholder="e.g. Meta Ads — May 2026"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Type<span style="color:var(--red)">*</span></label><select class="field-select" id="exp-type"></select></div>
+        <div class="field-group"><label class="field-label">Entity</label><select class="field-select" id="exp-entity"><option value="">All / General</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Date<span style="color:var(--red)">*</span></label><input class="field-input" type="date" id="exp-date"></div>
+        <div class="field-group"><label class="field-label">Cost (SAR)<span style="color:var(--red)">*</span></label><input class="field-input" type="number" id="exp-cost" placeholder="0.00" min="0" step="0.01"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" id="exp-description" placeholder="Optional notes..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeExpenseForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveExpense()">Save Expense</button>
     </div>
   </div>
 </div>
@@ -307,6 +440,8 @@ import {
   getMetricsForPeriod, getMetricPeriods, saveMonthMetrics as saveMonthMetricsToDb, deleteMetric,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
+  watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
+  getAnnualBudget, setAnnualBudget,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES
 } from './firebase-data.js';
@@ -315,15 +450,20 @@ import {
 let ALL_INITIATIVES = [];
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
+let ALL_EXPENSES = [];
 let ALL_METRIC_PERIODS = [];
+let ANNUAL_BUDGET = 0;
 let currentType = 'Campaign';
 let editingId = null;
 let editingResourceId = null;
+let editingExpenseId = null;
+let expSortDir = 'desc';
 let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
 let unsubResources = null;
 let unsubRequests = null;
+let unsubExpenses = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
 
@@ -383,15 +523,18 @@ watchAuth(async user => {
     if(unsubInitiatives) unsubInitiatives();
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
+    if(unsubExpenses) unsubExpenses();
   }
 });
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); });
+  unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); });
   unsubResources = watchResources(data => { ALL_RESOURCES = data; renderResourcesTable(); });
   unsubRequests = watchRequests(data => { ALL_REQUESTS = data; renderRequestsTable(); });
+  unsubExpenses = watchExpenses(data => { ALL_EXPENSES = data; renderBudgetTab(); });
   initMetricsTab();
+  initBudgetTab();
 }
 
 // ── TABS ───────────────────────────────────────────────────────────────
@@ -427,6 +570,19 @@ function populateStaticSelects() {
 
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
+
+  // Expense form
+  document.getElementById('exp-type').innerHTML = EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('exp-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
+  // Budget table filters
+  document.getElementById('exp-type-filter').innerHTML += EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('exp-entity-filter').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
+  const now = new Date();
+  const months = Array.from({length:12},(_,i)=>{
+    const d = new Date(now.getFullYear(),i,1);
+    return `<option value="${String(i+1).padStart(2,'0')}">${d.toLocaleString('en',{month:'long'})}</option>`;
+  }).join('');
+  document.getElementById('exp-month-filter').innerHTML += months;
 
   document.getElementById('type-switcher').innerHTML = TYPES.map(t=>
     `<div class="type-btn" data-type="${t}" onclick="selectType('${t}')">${t}</div>`
@@ -505,6 +661,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-printType').value = initiative?.printType || PRINT_TYPES[0];
   document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
+  document.getElementById('fld-cost').value = initiative?.cost ?? '';
   document.getElementById('fld-reach').value = initiative?.reach || '';
   document.getElementById('fld-impressions').value = initiative?.impressions || '';
   document.getElementById('fld-engagements').value = initiative?.engagements || '';
@@ -547,6 +704,7 @@ window.saveInitiative = async function() {
     printType: document.getElementById('fld-printType').value,
     hdCategory: document.getElementById('fld-hdCategory').value,
     postLink: document.getElementById('fld-postLink').value.trim(),
+    cost: parseFloat(document.getElementById('fld-cost').value) || null,
     reach: Number(document.getElementById('fld-reach').value) || null,
     impressions: Number(document.getElementById('fld-impressions').value) || null,
     engagements: Number(document.getElementById('fld-engagements').value) || null,
@@ -628,6 +786,220 @@ window.renderTable = function() {
         </td>
       </tr>`).join('')
     : '<tr><td colspan="7" class="empty">No initiatives found</td></tr>';
+}
+
+// ── BUDGET ────────────────────────────────────────────────────────────────
+let budgetMonthChart = null;
+let budgetTypeChart  = null;
+
+const EXPENSE_TYPE_COLORS = [
+  '#00539B','#00A3D9','#C8A96E','#1DB87A','#E8820C','#6C5CE7','#E0392B','#0BA4A4'
+];
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+async function initBudgetTab() {
+  const cfg = await getAnnualBudget();
+  ANNUAL_BUDGET = cfg.annualBudget || 0;
+  document.getElementById('annual-budget-input').value = ANNUAL_BUDGET || '';
+  renderBudgetTab();
+}
+
+function getBudgetRows() {
+  const year = new Date().getFullYear();
+  // Standalone expenses for this year
+  const expRows = ALL_EXPENSES
+    .filter(e => e.date && e.date.startsWith(String(year)))
+    .map(e => ({ ...e, source: 'expense' }));
+  // Initiative costs for this year
+  const initRows = ALL_INITIATIVES
+    .filter(i => i.cost && i.cost > 0 && i.startDate && i.startDate.startsWith(String(year)))
+    .map(i => ({
+      id: i.id, title: i.title,
+      type: i.type === 'SM Content' ? 'Paid Social'
+          : i.type === 'Print'      ? 'Print Production'
+          : i.type === 'Event'      ? 'Event' : 'Other',
+      entity: (i.entity||[]).join(', '),
+      description: i.objective || '',
+      date: i.startDate, cost: i.cost,
+      source: 'initiative',
+    }));
+  return [...expRows, ...initRows];
+}
+
+function renderBudgetTab() {
+  const rows = getBudgetRows();
+  const totalSpent = rows.reduce((s,r) => s + (r.cost||0), 0);
+  const remaining  = ANNUAL_BUDGET - totalSpent;
+  const pct        = ANNUAL_BUDGET > 0 ? Math.min(100, Math.round(totalSpent/ANNUAL_BUDGET*100)) : 0;
+
+  // Stats
+  document.getElementById('bs-budget').textContent    = ANNUAL_BUDGET ? fmtSAR(ANNUAL_BUDGET) : '—';
+  document.getElementById('bs-spent').textContent     = fmtSAR(totalSpent);
+  document.getElementById('bs-remaining').textContent = ANNUAL_BUDGET ? fmtSAR(remaining) : '—';
+  document.getElementById('bs-count').textContent     = rows.length;
+
+  // Progress bar
+  const fill = document.getElementById('budget-bar-fill');
+  fill.style.width = pct + '%';
+  fill.className = 'budget-bar-fill' + (pct >= 100 ? ' over' : pct >= 80 ? ' warn' : '');
+  document.getElementById('budget-bar-pct').textContent = ANNUAL_BUDGET ? `${pct}% used` : '';
+  document.getElementById('budget-bar-label').textContent =
+    `SAR ${totalSpent.toLocaleString()} spent${ANNUAL_BUDGET ? ' of SAR ' + ANNUAL_BUDGET.toLocaleString() : ''}`;
+
+  renderBudgetCharts(rows);
+  renderBudgetTable(rows);
+}
+
+function renderBudgetCharts(rows) {
+  // Monthly spend
+  const monthly = Array(12).fill(0);
+  rows.forEach(r => {
+    if(!r.date) return;
+    const m = parseInt(r.date.split('-')[1]) - 1;
+    if(m >= 0 && m < 12) monthly[m] += r.cost || 0;
+  });
+  if(budgetMonthChart) budgetMonthChart.destroy();
+  budgetMonthChart = new Chart(document.getElementById('budgetMonthChart'), {
+    type: 'bar',
+    data: { labels: MONTH_SHORT, datasets: [{
+      data: monthly, backgroundColor: '#00539B', borderRadius: 4,
+    }]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ y:{ ticks:{ callback: v => v>=1000?(v/1000)+'K':v, font:{size:9} }, grid:{color:'rgba(0,0,0,0.04)'} } } }
+  });
+
+  // Spend by type
+  const byType = {};
+  rows.forEach(r => { byType[r.type||'Other'] = (byType[r.type||'Other']||0) + (r.cost||0); });
+  const typeLabels = Object.keys(byType);
+  const typeData   = Object.values(byType);
+  if(budgetTypeChart) budgetTypeChart.destroy();
+  budgetTypeChart = new Chart(document.getElementById('budgetTypeChart'), {
+    type: 'doughnut',
+    data: { labels: typeLabels, datasets: [{
+      data: typeData,
+      backgroundColor: EXPENSE_TYPE_COLORS.slice(0, typeLabels.length),
+      borderWidth: 2, borderColor: '#fff',
+    }]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ font:{size:10}, boxWidth:10, padding:8 } } } }
+  });
+}
+
+window.toggleExpSort = function() {
+  expSortDir = expSortDir==='asc' ? 'desc' : 'asc';
+  document.getElementById('exp-sort-arrow').textContent = expSortDir==='asc' ? '↑' : '↓';
+  renderBudgetTab();
+}
+
+window.renderBudgetTable = function() { renderBudgetTab(); }
+
+function renderBudgetTable(rows) {
+  if(!rows) rows = getBudgetRows();
+  const typeF   = document.getElementById('exp-type-filter').value;
+  const entityF = document.getElementById('exp-entity-filter').value;
+  const monthF  = document.getElementById('exp-month-filter').value;
+
+  let filtered = rows.filter(r => {
+    if(typeF   && r.type   !== typeF) return false;
+    if(entityF && !(r.entity||'').includes(entityF)) return false;
+    if(monthF  && r.date   && r.date.split('-')[1] !== monthF) return false;
+    return true;
+  });
+  filtered = [...filtered].sort((a,b) =>
+    expSortDir==='asc' ? (a.date||'').localeCompare(b.date||'') : (b.date||'').localeCompare(a.date||'')
+  );
+  const filteredTotal = filtered.reduce((s,r)=>s+(r.cost||0), 0);
+
+  document.getElementById('budget-table-body').innerHTML = filtered.length
+    ? filtered.map(r => {
+        const isInit = r.source === 'initiative';
+        const srcBadge = isInit
+          ? `<span class="badge b-planned">Initiative</span>`
+          : `<span class="badge b-ready">Expense</span>`;
+        const actions = isInit ? '' :
+          `<td class="row-actions">
+            <button class="btn btn-sm" onclick="editExpense('${r.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="removeExpense('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button>
+          </td>`;
+        return `<tr>
+          <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${r.date||'—'}</td>
+          <td style="font-weight:600">${r.title||''}</td>
+          <td><span class="type-pill">${r.type||''}</span></td>
+          <td style="font-size:11px;color:var(--text-3)">${r.entity||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3);max-width:160px">${r.description||''}</td>
+          <td>${srcBadge}</td>
+          <td style="text-align:right;font-weight:700;color:var(--navy)">${(r.cost||0).toLocaleString()}</td>
+          ${isInit ? '<td></td>' : actions}
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="8" class="empty">No expenses found</td></tr>';
+
+  document.getElementById('budget-total-row').innerHTML =
+    `Showing ${filtered.length} entries · Total: <span style="color:var(--navy)">SAR ${filteredTotal.toLocaleString()}</span>`;
+}
+
+window.saveAnnualBudget = async function() {
+  const val = parseFloat(document.getElementById('annual-budget-input').value) || 0;
+  const year = new Date().getFullYear();
+  try {
+    await setAnnualBudget(val, year);
+    ANNUAL_BUDGET = val;
+    const s = document.getElementById('budget-save-status');
+    s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 2500);
+    renderBudgetTab();
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// Expense CRUD
+window.openExpenseForm = function(expense=null) {
+  editingExpenseId = expense ? expense.id : null;
+  document.getElementById('expense-form-title').textContent = expense ? 'Edit Expense' : 'New Expense';
+  document.getElementById('exp-title').value       = expense?.title || '';
+  document.getElementById('exp-type').value        = expense?.type  || EXPENSE_TYPES[0];
+  document.getElementById('exp-entity').value      = expense?.entity || '';
+  document.getElementById('exp-date').value        = expense?.date  || '';
+  document.getElementById('exp-cost').value        = expense?.cost  ?? '';
+  document.getElementById('exp-description').value = expense?.description || '';
+  document.getElementById('expense-overlay').classList.add('open');
+}
+window.closeExpenseForm = function() {
+  document.getElementById('expense-overlay').classList.remove('open');
+}
+window.saveExpense = async function() {
+  const title = document.getElementById('exp-title').value.trim();
+  const cost  = parseFloat(document.getElementById('exp-cost').value);
+  const date  = document.getElementById('exp-date').value;
+  if(!title || isNaN(cost) || !date) { showToast('Title, date and cost are required', true); return; }
+  const data = {
+    title,
+    type:        document.getElementById('exp-type').value,
+    entity:      document.getElementById('exp-entity').value,
+    date,
+    cost,
+    description: document.getElementById('exp-description').value.trim(),
+  };
+  try {
+    if(editingExpenseId) { await updateExpense(editingExpenseId, data); showToast('Expense updated'); }
+    else { await addExpense(data); showToast('Expense added'); }
+    closeExpenseForm();
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+window.editExpense = function(id) {
+  const e = ALL_EXPENSES.find(x=>x.id===id);
+  if(e) openExpenseForm(e);
+}
+window.removeExpense = async function(id, title) {
+  if(!confirm(`Delete expense "${title}"?`)) return;
+  try { await deleteExpense(id); showToast('Expense deleted'); }
+  catch(e) { showToast('Delete failed: '+e.message, true); }
+}
+
+function fmtSAR(n) {
+  if(!n && n!==0) return '—';
+  return n >= 1000000 ? (n/1000000).toFixed(1)+'M'
+       : n >= 1000    ? (n/1000).toFixed(1)+'K'
+       : n.toLocaleString();
 }
 
 // ── METRICS — MONTHLY BULK ENTRY ──────────────────────────────────────────
