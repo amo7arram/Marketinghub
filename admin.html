@@ -199,13 +199,25 @@ tr.row-done:hover td{background:#DCF2E5}
     <!-- METRICS PAGE -->
     <div class="page" id="page-metrics">
       <div class="toolbar">
-        <div></div>
-        <button class="btn btn-primary" onclick="openMetricForm()">+ New Metric</button>
+        <div class="filters">
+          <label style="font-size:12px;font-weight:600;color:var(--text-2)">Month:</label>
+          <input type="month" class="filter-select" id="metrics-period" style="width:160px">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="metrics-save-status" style="font-size:11px;color:var(--green);display:none">✓ Saved</span>
+          <button class="btn btn-primary" onclick="saveMonthMetrics()">Save Month</button>
+        </div>
       </div>
-      <table>
-        <thead><tr><th>Metric Name</th><th>Category</th><th>Current</th><th>Previous</th><th>Unit</th><th>Period</th><th>Actions</th></tr></thead>
-        <tbody id="metrics-table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
-      </table>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)" id="metrics-month-label">Select a month to enter or update metrics</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px">Enter numbers for the selected month — leave blank for metrics you don't have yet</div>
+          </div>
+          <div id="metrics-history-links" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div id="metrics-grid-wrap" style="padding:4px 0"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -266,33 +278,6 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
 </div>
 
-<!-- ── METRIC FORM MODAL ── -->
-<div class="modal-overlay" id="metric-overlay">
-  <div class="modal" style="width:420px">
-    <div class="modal-header">
-      <div class="modal-title" id="metric-form-title">New Metric</div>
-      <button class="modal-close" onclick="closeMetricForm()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="field-group"><label class="field-label">Metric Name</label><input class="field-input" id="m-name" placeholder="e.g. Instagram Reach"></div>
-      <div class="field-group"><label class="field-label">Category</label><input class="field-input" id="m-category" placeholder="e.g. Social Media"></div>
-      <div class="field-row">
-        <div class="field-group"><label class="field-label">Current Value</label><input class="field-input" type="number" id="m-current"></div>
-        <div class="field-group"><label class="field-label">Previous Value</label><input class="field-input" type="number" id="m-previous"></div>
-      </div>
-      <div class="field-row">
-        <div class="field-group"><label class="field-label">Unit</label><select class="field-select" id="m-unit"><option value="">Number</option><option>Percentage</option><option>SAR</option></select></div>
-        <div class="field-group"><label class="field-label">Period</label><input class="field-input" id="m-period" placeholder="2026-06"></div>
-      </div>
-      <div class="field-group"><label class="field-label">Notes</label><input class="field-input" id="m-notes"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeMetricForm()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveMetric()">Save Metric</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── RESOURCE FORM MODAL ── -->
 <div class="modal-overlay" id="resource-overlay">
   <div class="modal" style="width:460px">
@@ -319,25 +304,24 @@ tr.row-done:hover td{background:#DCF2E5}
 import {
   login, logout, watchAuth, getUserRole,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
-  getMetrics, watchMetrics, addMetric, updateMetric, deleteMetric,
+  getMetricsForPeriod, getMetricPeriods, saveMonthMetrics as saveMonthMetricsToDb, deleteMetric,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
-  DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, HEALTH_DAY_CATEGORIES
+  DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
+  HEALTH_DAY_CATEGORIES, METRIC_NAMES
 } from './firebase-data.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
-let ALL_METRICS = [];
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
+let ALL_METRIC_PERIODS = [];
 let currentType = 'Campaign';
 let editingId = null;
-let editingMetricId = null;
 let editingResourceId = null;
 let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
-let unsubMetrics = null;
 let unsubResources = null;
 let unsubRequests = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
@@ -348,12 +332,17 @@ window.doLogin = async function() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
+  const btn = document.querySelector('.login-btn');
   errEl.style.display = 'none';
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
   try {
     await login(email, password);
   } catch(e) {
     errEl.textContent = 'Sign-in failed — check your email and password.';
     errEl.style.display = 'block';
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
   }
 }
 window.doLogout = async function() {
@@ -361,23 +350,37 @@ window.doLogout = async function() {
 }
 
 watchAuth(async user => {
+  const btn = document.querySelector('.login-btn');
   if(user) {
-    const role = await getUserRole(user.uid);
-    if(role !== 'admin') {
-      document.getElementById('login-error').textContent = 'This account does not have admin access.';
-      document.getElementById('login-error').style.display = 'block';
+    try {
+      const role = await getUserRole(user.uid);
+      if(role !== 'admin') {
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = role
+          ? 'This account does not have admin access.'
+          : 'No role assigned to this account — contact your administrator.';
+        errEl.style.display = 'block';
+        if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
+        await logout();
+        return;
+      }
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('app').classList.add('active');
+      document.getElementById('user-email').textContent = user.email;
+      initData();
+    } catch(e) {
+      console.error('Role check failed:', e);
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = 'Could not verify access — check Firestore rules for the roles collection. Error: ' + e.message;
+      errEl.style.display = 'block';
+      if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
       await logout();
-      return;
     }
-    document.getElementById('login-wrap').style.display = 'none';
-    document.getElementById('app').classList.add('active');
-    document.getElementById('user-email').textContent = user.email;
-    initData();
   } else {
+    if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
     document.getElementById('login-wrap').style.display = 'flex';
     document.getElementById('app').classList.remove('active');
     if(unsubInitiatives) unsubInitiatives();
-    if(unsubMetrics) unsubMetrics();
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
   }
@@ -386,9 +389,9 @@ watchAuth(async user => {
 function initData() {
   populateStaticSelects();
   unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); });
-  unsubMetrics = watchMetrics(data => { ALL_METRICS = data; renderMetricsTable(); });
   unsubResources = watchResources(data => { ALL_RESOURCES = data; renderResourcesTable(); });
   unsubRequests = watchRequests(data => { ALL_REQUESTS = data; renderRequestsTable(); });
+  initMetricsTab();
 }
 
 // ── TABS ───────────────────────────────────────────────────────────────
@@ -627,65 +630,91 @@ window.renderTable = function() {
     : '<tr><td colspan="7" class="empty">No initiatives found</td></tr>';
 }
 
-// ── METRICS ───────────────────────────────────────────────────────────
-window.openMetricForm = function(metric=null) {
-  editingMetricId = metric ? metric.id : null;
-  document.getElementById('metric-form-title').textContent = metric ? 'Edit Metric' : 'New Metric';
-  document.getElementById('m-name').value = metric?.metricName || '';
-  document.getElementById('m-category').value = metric?.category || '';
-  document.getElementById('m-current').value = metric?.currentValue ?? '';
-  document.getElementById('m-previous').value = metric?.previousValue ?? '';
-  document.getElementById('m-unit').value = metric?.unit || '';
-  document.getElementById('m-period').value = metric?.period || '';
-  document.getElementById('m-notes').value = metric?.notes || '';
-  document.getElementById('metric-overlay').classList.add('open');
+// ── METRICS — MONTHLY BULK ENTRY ──────────────────────────────────────────
+const METRIC_CATEGORIES = {
+  "Instagram Reach":"Instagram","Instagram Impressions":"Instagram",
+  "Instagram Engagements":"Instagram","Instagram Engagement Rate":"Instagram",
+  "Instagram Followers":"Instagram","TikTok Views":"TikTok","TikTok Followers":"TikTok",
+  "X Reach":"X","LinkedIn Reach":"LinkedIn","SM Messages Received":"Social Media",
+  "PR Mentions":"PR","Website Visits":"Website",
+};
+const METRIC_ICONS = {"Instagram":"📸","TikTok":"🎵","X":"𝕏","LinkedIn":"💼","Social Media":"✉️","PR":"📰","Website":"🌐"};
+
+async function initMetricsTab() {
+  const now = new Date();
+  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('metrics-period').value = defaultPeriod;
+  document.getElementById('metrics-period').addEventListener('change', loadMetricsForPeriod);
+  ALL_METRIC_PERIODS = await getMetricPeriods();
+  renderMetricHistoryLinks();
+  await loadMetricsForPeriod();
 }
-window.closeMetricForm = function() {
-  document.getElementById('metric-overlay').classList.remove('open');
+
+async function loadMetricsForPeriod() {
+  const period = document.getElementById('metrics-period').value;
+  if(!period) return;
+  const [year, month] = period.split('-');
+  const monthName = new Date(year, month-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
+  document.getElementById('metrics-month-label').textContent = `${monthName} — Performance Metrics`;
+  const existing = await getMetricsForPeriod(period);
+  const valueMap = {};
+  existing.forEach(m => { valueMap[m.metricName] = m.value; });
+  const byCategory = {};
+  METRIC_NAMES.forEach(name => {
+    const cat = METRIC_CATEGORIES[name]||'Other';
+    if(!byCategory[cat]) byCategory[cat]=[];
+    byCategory[cat].push(name);
+  });
+  let html = '';
+  Object.entries(byCategory).forEach(([cat, names]) => {
+    html += `<div style="padding:12px 20px;border-bottom:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">${METRIC_ICONS[cat]||'📊'} ${cat}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${names.map(name=>`
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">${name}</label>
+            <input class="filter-input" type="number" min="0"
+              id="metric-input-${name.replace(/\s+/g,'_')}"
+              value="${valueMap[name]??''}" placeholder="0"
+              style="width:100%;padding:7px 10px;font-size:13px;font-weight:600">
+          </div>`).join('')}
+      </div>
+    </div>`;
+  });
+  document.getElementById('metrics-grid-wrap').innerHTML = html;
 }
-window.saveMetric = async function() {
-  const metricName = document.getElementById('m-name').value.trim();
-  if(!metricName) { showToast('Metric name is required', true); return; }
-  const data = {
-    metricName,
-    category: document.getElementById('m-category').value.trim(),
-    currentValue: Number(document.getElementById('m-current').value) || 0,
-    previousValue: Number(document.getElementById('m-previous').value) || 0,
-    unit: document.getElementById('m-unit').value,
-    period: document.getElementById('m-period').value.trim(),
-    notes: document.getElementById('m-notes').value.trim(),
-  };
+
+window.saveMonthMetrics = async function() {
+  const period = document.getElementById('metrics-period').value;
+  if(!period) { showToast('Select a month first', true); return; }
+  const metricsObj = {};
+  METRIC_NAMES.forEach(name => {
+    const el = document.getElementById('metric-input-'+name.replace(/\s+/g,'_'));
+    if(el && el.value !== '') metricsObj[name] = parseFloat(el.value)||0;
+  });
+  if(!Object.keys(metricsObj).length) { showToast('Enter at least one value', true); return; }
   try {
-    if(editingMetricId) { await updateMetric(editingMetricId, data); showToast('Metric updated'); }
-    else { await addMetric(data); showToast('Metric created'); }
-    closeMetricForm();
-  } catch(e) { showToast('Save failed: ' + e.message, true); }
+    await saveMonthMetricsToDb(period, metricsObj);
+    const s = document.getElementById('metrics-save-status');
+    s.style.display='inline'; setTimeout(()=>s.style.display='none', 3000);
+    ALL_METRIC_PERIODS = await getMetricPeriods();
+    renderMetricHistoryLinks();
+  } catch(e) { showToast('Save failed: '+e.message, true); }
 }
-window.editMetric = function(id) {
-  const m = ALL_METRICS.find(x=>x.id===id);
-  if(m) openMetricForm(m);
+
+function renderMetricHistoryLinks() {
+  const el = document.getElementById('metrics-history-links');
+  if(!ALL_METRIC_PERIODS.length){el.innerHTML='';return;}
+  el.innerHTML='<span style="font-size:11px;color:var(--text-3);margin-right:4px">History:</span>'+
+    ALL_METRIC_PERIODS.slice(0,6).map(p=>{
+      const [y,m]=p.split('-');
+      const label=new Date(y,m-1,1).toLocaleString('en',{month:'short',year:'2-digit'});
+      return `<button class="btn btn-sm" onclick="jumpToPeriod('${p}')">${label}</button>`;
+    }).join('');
 }
-window.removeMetric = async function(id, name) {
-  if(!confirm(`Delete metric "${name}"?`)) return;
-  try { await deleteMetric(id); showToast('Metric deleted'); }
-  catch(e) { showToast('Delete failed: ' + e.message, true); }
-}
-window.renderMetricsTable = function() {
-  document.getElementById('metrics-table-body').innerHTML = ALL_METRICS.length
-    ? ALL_METRICS.map(m=>`
-      <tr>
-        <td style="font-weight:600">${m.metricName||''}</td>
-        <td>${m.category||''}</td>
-        <td style="font-weight:600">${m.currentValue ?? '—'}</td>
-        <td>${m.previousValue ?? '—'}</td>
-        <td>${m.unit||'—'}</td>
-        <td>${m.period||'—'}</td>
-        <td class="row-actions">
-          <button class="btn btn-sm" onclick="editMetric('${m.id}')">Edit</button>
-          <button class="btn btn-sm btn-danger" onclick="removeMetric('${m.id}','${(m.metricName||'').replace(/'/g,"\\'")}')">Delete</button>
-        </td>
-      </tr>`).join('')
-    : '<tr><td colspan="7" class="empty">No metrics found</td></tr>';
+window.jumpToPeriod = async function(period) {
+  document.getElementById('metrics-period').value = period;
+  await loadMetricsForPeriod();
 }
 
 // ── RESOURCES ─────────────────────────────────────────────────────────
