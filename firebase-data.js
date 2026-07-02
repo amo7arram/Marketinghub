@@ -82,6 +82,13 @@ export function deleteInitiative(id) {
 }
 
 
+// watchMetrics — real-time listener for dashboard (reads any format metric doc)
+export function watchMetrics(callback) {
+  return onSnapshot(collection(db, METRICS), snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
 // ── METRICS CRUD (period-based — one document per metric per month) ──────
 // Document ID format: "metricName_YYYY-MM" e.g. "Instagram Reach_2026-06"
 // This preserves full history so the portal can show any past month.

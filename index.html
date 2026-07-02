@@ -298,11 +298,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <input class="search-input" type="text" id="global-search" placeholder="Search campaigns, content, events..." oninput="onSearchInput(this.value)" onfocus="onSearchInput(this.value)">
           <div class="search-results" id="search-results"></div>
         </div>
-        <div class="date-range-wrap" id="dash-daterange" style="display:none">
-          <span>From</span><input type="date" id="date-from">
-          <span>to</span><input type="date" id="date-to">
-          <button class="btn btn-sm" onclick="renderDashboard()">Apply</button>
-        </div>
+        <div class="date-range-wrap" id="dash-daterange" style="display:none"></div>
         <button class="btn btn-primary" onclick="window.print()">Export</button>
       </div>
     </div>
@@ -475,16 +471,16 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 
 <script type="module">
 import {
-  watchInitiatives, watchMetrics, watchResources,
-  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES
+  watchInitiatives, watchResources, watchMetrics,
+  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES
 } from './firebase-data.js';
 
 let RESOURCES = [];
 
 // ── STATE ──────────────────────────────────────────────────────────────
-let ALL = [];      // all initiatives
+let ALL = [];
 let METRICS = [];
-let campSortDir = null; // null, 'asc', 'desc'
+let campSortDir = null;
 
 const PAGE_META = {
   dashboard:     {title:'Dashboard', sub:'Performance overview — current month'},
@@ -562,12 +558,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-function initDates() {
-  const now = new Date();
-  document.getElementById('date-from').value = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-  document.getElementById('date-to').value = now.toISOString().split('T')[0];
-}
-
 function populateFilters() {
   const deptOptionsHtml = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   ['cal-dept','hd-dept-filter','lib-dept-filter'].forEach(id=>{
@@ -610,16 +600,16 @@ watchResources(data => {
 function renderAll() {
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
   if(!activePage) return;
-  if(activePage==='dashboard') renderDashboard();
-  if(activePage==='timeline') renderTimeline();
-  if(activePage==='smcalendar') renderCalendar();
-  if(activePage==='campaigns') renderCampaigns();
-  if(activePage==='events') renderEvents();
+  if(activePage==='dashboard')     window.renderDashboard();
+  if(activePage==='timeline')      renderTimeline();
+  if(activePage==='smcalendar')    window.renderCalendar();
+  if(activePage==='campaigns')     window.renderCampaigns();
+  if(activePage==='events')        window.renderEvents();
   if(activePage==='deptcampaigns') renderDeptCampaigns();
-  if(activePage==='healthdays') renderHealthDays();
-  if(activePage==='library')    window.renderLibrary();
-  if(activePage==='print')      window.renderPrint();
-  if(activePage==='resources')  window.renderResources();
+  if(activePage==='healthdays')    window.renderHealthDays();
+  if(activePage==='library')       window.renderLibrary();
+  if(activePage==='print')         window.renderPrint();
+  if(activePage==='resources')     window.renderResources();
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────────
@@ -645,10 +635,13 @@ function deptStyle(d) {
 function getMetric(name) { return METRICS.find(m=>m.metricName===name)||null; }
 function metricDelta(m) {
   if(!m) return '';
-  const cur=m.currentValue, prev=m.previousValue;
+  const cur = m.currentValue ?? m.value;
+  const prev = m.previousValue;
   if(!cur || !prev) return '';
   const pct = Math.round((cur-prev)/prev*100);
-  return pct>=0 ? `<span class="up">▲ ${pct}% vs last period</span>` : `<span class="down">▼ ${Math.abs(pct)}% vs last period</span>`;
+  return pct>=0
+    ? `<span class="up">▲ ${pct}% vs last month</span>`
+    : `<span class="down">▼ ${Math.abs(pct)}% vs last month</span>`;
 }
 function eventStatus(start, end) {
   const today = new Date().setHours(0,0,0,0);
@@ -664,14 +657,16 @@ function eventStatus(start, end) {
 let chartPerf=null, chartWeb=null;
 window.renderDashboard = function() {
   const pairs = [
-    ['m-reach','Instagram Reach'],['m-imp','Instagram Impressions'],['m-eng','Instagram Engagements'],
-    ['m-web','Website Visits'],['m-engr','Instagram Engagement Rate'],['m-ig','Instagram Followers'],
+    ['m-reach','Instagram Reach'],['m-imp','Instagram Impressions'],
+    ['m-eng','Instagram Engagements'],['m-web','Website Visits'],
+    ['m-engr','Instagram Engagement Rate'],['m-ig','Instagram Followers'],
     ['m-tiktok','TikTok Views'],['m-x','X Reach'],['m-li','LinkedIn Reach'],
     ['m-msg','SM Messages Received'],['m-pr','PR Mentions'],
   ];
   pairs.forEach(([vid,name])=>{
     const m = getMetric(name);
-    document.getElementById(vid).textContent = m ? fmt(m.currentValue)+(m.unit==='Percentage'?'%':'') : '—';
+    const val = m ? (m.currentValue ?? m.value) : null;
+    document.getElementById(vid).textContent = val !== null ? fmt(val)+(name.includes('Rate')?'%':'') : '—';
     document.getElementById(vid+'-d').innerHTML = metricDelta(m);
   });
 
@@ -684,15 +679,19 @@ window.renderDashboard = function() {
         <span style="margin-left:4px">${entityBadge(c.entity)}</span>
         ${statusBadge(c.status)}
       </div>`).join('')
-    : '<div class="empty-state"><div class="empty-state-icon">📋</div>No campaigns yet — add one in the admin panel</div>';
+    : '<div class="empty-state"><div class="empty-state-icon">📋</div>No campaigns yet</div>';
 
-  const labels=['Jan','Feb','Mar','Apr','May','Jun'];
+  renderCharts();
+}
+
+function renderCharts() {
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun'];
   const imp = getMetric('Instagram Impressions');
   const eng = getMetric('Instagram Engagements');
   const web = getMetric('Website Visits');
-  const impData=[180000,210000,290000,255000,300000,(imp?.currentValue)||310000];
-  const engData=[6000,7200,9100,8400,9200,(eng?.currentValue)||9840];
-  const visData=[8200,9400,11300,10200,11800,(web?.currentValue)||12400];
+  const impData = [180000,210000,290000,255000,300000, imp ? (imp.currentValue ?? imp.value ?? 310000) : 310000];
+  const engData = [6000,7200,9100,8400,9200, eng ? (eng.currentValue ?? eng.value ?? 9840) : 9840];
+  const visData = [8200,9400,11300,10200,11800, web ? (web.currentValue ?? web.value ?? 12400) : 12400];
 
   if(chartPerf) chartPerf.destroy();
   chartPerf = new Chart(document.getElementById('perfChart'),{
@@ -702,13 +701,19 @@ window.renderDashboard = function() {
       {label:'Engagements',data:engData,backgroundColor:'#00A3D9',borderRadius:3,yAxisID:'y2'},
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}}},y2:{position:'right',ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{display:false}}}}
+      scales:{
+        y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}},
+        y2:{position:'right',ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{display:false}}
+      }}
   });
   if(chartWeb) chartWeb.destroy();
   chartWeb = new Chart(document.getElementById('webChart'),{
     type:'line',
-    data:{labels,datasets:[{label:'Visitors',data:visData,borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.1)',tension:0.4,fill:true,pointRadius:3,borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}}}}}
+    data:{labels,datasets:[
+      {label:'Visitors',data:visData,borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.1)',tension:0.4,fill:true,pointRadius:3,borderWidth:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
   });
 }
 
@@ -1153,7 +1158,6 @@ function loadScriptOnce(id, src, onReady) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────
-initDates();
 populateFilters();
 </script>
 </body>
