@@ -32,6 +32,7 @@ const RESOURCES   = "resources";
 const REQUESTS    = "requests";
 const EXPENSES    = "expenses";
 const CONFIG      = "config";
+const PROMOTIONS  = "promotions";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -211,7 +212,35 @@ export function deleteExpense(id) {
   return deleteDoc(doc(db, EXPENSES, id));
 }
 
-// ── ANNUAL BUDGET CONFIG ─────────────────────────────────────────────────
+// ── PROMOTIONS CRUD ───────────────────────────────────────────────────────
+export function watchPromotions(callback) {
+  const q = query(collection(db, PROMOTIONS), orderBy("startDate", "desc"));
+  return onSnapshot(q, snap => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+export function addPromotion(data) {
+  return addDoc(collection(db, PROMOTIONS), { ...data, createdAt: Timestamp.now() });
+}
+export function updatePromotion(id, data) {
+  return updateDoc(doc(db, PROMOTIONS, id), data);
+}
+export function deletePromotion(id) {
+  return deleteDoc(doc(db, PROMOTIONS, id));
+}
+
+// Helper: derive promotion status from dates (no manual status needed)
+export function promoStatus(startDate, endDate) {
+  if(!startDate) return 'Upcoming';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = new Date(startDate);
+  const end   = endDate ? new Date(endDate) : null;
+  if(today < start) return 'Upcoming';
+  if(end && today > end) return 'Expired';
+  return 'Active';
+}
+
+
 // Stored as a single document: config/budget → { annualBudget: number, year: number }
 export async function getAnnualBudget() {
   const snap = await getDoc(doc(db, CONFIG, "budget"));

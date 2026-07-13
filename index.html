@@ -243,6 +243,35 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .res-download-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#fff;background:var(--navy);padding:6px 12px;border-radius:20px;text-decoration:none}
 .res-download-btn:hover{background:#003f7a}
 
+/* PROMOTIONS */
+.promotions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.promo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:all var(--transition)}
+.promo-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.promo-card.active-promo{border-color:var(--green);border-width:2px}
+.promo-card.expired-promo{opacity:0.65}
+.promo-card-header{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.promo-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;flex:1}
+.promo-discount-badge{flex-shrink:0;background:var(--green);color:#fff;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;padding:4px 10px;border-radius:8px;line-height:1}
+.promo-card-body{padding:0 16px 14px;font-size:11px;color:var(--text-3);line-height:1.55}
+.promo-price-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.promo-price-orig{font-size:12px;color:var(--text-3);text-decoration:line-through}
+.promo-price-new{font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--green)}
+.promo-price-sar{font-size:10px;color:var(--text-3);margin-top:2px}
+.promo-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
+
+/* PROMO DETAIL PANEL — reuses dp-* styles from detail panel CSS */
+.promo-detail-section{margin-bottom:18px}
+.promo-detail-label{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px}
+.promo-highlight{background:var(--gold-light);border:1px solid var(--gold);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;text-align:center}
+.promo-highlight-pct{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:var(--navy);line-height:1}
+.promo-highlight-label{font-size:11px;color:var(--text-3);margin-top:2px}
+.promo-prices-row{display:flex;gap:16px;margin-bottom:14px}
+.promo-price-box{flex:1;background:var(--bg);border-radius:var(--radius);padding:12px;text-align:center;border:1px solid var(--border)}
+.promo-price-box-label{font-size:9.5px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.promo-price-box-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text)}
+.promo-price-box-val.discounted{color:var(--green)}
+.conditions-box{background:var(--bg);border-left:3px solid var(--gold);border-radius:0 var(--radius) var(--radius) 0;padding:10px 14px;font-size:11px;color:var(--text-2);line-height:1.6}
+
 /* EMBED PREVIEW MODAL */
 .embed-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.6);z-index:100;align-items:center;justify-content:center;padding:30px}
 .embed-overlay.open{display:flex}
@@ -269,6 +298,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <div class="nav-item active" onclick="nav('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</div>
       <div class="nav-item" onclick="nav('timeline',this)"><span class="nav-icon">◎</span> Timeline</div>
       <div class="nav-item" onclick="nav('smcalendar',this)"><span class="nav-icon">▤</span> SM Calendar</div>
+      <div class="nav-item" onclick="nav('promotions',this)"><span class="nav-icon">🏷</span> Promotions</div>
       <div class="nav-section">Campaigns</div>
       <div class="nav-item" onclick="nav('campaigns',this)"><span class="nav-icon">◈</span> All Campaigns</div>
       <div class="nav-item" onclick="nav('events',this)"><span class="nav-icon">◆</span> Events</div>
@@ -363,6 +393,16 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="cal-days" id="cal-days"><div class="loading">Loading calendar...</div></div>
         </div>
         <div class="cal-legend" id="cal-legend"></div>
+      </div>
+
+      <!-- PROMOTIONS CALENDAR -->
+      <div class="page" id="page-promotions">
+        <div class="cal-controls" style="margin-bottom:20px">
+          <select class="cal-select" id="promo-entity-f" onchange="renderPromotions()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="promo-dept-f" onchange="renderPromotions()"><option value="">All Departments</option></select>
+          <select class="cal-select" id="promo-status-f" onchange="renderPromotions()"><option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option></select>
+        </div>
+        <div id="promotions-grid" class="promotions-grid"><div class="loading">Loading promotions...</div></div>
       </div>
 
       <!-- ALL CAMPAIGNS -->
@@ -471,15 +511,15 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 
 <script type="module">
 import {
-  watchInitiatives, watchResources, watchMetrics,
+  watchInitiatives, watchResources, watchMetrics, watchPromotions,
+  promoStatus,
   DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES
 } from './firebase-data.js';
 
-let RESOURCES = [];
-
-// ── STATE ──────────────────────────────────────────────────────────────
-let ALL = [];
-let METRICS = [];
+let RESOURCES   = [];
+let METRICS     = [];
+let PROMOTIONS  = [];
+let ALL         = [];
 let campSortDir = null;
 
 const PAGE_META = {
@@ -492,6 +532,7 @@ const PAGE_META = {
   healthdays:    {title:'Health Days Calendar', sub:'Saudi MOH health days, Islamic and national occasions'},
   library:   {title:'Content Library',  sub:'Browse and link to all published SM content'},
   print:     {title:'Print Materials',  sub:'Brochures, flyers, signage and other print assets'},
+  promotions:{title:'Promotions Calendar', sub:'Active and upcoming sales promotions by entity'},
   resources: {title:'Brand Resources',  sub:'Logos, templates, and brand guidelines to download'},
 };
 
@@ -578,8 +619,8 @@ function populateFilters() {
     `<span class="leg"><span class="leg-dot" style="background:${DEPT_BG[d]||'#EEF0FF'}"></span>${d}</span>`
   ).join('') + `<span class="leg"><span class="leg-dot" style="background:#FFF6E0"></span>Health Day</span>`;
   document.getElementById('res-type-filter').innerHTML += RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
-  // populate print dept filter
   document.getElementById('print-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('promo-dept-f').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
 }
 
 // ── DATA LOAD ─────────────────────────────────────────────────────────
@@ -590,6 +631,10 @@ watchInitiatives(data => {
 });
 watchMetrics(data => {
   METRICS = data;
+  renderAll();
+});
+watchPromotions(data => {
+  PROMOTIONS = data;
   renderAll();
 });
 watchResources(data => {
@@ -609,6 +654,7 @@ function renderAll() {
   if(activePage==='healthdays')    window.renderHealthDays();
   if(activePage==='library')       window.renderLibrary();
   if(activePage==='print')         window.renderPrint();
+  if(activePage==='promotions')    window.renderPromotions();
   if(activePage==='resources')     window.renderResources();
 }
 
@@ -1064,6 +1110,105 @@ window.renderPrint = function(filter='') {
       }).join('')
     : '<tr><td colspan="8" class="empty-state">No print materials yet — add them in the admin panel</td></tr>';
 }
+// ── PROMOTIONS ───────────────────────────────────────────────────────────
+const PROMO_STATUS_CLASS = {'Active':'b-published','Upcoming':'b-planned','Expired':'b-past'};
+
+window.renderPromotions = function() {
+  const entityF = document.getElementById('promo-entity-f').value;
+  const deptF   = document.getElementById('promo-dept-f').value;
+  const statusF = document.getElementById('promo-status-f').value;
+
+  let data = PROMOTIONS.filter(p=>{
+    if(entityF && !(p.entity||[]).includes(entityF)) return false;
+    if(deptF   && p.department!==deptF) return false;
+    if(statusF && promoStatus(p.startDate,p.endDate)!==statusF) return false;
+    return true;
+  });
+
+  const grid = document.getElementById('promotions-grid');
+  if(!data.length) {
+    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🏷️</div>No promotions found</div>';
+    return;
+  }
+  grid.innerHTML = data.map(p=>{
+    const status = promoStatus(p.startDate, p.endDate);
+    const ds = deptStyle(p.department);
+    return `<div class="promo-card ${status==='Active'?'active-promo':status==='Expired'?'expired-promo':''}"
+      onclick='openPromoDetail(${JSON.stringify(p).replace(/'/g,"&apos;")})'>
+      <div class="promo-card-header">
+        <div class="promo-card-title">${p.title||''}</div>
+        <div class="promo-discount-badge">${p.discountPct||0}%</div>
+      </div>
+      <div class="promo-card-body">
+        <div style="margin-bottom:8px">${p.description ? p.description.substring(0,90)+(p.description.length>90?'...':'') : ''}</div>
+        <div class="promo-price-row">
+          <div>
+            <div class="promo-price-orig">${p.originalPrice?.toLocaleString()||''} SAR</div>
+            <div class="promo-price-new">${p.discountedPrice?.toLocaleString()||''}</div>
+            <div class="promo-price-sar">SAR</div>
+          </div>
+        </div>
+      </div>
+      <div class="promo-card-footer">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          <span class="badge" style="background:${ds.bg};color:${ds.t}">${p.department||''}</span>
+          ${(p.entity||[]).map(e=>`<span class="badge ent-${e.toLowerCase()}">${e}</span>`).join('')}
+        </div>
+        <div style="text-align:right">
+          <span class="badge ${PROMO_STATUS_CLASS[status]||'b-planned'}">${status}</span>
+          <div style="font-size:10px;color:var(--text-3);margin-top:2px">${p.endDate?'Ends '+p.endDate:'Open-ended'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.openPromoDetail = function(p) {
+  const status = promoStatus(p.startDate, p.endDate);
+  const ds = deptStyle(p.department);
+  document.getElementById('dp-title').textContent = p.title||'Promotion';
+  document.getElementById('dp-badges').innerHTML =
+    `<span class="badge ${PROMO_STATUS_CLASS[status]||'b-planned'}">${status}</span> ` +
+    `<span class="badge" style="background:${ds.bg};color:${ds.t}">${p.department||''}</span> ` +
+    (p.entity||[]).map(e=>`<span class="badge ent-${e.toLowerCase()}">${e}</span>`).join(' ');
+
+  document.getElementById('dp-body').innerHTML = `
+    ${p.description?`<div class="dp-section"><div class="dp-section-title">Description</div><div style="font-size:12px;color:var(--text-2);line-height:1.6">${p.description}</div></div>`:''}
+    <div class="promo-highlight">
+      <div class="promo-highlight-pct">${p.discountPct||0}% OFF</div>
+      <div class="promo-highlight-label">Promotional Discount</div>
+    </div>
+    <div class="promo-prices-row">
+      <div class="promo-price-box">
+        <div class="promo-price-box-label">Original Price</div>
+        <div class="promo-price-box-val" style="text-decoration:line-through;color:var(--text-3)">${p.originalPrice?.toLocaleString()||'—'}</div>
+        <div style="font-size:10px;color:var(--text-3)">SAR</div>
+      </div>
+      <div class="promo-price-box">
+        <div class="promo-price-box-label">Promo Price</div>
+        <div class="promo-price-box-val discounted">${p.discountedPrice?.toLocaleString()||'—'}</div>
+        <div style="font-size:10px;color:var(--text-3)">SAR</div>
+      </div>
+      <div class="promo-price-box">
+        <div class="promo-price-box-label">You Save</div>
+        <div class="promo-price-box-val discounted">${((p.originalPrice||0)-(p.discountedPrice||0)).toLocaleString()}</div>
+        <div style="font-size:10px;color:var(--text-3)">SAR</div>
+      </div>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">Validity Period</div>
+      <div class="dp-timeline">
+        <div class="dp-tl-item"><div class="dp-tl-dot"></div><div class="dp-tl-date">Start</div><div class="dp-tl-label">${p.startDate||'TBD'}</div></div>
+        <div class="dp-tl-item"><div class="dp-tl-dot" style="background:${p.endDate?'var(--red)':'var(--text-3)'}"></div><div class="dp-tl-date">End</div><div class="dp-tl-label">${p.endDate||'No end date'}</div></div>
+      </div>
+    </div>
+    ${p.conditions?`<div class="dp-section"><div class="dp-section-title">Special Conditions</div><div class="conditions-box">${p.conditions}</div></div>`:''}
+  `;
+  document.getElementById('detail-overlay').classList.add('open');
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+// ── BRAND RESOURCES ──────────────────────────────────────────────────
 const RES_TYPE_ICONS = {
   'Social Media':'📱','Print':'🖨️','Stationery':'✉️','Logo & Brand Mark':'🎨',
   'Presentation Template':'📊','Guideline Document':'📘','Other':'📁'

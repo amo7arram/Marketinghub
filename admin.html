@@ -160,6 +160,7 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
   <div class="tabs">
     <div class="tab active" onclick="switchTab('initiatives',this)">Initiatives</div>
+    <div class="tab" onclick="switchTab('promotions',this)">Promotions</div>
     <div class="tab" onclick="switchTab('budget',this)">Budget</div>
     <div class="tab" onclick="switchTab('requests',this)">Requests</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
@@ -185,6 +186,29 @@ tr.row-done:hover td{background:#DCF2E5}
       <table>
         <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Actions</th></tr></thead>
         <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- PROMOTIONS PAGE -->
+    <div class="page" id="page-promotions">
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select" id="promo-dept-filter" onchange="renderPromotionsTable()"><option value="">All Departments</option></select>
+          <select class="filter-select" id="promo-entity-filter" onchange="renderPromotionsTable()"><option value="">All Entities</option></select>
+          <select class="filter-select" id="promo-status-filter" onchange="renderPromotionsTable()">
+            <option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="openPromoForm()">+ New Promotion</button>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Title</th><th>Department</th><th>Entity</th>
+          <th>Original (SAR)</th><th>Discounted (SAR)</th><th>Discount</th>
+          <th onclick="togglePromoSort()" style="cursor:pointer;user-select:none">Dates <span id="promo-sort-arrow">↓</span></th>
+          <th>Status</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="promotions-table-body"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -385,6 +409,49 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
 </div>
 
+<!-- ── PROMOTION FORM MODAL ── -->
+<div class="modal-overlay" id="promo-overlay">
+  <div class="modal" style="width:540px">
+    <div class="modal-header">
+      <div class="modal-title" id="promo-form-title">New Promotion</div>
+      <button class="modal-close" onclick="closePromoForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="promo-title" placeholder="e.g. Ramadan Cardiology Check-up Package"></div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" id="promo-description" placeholder="What's included in this promotion?"></textarea></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="promo-department"></select></div>
+        <div class="field-group"><label class="field-label">Entity (select all that apply)</label><div class="chip-select" id="promo-entity"></div></div>
+      </div>
+      <div class="field-section-title">Pricing</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="field-group" style="margin:0">
+          <label class="field-label">Original Price (SAR)<span style="color:var(--red)">*</span></label>
+          <input class="field-input" type="number" id="promo-original" placeholder="0" min="0" oninput="calcDiscount()">
+        </div>
+        <div class="field-group" style="margin:0">
+          <label class="field-label">Discounted Price (SAR)<span style="color:var(--red)">*</span></label>
+          <input class="field-input" type="number" id="promo-discounted" placeholder="0" min="0" oninput="calcDiscount()">
+        </div>
+        <div class="field-group" style="margin:0">
+          <label class="field-label">Discount %</label>
+          <div style="padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:18px;font-weight:800;color:var(--green);text-align:center" id="promo-pct">—</div>
+        </div>
+      </div>
+      <div class="field-section-title">Dates</div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Start Date<span style="color:var(--red)">*</span></label><input class="field-input" type="date" id="promo-start"></div>
+        <div class="field-group"><label class="field-label">End Date</label><input class="field-input" type="date" id="promo-end"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Special Conditions</label><textarea class="field-textarea" style="min-height:50px" id="promo-conditions" placeholder="e.g. Valid for new patients only. Not combinable with other offers."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closePromoForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePromotion()">Save Promotion</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── EXPENSE FORM MODAL ── -->
 <div class="modal-overlay" id="expense-overlay">
   <div class="modal" style="width:480px">
@@ -442,6 +509,7 @@ import {
   watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
   getAnnualBudget, setAnnualBudget,
+  watchPromotions, addPromotion, updatePromotion, deletePromotion, promoStatus,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES
 } from './firebase-data.js';
@@ -451,19 +519,24 @@ let ALL_INITIATIVES = [];
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let ALL_EXPENSES = [];
+let ALL_PROMOTIONS = [];
 let ALL_METRIC_PERIODS = [];
 let ANNUAL_BUDGET = 0;
 let currentType = 'Campaign';
 let editingId = null;
 let editingResourceId = null;
 let editingExpenseId = null;
+let editingPromoId = null;
 let expSortDir = 'desc';
+let promoSortDir = 'desc';
+let selectedPromoEntities = [];
 let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
 let unsubResources = null;
 let unsubRequests = null;
 let unsubExpenses = null;
+let unsubPromotions = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
 
@@ -524,15 +597,17 @@ watchAuth(async user => {
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
     if(unsubExpenses) unsubExpenses();
+    if(unsubPromotions) unsubPromotions();
   }
 });
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); });
-  unsubResources = watchResources(data => { ALL_RESOURCES = data; renderResourcesTable(); });
-  unsubRequests = watchRequests(data => { ALL_REQUESTS = data; renderRequestsTable(); });
-  unsubExpenses = watchExpenses(data => { ALL_EXPENSES = data; renderBudgetTab(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); });
+  unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
+  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
+  unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
+  unsubPromotions   = watchPromotions(data   => { ALL_PROMOTIONS  = data; renderPromotionsTable(); });
   initMetricsTab();
   initBudgetTab();
 }
@@ -574,6 +649,15 @@ function populateStaticSelects() {
   // Expense form
   document.getElementById('exp-type').innerHTML = EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('exp-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
+
+  // Promotion form
+  document.getElementById('promo-department').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('promo-entity').innerHTML = ENTITIES.map(e=>
+    `<div class="chip" data-val="${e}" onclick="togglePromoChip(this)">${e}</div>`
+  ).join('');
+  // Promotion filters
+  document.getElementById('promo-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('promo-entity-filter').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
   // Budget table filters
   document.getElementById('exp-type-filter').innerHTML += EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('exp-entity-filter').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
@@ -786,6 +870,134 @@ window.renderTable = function() {
         </td>
       </tr>`).join('')
     : '<tr><td colspan="7" class="empty">No initiatives found</td></tr>';
+}
+
+// ── PROMOTIONS ────────────────────────────────────────────────────────────
+const PROMO_STATUS_CLASS = {'Active':'b-published','Upcoming':'b-planned','Expired':'b-cancelled'};
+let promoSortAsc = false;
+
+window.togglePromoChip = function(el) {
+  el.classList.toggle('active');
+  const val = el.dataset.val;
+  const idx = selectedPromoEntities.indexOf(val);
+  if(el.classList.contains('active') && idx===-1) selectedPromoEntities.push(val);
+  if(!el.classList.contains('active') && idx>-1) selectedPromoEntities.splice(idx,1);
+}
+
+window.calcDiscount = function() {
+  const orig = parseFloat(document.getElementById('promo-original').value)||0;
+  const disc = parseFloat(document.getElementById('promo-discounted').value)||0;
+  const pctEl = document.getElementById('promo-pct');
+  if(orig > 0 && disc >= 0 && disc < orig) {
+    const pct = Math.round((orig-disc)/orig*100);
+    pctEl.textContent = pct + '%';
+    pctEl.style.color = 'var(--green)';
+  } else {
+    pctEl.textContent = '—';
+    pctEl.style.color = 'var(--text-3)';
+  }
+}
+
+window.openPromoForm = function(p=null) {
+  editingPromoId = p ? p.id : null;
+  document.getElementById('promo-form-title').textContent = p ? 'Edit Promotion' : 'New Promotion';
+  selectedPromoEntities = p ? [...(p.entity||[])] : [];
+  document.getElementById('promo-title').value       = p?.title || '';
+  document.getElementById('promo-description').value = p?.description || '';
+  document.getElementById('promo-department').value  = p?.department || DEPARTMENTS[0];
+  document.getElementById('promo-original').value    = p?.originalPrice ?? '';
+  document.getElementById('promo-discounted').value  = p?.discountedPrice ?? '';
+  document.getElementById('promo-start').value       = p?.startDate || '';
+  document.getElementById('promo-end').value         = p?.endDate || '';
+  document.getElementById('promo-conditions').value  = p?.conditions || '';
+  document.querySelectorAll('#promo-entity .chip').forEach(c=>
+    c.classList.toggle('active', selectedPromoEntities.includes(c.dataset.val))
+  );
+  calcDiscount();
+  document.getElementById('promo-overlay').classList.add('open');
+}
+window.closePromoForm = function() {
+  document.getElementById('promo-overlay').classList.remove('open');
+}
+window.savePromotion = async function() {
+  const title = document.getElementById('promo-title').value.trim();
+  const orig  = parseFloat(document.getElementById('promo-original').value);
+  const disc  = parseFloat(document.getElementById('promo-discounted').value);
+  const start = document.getElementById('promo-start').value;
+  if(!title || isNaN(orig) || isNaN(disc) || !start) {
+    showToast('Title, prices and start date are required', true); return;
+  }
+  const discountPct = orig>0 ? Math.round((orig-disc)/orig*100) : 0;
+  const data = {
+    title,
+    description:    document.getElementById('promo-description').value.trim(),
+    department:     document.getElementById('promo-department').value,
+    entity:         selectedPromoEntities,
+    originalPrice:  orig,
+    discountedPrice:disc,
+    discountPct,
+    startDate:      start,
+    endDate:        document.getElementById('promo-end').value,
+    conditions:     document.getElementById('promo-conditions').value.trim(),
+  };
+  try {
+    if(editingPromoId) { await updatePromotion(editingPromoId, data); showToast('Promotion updated'); }
+    else               { await addPromotion(data);                    showToast('Promotion created'); }
+    closePromoForm();
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+window.editPromo = function(id) {
+  const p = ALL_PROMOTIONS.find(x=>x.id===id);
+  if(p) openPromoForm(p);
+}
+window.removePromo = async function(id, title) {
+  if(!confirm(`Delete promotion "${title}"?`)) return;
+  try { await deletePromotion(id); showToast('Promotion deleted'); }
+  catch(e) { showToast('Delete failed: '+e.message, true); }
+}
+
+window.togglePromoSort = function() {
+  promoSortAsc = !promoSortAsc;
+  document.getElementById('promo-sort-arrow').textContent = promoSortAsc ? '↑' : '↓';
+  renderPromotionsTable();
+}
+
+window.renderPromotionsTable = function() {
+  const deptF   = document.getElementById('promo-dept-filter').value;
+  const entityF = document.getElementById('promo-entity-filter').value;
+  const statusF = document.getElementById('promo-status-filter').value;
+
+  let data = ALL_PROMOTIONS.filter(p=>{
+    if(deptF   && p.department !== deptF) return false;
+    if(entityF && !(p.entity||[]).includes(entityF)) return false;
+    if(statusF && promoStatus(p.startDate, p.endDate) !== statusF) return false;
+    return true;
+  });
+  data = [...data].sort((a,b)=> promoSortAsc
+    ? (a.startDate||'').localeCompare(b.startDate||'')
+    : (b.startDate||'').localeCompare(a.startDate||'')
+  );
+
+  document.getElementById('promotions-table-body').innerHTML = data.length
+    ? data.map(p=>{
+        const status = promoStatus(p.startDate, p.endDate);
+        const ds = deptStyle(p.department);
+        return `<tr>
+          <td style="font-weight:600;max-width:200px">${p.title||''}</td>
+          <td><span class="badge" style="background:${ds.bg};color:${ds.t}">${p.department||''}</span></td>
+          <td style="font-size:11px">${(p.entity||[]).map(e=>`<span class="badge ent-${e.toLowerCase()}" style="margin-right:2px">${e}</span>`).join('')||'—'}</td>
+          <td style="font-size:12px">${p.originalPrice?.toLocaleString()||'—'}</td>
+          <td style="font-size:12px;font-weight:600;color:var(--green)">${p.discountedPrice?.toLocaleString()||'—'}</td>
+          <td><span style="font-size:14px;font-weight:800;color:var(--green)">${p.discountPct||0}%</span></td>
+          <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${p.startDate||'—'}${p.endDate?' → '+p.endDate:''}</td>
+          <td><span class="badge ${PROMO_STATUS_CLASS[status]||'b-planned'}">${status}</span></td>
+          <td class="row-actions">
+            <button class="btn btn-sm" onclick="editPromo('${p.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="removePromo('${p.id}','${(p.title||'').replace(/'/g,"\\'")}')">Delete</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="9" class="empty">No promotions yet — click "+ New Promotion" to add one</td></tr>';
 }
 
 // ── BUDGET ────────────────────────────────────────────────────────────────
