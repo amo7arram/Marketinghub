@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC — Promotions Injection Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#00539B;--green:#1DB87A;--red:#E0392B;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--text:#0F1423;--text-3:#8890A8;--radius:8px}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);padding:30px;font-size:14px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.sub{font-size:12px;color:var(--text-3);margin-bottom:20px}
+.warn{background:#FFF6E0;border:1px solid #E8C975;border-radius:var(--radius);padding:14px 16px;font-size:12px;color:#7A4A00;margin-bottom:20px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.login-box input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;margin-right:8px}
+button{font-size:12px;padding:9px 16px;border-radius:6px;border:1px solid var(--navy);background:var(--navy);color:#fff;cursor:pointer;font-family:inherit;font-weight:600;margin-right:8px}
+button.secondary{background:var(--surface);color:var(--navy)}
+button:disabled{opacity:0.5;cursor:not-allowed}
+.hidden{display:none}
+.tools{display:none}
+.tools.show{display:block}
+.plan-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px}
+.plan-card h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;margin-bottom:4px}
+.plan-card p{font-size:12px;color:var(--text-3);margin-bottom:14px}
+.promo-preview{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;max-height:340px;overflow-y:auto;padding:2px}
+.promo-mini{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:11px}
+.promo-mini strong{display:block;font-size:12px;margin-bottom:3px;color:var(--navy)}
+.promo-mini .pct{display:inline-block;background:var(--green);color:#fff;font-weight:700;padding:1px 6px;border-radius:4px;font-size:10px;margin-bottom:4px}
+.log{font-size:11px;color:var(--text-3);margin-top:12px;max-height:180px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px;display:none}
+.log.show{display:block}
+.log div{padding:2px 0}
+.log .ok{color:var(--green)}.log .err{color:var(--red)}
+.status-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#E4F8F0;color:#0E7A55;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>IMC Marketing Hub — Promotions Injection Tool</h1>
+  <div class="sub">One-time injection of the 2026 Annual Promotions Plan into Firestore</div>
+  <div class="warn">⚠️ Run this only once. It does not check for duplicates — running it twice will create duplicate promotions. Delete this file from GitHub after use.</div>
+
+  <div class="login-box" id="login-box">
+    <strong style="font-size:13px">Sign in with your admin account</strong><br><br>
+    <input type="email" id="email" placeholder="admin email">
+    <input type="password" id="password" placeholder="password">
+    <button onclick="doLogin()">Sign In</button>
+    <div id="login-err" style="color:var(--red);font-size:11px;margin-top:8px"></div>
+  </div>
+
+  <div class="tools" id="tools">
+    <div class="plan-card">
+      <h3>2026 Annual Promotions Plan <span id="inj-status"></span></h3>
+      <p>32 promotions across IMC, TFC, and Makkah · 12 months · Dermatology, Dental, Home Healthcare, Maternity, Children's Health, Cardiology, Diabetes, Orthopedics</p>
+      <div class="promo-preview" id="preview-grid"></div>
+      <button onclick="runInjection()">Inject All 32 Promotions into Firestore</button>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { login, watchAuth, addPromotion } from './firebase-data.js';
+
+window.doLogin = async function() {
+  const email = document.getElementById('email').value.trim();
+  const pass  = document.getElementById('password').value;
+  const err   = document.getElementById('login-err');
+  err.textContent = '';
+  try { await login(email, pass); }
+  catch(e) { err.textContent = 'Sign-in failed: ' + e.message; }
+}
+
+watchAuth(user => {
+  document.getElementById('login-box').style.display = user ? 'none' : 'block';
+  const tools = document.getElementById('tools');
+  if(user) { tools.classList.add('show'); renderPreview(); }
+  else tools.classList.remove('show');
+});
+
+// ── THE 2026 PROMOTIONS PLAN ─────────────────────────────────────────────────
+const PROMOTIONS_2026 = [
+
+  // ── JANUARY — New Year Health Resolutions ──────────────────────────────
+  {
+    title: "New Year Full Body Wellness Checkup",
+    description: "Start 2026 with a complete health assessment. Includes CBC, lipid profile, blood sugar, kidney & liver function, BMI analysis, and specialist consultation.",
+    department: "General / Brand",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 850, discountedPrice: 499,
+    startDate: "2026-01-01", endDate: "2026-01-31",
+    conditions: "Valid for new patients only. One checkup per patient. Results within 24 hours. Appointment required."
+  },
+  {
+    title: "January Skin Renewal Package",
+    description: "Post-holiday skin recovery session including deep cleansing facial, skin analysis, and 2 laser toning sessions to restore your natural glow.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 1200, discountedPrice: 799,
+    startDate: "2026-01-05", endDate: "2026-01-31",
+    conditions: "Valid for new dermatology patients. Sessions to be used within 60 days."
+  },
+  {
+    title: "Home Healthcare New Year Package",
+    description: "Comprehensive in-home health monitoring plan for 3 months including weekly nurse visits, monthly doctor consultation, and lab tests delivered to your door.",
+    department: "General / Brand",
+    entity: ["IMC","Makkah"],
+    originalPrice: 4500, discountedPrice: 2999,
+    startDate: "2026-01-01", endDate: "2026-01-31",
+    conditions: "3-month commitment required. Covers Jeddah and Makkah zones only. Weekly scheduling based on availability."
+  },
+
+  // ── FEBRUARY — Founding Day + Valentine's + Ramadan Start ──────────────
+  {
+    title: "Saudi Founding Day Dental Smile Package",
+    description: "Celebrate Saudi Founding Day with a radiant smile. Package includes dental cleaning, full oral examination, digital X-ray, and whitening consultation.",
+    department: "General / Brand",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 650, discountedPrice: 320,
+    startDate: "2026-02-15", endDate: "2026-02-28",
+    conditions: "Valid for all patients. Single visit required. Whitening treatment priced separately."
+  },
+  {
+    title: "Valentine's Glow — Couples Derma Package",
+    description: "A special gift for two. Each person receives a skin analysis, hydrafacial session, and customized skincare recommendation. Valid for two people visiting together.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 2200, discountedPrice: 1399,
+    startDate: "2026-02-10", endDate: "2026-02-20",
+    conditions: "Must be booked for two people at the same appointment. Non-transferable. Results may vary by skin type."
+  },
+  {
+    title: "Ramadan Chronic Disease Management Program",
+    description: "Special Ramadan program for diabetes and hypertension patients. Includes pre-Ramadan screening, fasting-safe medication review, nutritional counseling, and continuous monitoring throughout the month.",
+    department: "Diabetes & Chronic",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 1100, discountedPrice: 699,
+    startDate: "2026-02-17", endDate: "2026-03-18",
+    conditions: "For existing or new diabetes and hypertension patients. Endocrinologist appointment required within first week."
+  },
+  {
+    title: "Ramadan Maternity Wellness Package",
+    description: "Designed for expectant mothers during Ramadan. Includes OB-GYN consultation, fetal ultrasound, nutrition plan tailored for fasting needs, and iron & vitamin D testing.",
+    department: "Women's Health",
+    entity: ["IMC","Makkah"],
+    originalPrice: 950, discountedPrice: 599,
+    startDate: "2026-02-17", endDate: "2026-03-18",
+    conditions: "For pregnant women in second or third trimester. Fasting advice provided by specialist."
+  },
+
+  // ── MARCH — Women's Day + Eid Al-Fitr ──────────────────────────────────
+  {
+    title: "Women's Day Complete Health Check",
+    description: "Celebrate International Women's Day with a comprehensive women's health package: breast examination, pelvic ultrasound, hormonal profile, bone density screening, and gynecology consultation.",
+    department: "Women's Health",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 1400, discountedPrice: 850,
+    startDate: "2026-03-05", endDate: "2026-03-15",
+    conditions: "For women aged 25 and above. Advance booking required."
+  },
+  {
+    title: "Eid Glow — Pre-Eid Beauty & Wellness Bundle",
+    description: "Look and feel your best for Eid! Includes chemical peel or HydraFacial, teeth whitening consultation, and a vitamin boost injection to energize after Ramadan.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 1800, discountedPrice: 1099,
+    startDate: "2026-03-10", endDate: "2026-03-22",
+    conditions: "Book at least 5 days before Eid. Results visible within 48 hours. Not suitable for skin conditions — dermatologist assessment required."
+  },
+  {
+    title: "Post-Ramadan Nutritional Recovery Program",
+    description: "Rebalance after Ramadan with a comprehensive metabolic reset: full nutritional blood panel, body composition analysis, personalized diet plan, and 2 nutritionist follow-up sessions.",
+    department: "Diabetes & Chronic",
+    entity: ["IMC","Makkah"],
+    originalPrice: 800, discountedPrice: 499,
+    startDate: "2026-03-20", endDate: "2026-04-15",
+    conditions: "Valid for all adults. Body composition scan via InBody device. Plan provided digitally within 48 hours."
+  },
+
+  // ── APRIL — Spring Health Season ───────────────────────────────────────
+  {
+    title: "Spring Children's Vaccination & Growth Package",
+    description: "Spring is the perfect time to catch up on your child's vaccines and growth milestones. Includes full vaccination review, height/weight assessment, developmental consultation, and nutritional advice.",
+    department: "Children's Health",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 500, discountedPrice: 299,
+    startDate: "2026-04-01", endDate: "2026-04-30",
+    conditions: "For children aged 0–12 years. Parent or guardian must be present. Vaccination records required."
+  },
+  {
+    title: "Spring Joint & Mobility Check — Orthopedics",
+    description: "Spring into movement. X-ray of one joint area, orthopedic consultation, physiotherapy assessment, and personalized exercise plan for better mobility.",
+    department: "Orthopedics",
+    entity: ["IMC","TFC"],
+    originalPrice: 750, discountedPrice: 449,
+    startDate: "2026-04-01", endDate: "2026-04-30",
+    conditions: "Valid for adults aged 18 and above. X-ray included for one joint region."
+  },
+  {
+    title: "Spring Facial Refresh — Laser & Peels",
+    description: "Renew your skin this spring with a personalized treatment plan. Package includes skin analysis, 2 laser sessions or 2 medical-grade peels (dermatologist selects based on skin assessment).",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 1600, discountedPrice: 999,
+    startDate: "2026-04-01", endDate: "2026-04-30",
+    conditions: "Skin type assessment required before treatment. Sun protection products not included."
+  },
+
+  // ── MAY — Mother's Day + Maternity Month ───────────────────────────────
+  {
+    title: "Mother's Day — Maternity Care Package",
+    description: "Honor every mother with exceptional maternity care. Package includes OB-GYN consultation, detailed anomaly scan, iron and vitamin D testing, and a personalized birth plan discussion.",
+    department: "Women's Health",
+    entity: ["IMC","Makkah"],
+    originalPrice: 1200, discountedPrice: 750,
+    startDate: "2026-05-01", endDate: "2026-05-25",
+    conditions: "For pregnant women in any trimester. Gift cards available for this package."
+  },
+  {
+    title: "Mother's Day Anti-Aging Derma Package",
+    description: "A luxurious gift for mom: full skin rejuvenation consultation, anti-aging treatment session, and premium SPF skincare starter kit.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 1500, discountedPrice: 899,
+    startDate: "2026-05-01", endDate: "2026-05-25",
+    conditions: "Gift cards available for this promotion. Treatment session to be redeemed within 30 days of purchase."
+  },
+  {
+    title: "Cardiac Health Screening — Heart Month",
+    description: "Comprehensive cardiac risk assessment: resting ECG, echocardiogram, cholesterol panel, blood pressure monitoring, and cardiologist consultation.",
+    department: "Cardiology",
+    entity: ["IMC","TFC"],
+    originalPrice: 1350, discountedPrice: 799,
+    startDate: "2026-05-01", endDate: "2026-05-31",
+    conditions: "For adults aged 30 and above. Results and report provided within 48 hours."
+  },
+
+  // ── JUNE — Summer Start ─────────────────────────────────────────────────
+  {
+    title: "Summer Sun Damage Repair — Derma Bundle",
+    description: "Shield and repair skin from summer heat. Includes sun damage assessment, 2 laser sessions targeting pigmentation and uneven tone, and a personalized summer skincare routine.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 1800, discountedPrice: 1099,
+    startDate: "2026-06-01", endDate: "2026-06-30",
+    conditions: "Includes SPF consultation. Not recommended for active skin conditions. Dermatologist assessment required."
+  },
+  {
+    title: "Summer Home Healthcare Package — 2 Months",
+    description: "Stay healthy this summer without leaving home. 2-month package including bi-weekly nurse visits, monthly physician consultation, chronic disease monitoring, and medication delivery coordination.",
+    department: "General / Brand",
+    entity: ["IMC","Makkah"],
+    originalPrice: 3800, discountedPrice: 2499,
+    startDate: "2026-06-01", endDate: "2026-06-30",
+    conditions: "2-month minimum commitment. Available in Jeddah and Makkah zones. Scheduling based on care team availability."
+  },
+  {
+    title: "Summer Children's Dental Package",
+    description: "School's out — perfect time for a dental visit! Includes pediatric dental examination, cleaning, fluoride treatment, and oral hygiene coaching for kids.",
+    department: "Children's Health",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 400, discountedPrice: 230,
+    startDate: "2026-06-15", endDate: "2026-07-31",
+    conditions: "For children aged 4–15 years. Parent must accompany child."
+  },
+
+  // ── AUGUST — Back to School ─────────────────────────────────────────────
+  {
+    title: "Back to School Health Passport",
+    description: "Everything your child needs before the new school year: full physical examination, vision screening, hearing check, BMI assessment, vaccination review, and school fitness certificate.",
+    department: "Children's Health",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 650, discountedPrice: 380,
+    startDate: "2026-08-01", endDate: "2026-08-31",
+    conditions: "For children aged 4–18 years. School certificate issued same day. Vaccination records required."
+  },
+  {
+    title: "Back to School Dental Checkup for Kids",
+    description: "Start the school year with a healthy smile! Pediatric dental exam, cleaning, fluoride treatment, and cavity risk assessment.",
+    department: "Children's Health",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 380, discountedPrice: 200,
+    startDate: "2026-08-01", endDate: "2026-08-31",
+    conditions: "For children aged 3–16. Parent must accompany child. Appointment required."
+  },
+  {
+    title: "Teacher Appreciation Wellness Package",
+    description: "A special offer for educators returning to school. Includes general checkup, blood pressure and blood sugar screening, eye strain consultation, and stress management session.",
+    department: "General / Brand",
+    entity: ["IMC","TFC"],
+    originalPrice: 700, discountedPrice: 399,
+    startDate: "2026-08-15", endDate: "2026-09-15",
+    conditions: "Valid with valid teacher/staff ID. One package per person."
+  },
+
+  // ── SEPTEMBER — National Day + World Heart Day ──────────────────────────
+  {
+    title: "National Day Heart Health Initiative",
+    description: "Protect what matters most this National Day. Comprehensive cardiac package: ECG, echocardiogram, arterial pressure index, cholesterol panel, and cardiologist consultation.",
+    department: "Cardiology",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 1500, discountedPrice: 880,
+    startDate: "2026-09-16", endDate: "2026-09-30",
+    conditions: "For Saudi nationals and residents aged 35+. National ID required for National Day pricing."
+  },
+  {
+    title: "National Day Preventive Health Package",
+    description: "Gift yourself and your family with health this National Day. Full blood panel, BMI & metabolic analysis, blood pressure monitoring, and GP consultation.",
+    department: "General / Brand",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 700, discountedPrice: 399,
+    startDate: "2026-09-20", endDate: "2026-09-30",
+    conditions: "Valid for all nationalities. National Day special — limited slots per day."
+  },
+  {
+    title: "Back Pain Relief — Orthopedic National Day Package",
+    description: "September is the time to get your back checked. Spinal X-ray, physiotherapy assessment, orthopedic consultation, and customized exercise plan.",
+    department: "Orthopedics",
+    entity: ["IMC","TFC"],
+    originalPrice: 900, discountedPrice: 549,
+    startDate: "2026-09-15", endDate: "2026-09-30",
+    conditions: "For adults 18 and above. X-ray for one spinal region included."
+  },
+
+  // ── OCTOBER — Breast Cancer Awareness Month ─────────────────────────────
+  {
+    title: "Pink October Breast Cancer Screening Package",
+    description: "Early detection saves lives. October package includes clinical breast examination, mammogram or breast ultrasound (based on age), and oncology consultation.",
+    department: "Women's Health",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 900, discountedPrice: 499,
+    startDate: "2026-10-01", endDate: "2026-10-31",
+    conditions: "For women aged 30 and above. Radiologist report within 24 hours. Follow-up appointment included."
+  },
+  {
+    title: "October Women's Full Health Screen",
+    description: "A complete women's preventive package: breast ultrasound, pelvic ultrasound, hormonal profile, thyroid function, pap smear (if applicable), and gynecology consultation.",
+    department: "Women's Health",
+    entity: ["IMC","Makkah"],
+    originalPrice: 1600, discountedPrice: 950,
+    startDate: "2026-10-01", endDate: "2026-10-31",
+    conditions: "For women aged 25 and above. Results within 48 hours."
+  },
+  {
+    title: "October Skin Cancer Awareness Screening",
+    description: "Early detection matters beyond breast cancer. Full-body mole and skin lesion examination by a dermatologist, dermoscopy where indicated, and sun damage assessment.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 600, discountedPrice: 350,
+    startDate: "2026-10-01", endDate: "2026-10-31",
+    conditions: "Appointment required. Report provided within 48 hours. Biopsy fee not included if required."
+  },
+
+  // ── NOVEMBER — World Diabetes Day ──────────────────────────────────────
+  {
+    title: "World Diabetes Day — Comprehensive Diabetes Package",
+    description: "Know your numbers on World Diabetes Day. HbA1c, fasting glucose, kidney function, eye examination, foot assessment, BMI, and endocrinologist consultation — the full picture.",
+    department: "Diabetes & Chronic",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 1300, discountedPrice: 750,
+    startDate: "2026-11-07", endDate: "2026-11-21",
+    conditions: "Fasting for 8 hours required for blood tests. Eye dilation may temporarily affect vision."
+  },
+  {
+    title: "Diabetes Prevention Screening",
+    description: "Don't wait for a diagnosis. Prediabetes and risk assessment package: fasting glucose, HbA1c, BMI & waist measurement, lifestyle risk scoring, and nutritional counseling session.",
+    department: "Diabetes & Chronic",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 650, discountedPrice: 380,
+    startDate: "2026-11-01", endDate: "2026-11-30",
+    conditions: "For adults aged 25+. Fasting blood test required."
+  },
+  {
+    title: "November Home Healthcare Chronic Care Program",
+    description: "Manage diabetes and hypertension from the comfort of home this winter. Monthly package including weekly nursing visits, medication review, blood sugar monitoring kit, and dietitian consultation.",
+    department: "General / Brand",
+    entity: ["IMC","Makkah"],
+    originalPrice: 2200, discountedPrice: 1450,
+    startDate: "2026-11-01", endDate: "2026-11-30",
+    conditions: "Monthly subscription. Equipment (glucometer, BP monitor) included in first month."
+  },
+
+  // ── DECEMBER — Year-End / Winter ───────────────────────────────────────
+  {
+    title: "Year-End Executive Checkup Package",
+    description: "Close the year in good health. Comprehensive executive health screen: full blood panel with 30+ parameters, cardiac ECG, abdominal ultrasound, chest X-ray, and physician consultation with printed health report.",
+    department: "General / Brand",
+    entity: ["IMC","TFC","Makkah"],
+    originalPrice: 1500, discountedPrice: 899,
+    startDate: "2026-12-01", endDate: "2026-12-31",
+    conditions: "Fasting required. Results and printed health report within 48 hours. Appointment required."
+  },
+  {
+    title: "December Anti-Aging & Winter Skin Package",
+    description: "End the year with radiant skin. Anti-aging consultation, collagen booster injection or PRP session, skin tightening treatment, and a personalized winter skincare plan.",
+    department: "Dermatology & Plastics",
+    entity: ["IMC","TFC"],
+    originalPrice: 2500, discountedPrice: 1599,
+    startDate: "2026-12-01", endDate: "2026-12-31",
+    conditions: "Treatment type selected by dermatologist based on skin assessment. Results vary. 3–5 day recovery may apply for some treatments."
+  },
+  {
+    title: "December Home Healthcare Year-End Wellness",
+    description: "Gift a loved one home healthcare this December. 3-month at-home wellness subscription including biweekly nurse visits, monthly physician check-in, and 24/7 telehealth access.",
+    department: "General / Brand",
+    entity: ["IMC","Makkah"],
+    originalPrice: 5500, discountedPrice: 3499,
+    startDate: "2026-12-01", endDate: "2026-12-31",
+    conditions: "Gift subscription available. Service area: Jeddah and Makkah. Scheduling based on care team availability."
+  }
+];
+
+// Auto-calculate discount % for all promotions
+PROMOTIONS_2026.forEach(p => {
+  if(p.originalPrice > 0) {
+    p.discountPct = Math.round((p.originalPrice - p.discountedPrice) / p.originalPrice * 100);
+  }
+});
+
+function renderPreview() {
+  document.getElementById('preview-grid').innerHTML = PROMOTIONS_2026.map(p=>
+    `<div class="promo-mini">
+      <div class="pct">${p.discountPct}% off</div>
+      <strong>${p.title}</strong>
+      <div>${(p.entity||[]).join(', ')} · ${p.department}</div>
+      <div style="color:#0E7A55;font-weight:600">${p.discountedPrice.toLocaleString()} SAR</div>
+      <div style="color:#8890A8">${p.startDate} → ${p.endDate||'Open'}</div>
+    </div>`
+  ).join('');
+}
+
+window.runInjection = async function() {
+  const log = document.getElementById('log');
+  log.classList.add('show');
+  log.innerHTML = `<div>Starting injection of ${PROMOTIONS_2026.length} promotions...</div>`;
+  const btn = document.querySelector('button:not(.secondary)');
+  btn.disabled = true;
+
+  let success = 0, failed = 0;
+  for(const promo of PROMOTIONS_2026) {
+    try {
+      await addPromotion(promo);
+      success++;
+      log.innerHTML += `<div class="ok">✓ ${promo.title}</div>`;
+      log.scrollTop = log.scrollHeight;
+    } catch(e) {
+      failed++;
+      log.innerHTML += `<div class="err">✗ ${promo.title}: ${e.message}</div>`;
+    }
+  }
+
+  log.innerHTML += `<div style="font-weight:600;margin-top:8px" class="${failed?'err':'ok'}">
+    Done: ${success} added${failed?' · '+failed+' failed':' · All successful ✓'}.
+  </div>`;
+  document.getElementById('inj-status').innerHTML = `<span class="status-pill">${success} Injected ✓</span>`;
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
