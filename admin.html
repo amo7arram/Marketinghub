@@ -824,6 +824,21 @@ window.removeInitiative = async function(id, title) {
   }
 }
 
+// ── DEPT STYLE HELPER (used by promotions + initiatives table) ────────────
+function deptStyle(d) {
+  const BG = {
+    "Women's Health":"#FFE8F0","Cardiology":"#FFE8E8","Children's Health":"#E4F8F0",
+    "Diabetes & Chronic":"#EEEAFF","Dermatology & Plastics":"#FFF6E0",
+    "Orthopedics":"#E4F0FF","Oncology":"#FFF0E4","General Surgery":"#E4F8FF","General / Brand":"#EEF0FF"
+  };
+  const T = {
+    "Women's Health":"#8C1F47","Cardiology":"#992020","Children's Health":"#0E7A55",
+    "Diabetes & Chronic":"#4535B0","Dermatology & Plastics":"#9B6000",
+    "Orthopedics":"#0F4D99","Oncology":"#8C3200","General Surgery":"#06607A","General / Brand":"#2E3BAA"
+  };
+  return { bg: BG[d]||'#EEF0FF', t: T[d]||'#2E3BAA' };
+}
+
 // ── RENDER TABLE ──────────────────────────────────────────────────────
 const STATUS_CLASS = {'Planned':'b-planned','In Production':'b-production','Ready':'b-ready','Published':'b-published','Cancelled':'b-cancelled'};
 
