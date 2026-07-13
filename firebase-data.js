@@ -54,15 +54,17 @@ export async function getUserRole(uid) {
 
 // ── INITIATIVES CRUD ────────────────────────────────────────────────────
 export async function getInitiatives() {
-  const snap = await getDocs(query(collection(db, INITIATIVES), orderBy("startDate", "desc")));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, INITIATIVES));
+  const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  data.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
+  return data;
 }
 
 export function watchInitiatives(callback) {
-  // Real-time listener — portal + admin both stay in sync automatically
-  const q = query(collection(db, INITIATIVES), orderBy("startDate", "desc"));
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  return onSnapshot(collection(db, INITIATIVES), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
+    callback(data);
   });
 }
 
@@ -133,10 +135,10 @@ export async function getMetricPeriods() {
 
 // Fetch all metrics across all periods (for chart history)
 export async function getAllMetrics() {
-  const snap = await getDocs(
-    query(collection(db, METRICS), orderBy("period", "asc"))
-  );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db, METRICS));
+  const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  data.sort((a,b) => (a.period||'').localeCompare(b.period||''));
+  return data;
 }
 
 // Save (upsert) a full month's metrics in one batch
@@ -197,9 +199,10 @@ export const EXPENSE_TYPES = [
 
 // ── EXPENSES CRUD ────────────────────────────────────────────────────────
 export function watchExpenses(callback) {
-  const q = query(collection(db, EXPENSES), orderBy("date", "desc"));
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  return onSnapshot(collection(db, EXPENSES), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    callback(data);
   });
 }
 export function addExpense(data) {
@@ -214,9 +217,11 @@ export function deleteExpense(id) {
 
 // ── PROMOTIONS CRUD ───────────────────────────────────────────────────────
 export function watchPromotions(callback) {
-  const q = query(collection(db, PROMOTIONS), orderBy("startDate", "desc"));
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  return onSnapshot(collection(db, PROMOTIONS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Sort in JS — avoids Firestore composite index requirement
+    data.sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''));
+    callback(data);
   });
 }
 export function addPromotion(data) {
@@ -254,9 +259,14 @@ export function setAnnualBudget(annualBudget, year) {
 
 // ── REQUESTS CRUD (Coordinator Request Form → log visible in admin) ────
 export function watchRequests(callback) {
-  const q = query(collection(db, REQUESTS), orderBy("createdAt", "desc"));
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  return onSnapshot(collection(db, REQUESTS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => {
+      const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return tb - ta;
+    });
+    callback(data);
   });
 }
 
