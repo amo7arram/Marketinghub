@@ -100,12 +100,13 @@ export function watchMetrics(callback) {
 
 export const METRIC_NAMES = [
   "Instagram Reach",
-  "Instagram Impressions",
+  "Instagram Views",
   "Instagram Engagements",
   "Instagram Engagement Rate",
-  "Instagram Followers",
+  "Instagram New Followers",
+  "Instagram Conversations",
   "TikTok Views",
-  "TikTok Followers",
+  "TikTok New Followers",
   "X Reach",
   "LinkedIn Reach",
   "SM Messages Received",

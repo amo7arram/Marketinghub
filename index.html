@@ -243,6 +243,26 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .res-download-btn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#fff;background:var(--navy);padding:6px 12px;border-radius:20px;text-decoration:none}
 .res-download-btn:hover{background:#003f7a}
 
+/* NEW DASHBOARD */
+.period-nav-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 16px;width:fit-content;box-shadow:var(--shadow)}
+.period-nav-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:13px;color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.period-nav-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.period-nav-btn:disabled{opacity:0.35;cursor:not-allowed}
+.period-nav-label{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--navy);min-width:140px;text-align:center;letter-spacing:0.02em}
+.dash-section-title{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.sm-kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow);text-align:center}
+.sm-kpi-val{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;color:var(--navy);line-height:1;letter-spacing:-0.02em;margin-bottom:8px}
+.sm-kpi-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.sm-kpi-sub{font-size:10px;color:var(--text-3)}
+.camp-month-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px}
+.camp-month-row:last-child{border:none;padding-bottom:0}
+.featured-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);transition:all var(--transition)}
+.featured-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.featured-card-header{padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.featured-card-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.3;flex:1}
+.featured-card-body{padding:0 16px 10px;font-size:11px;color:var(--text-3);line-height:1.55}
+.featured-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
+
 /* PROMOTIONS */
 .promotions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .promo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:all var(--transition)}
@@ -336,37 +356,47 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
-        <div class="metrics-grid metrics-grid-wide" id="dash-metrics-row1">
-          <div class="metric-card" style="--accent:var(--navy)"><div class="metric-label">Instagram Reach</div><div class="metric-icon">📸</div><div class="metric-value" id="m-reach">—</div><div class="metric-delta" id="m-reach-d"></div></div>
-          <div class="metric-card" style="--accent:var(--blue)"><div class="metric-label">Total Impressions</div><div class="metric-icon">👁</div><div class="metric-value" id="m-imp">—</div><div class="metric-delta" id="m-imp-d"></div></div>
-          <div class="metric-card" style="--accent:var(--teal)"><div class="metric-label">Engagements</div><div class="metric-icon">💬</div><div class="metric-value" id="m-eng">—</div><div class="metric-delta" id="m-eng-d"></div></div>
-          <div class="metric-card" style="--accent:var(--green)"><div class="metric-label">Website Visits</div><div class="metric-icon">🌐</div><div class="metric-value" id="m-web">—</div><div class="metric-delta" id="m-web-d"></div></div>
-          <div class="metric-card" style="--accent:var(--gold)"><div class="metric-label">Engagement Rate</div><div class="metric-icon">📈</div><div class="metric-value" id="m-engr">—</div><div class="metric-delta" id="m-engr-d"></div></div>
+
+        <!-- Period Navigator -->
+        <div class="period-nav-bar">
+          <button class="period-nav-btn" id="period-prev" onclick="shiftPeriod(-1)">←</button>
+          <div class="period-nav-label" id="period-nav-label">Loading...</div>
+          <button class="period-nav-btn" id="period-next" onclick="shiftPeriod(1)">→</button>
         </div>
-        <div class="metrics-grid" id="dash-metrics-row2">
-          <div class="metric-card" style="--accent:#E1306C"><div class="metric-label">Instagram Followers</div><div class="metric-icon">📷</div><div class="metric-value" id="m-ig">—</div><div class="metric-delta" id="m-ig-d"></div></div>
-          <div class="metric-card" style="--accent:#000"><div class="metric-label">TikTok Views</div><div class="metric-icon">🎵</div><div class="metric-value" id="m-tiktok">—</div><div class="metric-delta" id="m-tiktok-d"></div></div>
-          <div class="metric-card" style="--accent:#1DA1F2"><div class="metric-label">X Reach</div><div class="metric-icon">𝕏</div><div class="metric-value" id="m-x">—</div><div class="metric-delta" id="m-x-d"></div></div>
-          <div class="metric-card" style="--accent:#0A66C2"><div class="metric-label">LinkedIn Reach</div><div class="metric-icon">💼</div><div class="metric-value" id="m-li">—</div><div class="metric-delta" id="m-li-d"></div></div>
+
+        <!-- Social Media Performance -->
+        <div class="dash-section-title">Social Media Performance</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-views">—</div><div class="sm-kpi-label">👁 Views</div><div class="sm-kpi-sub">Instagram + TikTok</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-reach">—</div><div class="sm-kpi-label">📡 Reach</div><div class="sm-kpi-sub">All Channels</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-eng">—</div><div class="sm-kpi-label">💬 Engagements</div><div class="sm-kpi-sub">Instagram</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-conv">—</div><div class="sm-kpi-label">✉️ Conversations</div><div class="sm-kpi-sub">Instagram DMs</div></div>
         </div>
-        <div class="two-col">
-          <div class="metric-card" style="--accent:var(--purple)"><div class="metric-label">SM Messages Received</div><div class="metric-icon">✉️</div><div class="metric-value" id="m-msg">—</div><div class="metric-delta" id="m-msg-d"></div></div>
-          <div class="metric-card" style="--accent:var(--orange)"><div class="metric-label">PR Mentions</div><div class="metric-icon">📰</div><div class="metric-value" id="m-pr">—</div><div class="metric-delta" id="m-pr-d"></div></div>
-        </div>
-        <div class="two-col">
-          <div class="card">
-            <div class="card-header"><div class="card-title">Monthly Social Media Performance</div></div>
-            <div class="chart-container"><canvas id="perfChart"></canvas></div>
+
+        <!-- Website Chart -->
+        <div class="card" style="margin-bottom:24px">
+          <div class="card-header">
+            <div class="card-title">Website Visitors — <span id="web-chart-year">2026</span></div>
+            <span style="font-size:11px;color:var(--text-3)">Monthly unique visitors</span>
           </div>
-          <div class="card">
-            <div class="card-header"><div class="card-title">Website Performance — Monthly Visitors</div></div>
-            <div class="chart-container"><canvas id="webChart"></canvas></div>
+          <div class="chart-container"><canvas id="webChart"></canvas></div>
+        </div>
+
+        <!-- Campaigns & Health Days by Month -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="dash-section-title" style="margin-bottom:0">Campaigns & Health Days</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="period-nav-btn" onclick="shiftCampMonth(-1)">←</button>
+            <span id="camp-month-label" style="font-size:13px;font-weight:700;color:var(--text);min-width:130px;text-align:center"></span>
+            <button class="period-nav-btn" onclick="shiftCampMonth(1)">→</button>
           </div>
         </div>
-        <div class="card">
-          <div class="card-header"><div class="card-title">Active & Upcoming Campaigns</div><span class="card-link" onclick="nav('campaigns',document.querySelectorAll('.nav-item')[3])">View all →</span></div>
-          <div id="dash-campaigns"><div class="loading">Loading...</div></div>
-        </div>
+        <div class="card" style="margin-bottom:24px;padding:14px 18px" id="camp-month-list"><div class="loading">Loading...</div></div>
+
+        <!-- Featured Initiatives -->
+        <div class="dash-section-title">Featured Initiatives</div>
+        <div class="dept-camp-grid" id="featured-grid"><div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">⭐</div>No featured initiatives yet — tick the star checkbox on any initiative in the admin panel</div></div>
+
       </div>
 
       <!-- TIMELINE -->
@@ -521,6 +551,8 @@ let METRICS     = [];
 let PROMOTIONS  = [];
 let ALL         = [];
 let campSortDir = null;
+let dashPeriodIdx   = 0;  // 0 = most recent period, 1 = one before, 2 = two before
+let campMonthOffset = 0;  // 0 = this month, -1 = prev, +1 = next
 
 const PAGE_META = {
   dashboard:     {title:'Dashboard', sub:'Performance overview — current month'},
@@ -678,17 +710,6 @@ function entityBadge(arr) {
 function deptStyle(d) {
   return {bg: DEPT_BG[d]||'#EEF0FF', t: DEPT_COLORS[d]||'#2E3BAA'};
 }
-function getMetric(name) { return METRICS.find(m=>m.metricName===name)||null; }
-function metricDelta(m) {
-  if(!m) return '';
-  const cur = m.currentValue ?? m.value;
-  const prev = m.previousValue;
-  if(!cur || !prev) return '';
-  const pct = Math.round((cur-prev)/prev*100);
-  return pct>=0
-    ? `<span class="up">▲ ${pct}% vs last month</span>`
-    : `<span class="down">▼ ${Math.abs(pct)}% vs last month</span>`;
-}
 function eventStatus(start, end) {
   const today = new Date().setHours(0,0,0,0);
   const s = start ? new Date(start).setHours(0,0,0,0) : null;
@@ -700,67 +721,169 @@ function eventStatus(start, end) {
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────
-let chartPerf=null, chartWeb=null;
-window.renderDashboard = function() {
-  const pairs = [
-    ['m-reach','Instagram Reach'],['m-imp','Instagram Impressions'],
-    ['m-eng','Instagram Engagements'],['m-web','Website Visits'],
-    ['m-engr','Instagram Engagement Rate'],['m-ig','Instagram Followers'],
-    ['m-tiktok','TikTok Views'],['m-x','X Reach'],['m-li','LinkedIn Reach'],
-    ['m-msg','SM Messages Received'],['m-pr','PR Mentions'],
-  ];
-  pairs.forEach(([vid,name])=>{
-    const m = getMetric(name);
-    const val = m ? (m.currentValue ?? m.value) : null;
-    document.getElementById(vid).textContent = val !== null ? fmt(val)+(name.includes('Rate')?'%':'') : '—';
-    document.getElementById(vid+'-d').innerHTML = metricDelta(m);
-  });
+let chartWeb = null;
 
-  const shown = ALL.filter(i=>i.type==='Campaign' && ['In Production','Ready','Published','Planned'].includes(i.status)).slice(0,6);
-  document.getElementById('dash-campaigns').innerHTML = shown.length
-    ? shown.map(c=>`<div class="camp-row">
-        <div class="camp-dot" style="background:${deptStyle(c.department).t}"></div>
-        <span class="camp-name">${c.title}</span>
-        <span class="camp-dept">${c.department||''}</span>
-        <span style="margin-left:4px">${entityBadge(c.entity)}</span>
-        ${statusBadge(c.status)}
-      </div>`).join('')
-    : '<div class="empty-state"><div class="empty-state-icon">📋</div>No campaigns yet</div>';
-
-  renderCharts();
+// ── DASHBOARD HELPERS ────────────────────────────────────────────────────
+function getAvailablePeriods() {
+  const periods = [...new Set(METRICS.map(m=>m.period).filter(Boolean))].sort().reverse();
+  return periods.slice(0,3); // last 3 months with data
+}
+function getPeriodMetrics(period) {
+  return METRICS.filter(m=>m.period===period);
+}
+function getMVal(name, pms) {
+  const m = pms.find(x=>x.metricName===name);
+  return m ? (m.value ?? m.currentValue ?? 0) : 0;
+}
+function periodLabel(p) {
+  if(!p) return 'No data yet';
+  const [y,mo] = p.split('-');
+  return new Date(y, mo-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
 }
 
-function renderCharts() {
-  const labels = ['Jan','Feb','Mar','Apr','May','Jun'];
-  const imp = getMetric('Instagram Impressions');
-  const eng = getMetric('Instagram Engagements');
-  const web = getMetric('Website Visits');
-  const impData = [180000,210000,290000,255000,300000, imp ? (imp.currentValue ?? imp.value ?? 310000) : 310000];
-  const engData = [6000,7200,9100,8400,9200, eng ? (eng.currentValue ?? eng.value ?? 9840) : 9840];
-  const visData = [8200,9400,11300,10200,11800, web ? (web.currentValue ?? web.value ?? 12400) : 12400];
+// ── PERIOD NAVIGATION ────────────────────────────────────────────────────
+window.shiftPeriod = function(dir) {
+  const periods = getAvailablePeriods();
+  if(!periods.length) return;
+  dashPeriodIdx = Math.max(0, Math.min(periods.length-1, dashPeriodIdx+dir));
+  window.renderDashboard();
+}
 
-  if(chartPerf) chartPerf.destroy();
-  chartPerf = new Chart(document.getElementById('perfChart'),{
-    type:'bar',
-    data:{labels,datasets:[
-      {label:'Impressions',data:impData,backgroundColor:'#00539B',borderRadius:3,yAxisID:'y'},
-      {label:'Engagements',data:engData,backgroundColor:'#00A3D9',borderRadius:3,yAxisID:'y2'},
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{
-        y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}},
-        y2:{position:'right',ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{display:false}}
-      }}
+// ── CAMPAIGN MONTH NAVIGATION ────────────────────────────────────────────
+window.shiftCampMonth = function(dir) {
+  campMonthOffset = Math.max(-1, Math.min(1, campMonthOffset+dir));
+  renderCampMonthList();
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
+  document.getElementById('camp-month-label').textContent =
+    d.toLocaleString('en',{month:'long',year:'numeric'});
+  document.getElementById('period-prev').disabled = campMonthOffset<==-1;
+  document.getElementById('period-next').disabled = campMonthOffset>=1;
+}
+
+function renderCampMonthList() {
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
+  const y = target.getFullYear();
+  const m = target.getMonth();
+  const targetStr = `${y}-${String(m+1).padStart(2,'0')}`;
+
+  const items = ALL.filter(i=>{
+    if(!['Campaign','Event','Health Day'].includes(i.type)) return false;
+    const d = i.startDate||'';
+    return d.startsWith(targetStr);
   });
+
+  const listEl = document.getElementById('camp-month-list');
+  if(!items.length) {
+    listEl.innerHTML='<div class="empty-state"><div class="empty-state-icon">📅</div>No campaigns or health days this month</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(i=>{
+    const ds = deptStyle(i.department);
+    const typeIcon = i.type==='Health Day'?'♡':i.type==='Event'?'◆':'◈';
+    return `<div class="camp-month-row">
+      <span style="font-size:12px;color:var(--text-3);width:16px;text-align:center">${typeIcon}</span>
+      <div class="camp-dot" style="background:${ds.t}"></div>
+      <span style="flex:1;font-weight:600;color:var(--text)">${i.title||''}</span>
+      <span style="font-size:10px;color:var(--text-3);margin-right:8px">${i.department||''}</span>
+      ${entityBadge(i.entity)}
+      ${statusBadge(i.status)}
+    </div>`;
+  }).join('');
+}
+
+// ── FEATURED INITIATIVES ─────────────────────────────────────────────────
+function renderFeatured() {
+  const featured = ALL.filter(i=>i.featured===true);
+  const el = document.getElementById('featured-grid');
+  if(!featured.length) {
+    el.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">⭐</div>No featured initiatives — tick the star on any initiative in the admin panel</div>';
+    return;
+  }
+  el.innerHTML = featured.map(i=>{
+    const ds = deptStyle(i.department);
+    return `<div class="featured-card">
+      <div class="featured-card-header" style="background:${ds.bg}">
+        <div class="featured-card-name" style="color:${ds.t}">${i.title||''}</div>
+        ${statusBadge(i.status)}
+      </div>
+      <div class="featured-card-body">
+        ${i.objective ? `<div style="margin-bottom:6px">${i.objective.substring(0,100)}${i.objective.length>100?'...':''}</div>` : ''}
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">${entityBadge(i.entity)}</div>
+      </div>
+      <div class="featured-card-footer">
+        <span>${i.department||''}</span>
+        <span>${i.startDate||''}${i.endDate?' → '+i.endDate:''}</span>
+        ${i.postLink?`<a class="post-link" href="${i.postLink}" target="_blank">🔗 View</a>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── MAIN DASHBOARD RENDER ────────────────────────────────────────────────
+window.renderDashboard = function() {
+  const periods = getAvailablePeriods();
+
+  // Period navigator UI
+  const navLabel = document.getElementById('period-nav-label');
+  if(periods.length) {
+    const currentPeriod = periods[dashPeriodIdx] || periods[0];
+    navLabel.textContent = periodLabel(currentPeriod);
+    document.getElementById('period-prev').disabled = dashPeriodIdx >= periods.length-1;
+    document.getElementById('period-next').disabled = dashPeriodIdx <= 0;
+
+    // Social media KPIs — aggregate across channels
+    const pms = getPeriodMetrics(currentPeriod);
+    const views = getMVal('Instagram Views',pms) + getMVal('TikTok Views',pms);
+    const reach = getMVal('Instagram Reach',pms) + getMVal('X Reach',pms) + getMVal('LinkedIn Reach',pms);
+    const eng   = getMVal('Instagram Engagements',pms);
+    const conv  = getMVal('Instagram Conversations',pms);
+    document.getElementById('kpi-views').textContent = fmt(views)||'—';
+    document.getElementById('kpi-reach').textContent = fmt(reach)||'—';
+    document.getElementById('kpi-eng').textContent   = fmt(eng)||'—';
+    document.getElementById('kpi-conv').textContent  = fmt(conv)||'—';
+  } else {
+    navLabel.textContent = 'No monthly data yet';
+    document.getElementById('period-prev').disabled = true;
+    document.getElementById('period-next').disabled = true;
+    ['kpi-views','kpi-reach','kpi-eng','kpi-conv'].forEach(id=>document.getElementById(id).textContent='—');
+  }
+
+  // Website chart — full year, real data only, zeros if missing
+  const year = new Date().getFullYear();
+  document.getElementById('web-chart-year').textContent = year;
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const webData = MONTH_LABELS.map((_,i)=>{
+    const p = `${year}-${String(i+1).padStart(2,'0')}`;
+    return getMVal('Website Visits', getPeriodMetrics(p));
+  });
+
   if(chartWeb) chartWeb.destroy();
   chartWeb = new Chart(document.getElementById('webChart'),{
     type:'line',
-    data:{labels,datasets:[
-      {label:'Visitors',data:visData,borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.1)',tension:0.4,fill:true,pointRadius:3,borderWidth:2}
-    ]},
+    data:{labels:MONTH_LABELS,datasets:[{
+      label:'Visitors',data:webData,
+      borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.08)',
+      tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#1DB87A',borderWidth:2
+    }]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{y:{ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
+      scales:{y:{
+        beginAtZero:true,
+        ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},
+        grid:{color:'rgba(0,0,0,0.04)'}
+      }}}
   });
+
+  // Campaigns/health days month list
+  const now = new Date();
+  const campTarget = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
+  document.getElementById('camp-month-label').textContent =
+    campTarget.toLocaleString('en',{month:'long',year:'numeric'});
+  renderCampMonthList();
+
+  // Featured initiatives
+  renderFeatured();
 }
 
 // ── TIMELINE ─────────────────────────────────────────────────────────

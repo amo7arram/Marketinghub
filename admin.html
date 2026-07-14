@@ -393,6 +393,10 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
       <div class="field-group" id="fld-postlink-wrap"><label class="field-label" id="fld-postlink-label">Post / Content Link</label><input class="field-input" id="fld-postLink" placeholder="https://..."></div>
       <div class="field-group" id="fld-cost-wrap"><label class="field-label">Cost (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, appears in Budget tab</span></label><input class="field-input" type="number" id="fld-cost" placeholder="0.00" min="0" step="0.01"></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);margin-top:6px">
+        <input type="checkbox" id="fld-featured" style="width:16px;height:16px;cursor:pointer;accent-color:var(--gold)">
+        <label for="fld-featured" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">⭐ Feature this initiative on the public dashboard</label>
+      </div>
 
       <div class="field-section-title" id="section-perf">Performance (optional)</div>
       <div class="field-row" id="fld-perf-wrap">
@@ -747,6 +751,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
   document.getElementById('fld-cost').value = initiative?.cost ?? '';
+  document.getElementById('fld-featured').checked = initiative?.featured || false;
   document.getElementById('fld-reach').value = initiative?.reach || '';
   document.getElementById('fld-impressions').value = initiative?.impressions || '';
   document.getElementById('fld-engagements').value = initiative?.engagements || '';
@@ -790,6 +795,7 @@ window.saveInitiative = async function() {
     hdCategory: document.getElementById('fld-hdCategory').value,
     postLink: document.getElementById('fld-postLink').value.trim(),
     cost: parseFloat(document.getElementById('fld-cost').value) || null,
+    featured: document.getElementById('fld-featured').checked,
     reach: Number(document.getElementById('fld-reach').value) || null,
     impressions: Number(document.getElementById('fld-impressions').value) || null,
     engagements: Number(document.getElementById('fld-engagements').value) || null,
@@ -1232,9 +1238,10 @@ function fmtSAR(n) {
 
 // ── METRICS — MONTHLY BULK ENTRY ──────────────────────────────────────────
 const METRIC_CATEGORIES = {
-  "Instagram Reach":"Instagram","Instagram Impressions":"Instagram",
+  "Instagram Reach":"Instagram","Instagram Views":"Instagram",
   "Instagram Engagements":"Instagram","Instagram Engagement Rate":"Instagram",
-  "Instagram Followers":"Instagram","TikTok Views":"TikTok","TikTok Followers":"TikTok",
+  "Instagram New Followers":"Instagram","Instagram Conversations":"Instagram",
+  "TikTok Views":"TikTok","TikTok New Followers":"TikTok",
   "X Reach":"X","LinkedIn Reach":"LinkedIn","SM Messages Received":"Social Media",
   "PR Mentions":"PR","Website Visits":"Website",
 };
@@ -1282,6 +1289,26 @@ async function loadMetricsForPeriod() {
     </div>`;
   });
   document.getElementById('metrics-grid-wrap').innerHTML = html;
+  setupEngagementRateCalc();
+}
+
+function setupEngagementRateCalc() {
+  const viewsEl = document.getElementById('metric-input-Instagram_Views');
+  const engEl   = document.getElementById('metric-input-Instagram_Engagements');
+  const rateEl  = document.getElementById('metric-input-Instagram_Engagement_Rate');
+  if(!viewsEl || !engEl || !rateEl) return;
+  // Make rate field read-only and visually distinct
+  rateEl.readOnly = true;
+  rateEl.style.cssText += ';background:var(--bg);color:var(--green);font-weight:700;cursor:default';
+  rateEl.title = 'Auto-calculated: (Engagements ÷ Views) × 100';
+  const calc = () => {
+    const v = parseFloat(viewsEl.value) || 0;
+    const e = parseFloat(engEl.value) || 0;
+    rateEl.value = v > 0 ? (e / v * 100).toFixed(2) : '';
+  };
+  viewsEl.addEventListener('input', calc);
+  engEl.addEventListener('input', calc);
+  calc(); // calculate immediately with existing values
 }
 
 window.saveMonthMetrics = async function() {
