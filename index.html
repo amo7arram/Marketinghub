@@ -752,13 +752,11 @@ window.shiftPeriod = function(dir) {
 // ── CAMPAIGN MONTH NAVIGATION ────────────────────────────────────────────
 window.shiftCampMonth = function(dir) {
   campMonthOffset = Math.max(-1, Math.min(1, campMonthOffset+dir));
-  renderCampMonthList();
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
-  document.getElementById('camp-month-label').textContent =
-    d.toLocaleString('en',{month:'long',year:'numeric'});
-  document.getElementById('period-prev').disabled = campMonthOffset<==-1;
-  document.getElementById('period-next').disabled = campMonthOffset>=1;
+  const labelEl = document.getElementById('camp-month-label');
+  if(labelEl) labelEl.textContent = d.toLocaleString('en',{month:'long',year:'numeric'});
+  renderCampMonthList();
 }
 
 function renderCampMonthList() {
@@ -823,67 +821,81 @@ function renderFeatured() {
 
 // ── MAIN DASHBOARD RENDER ────────────────────────────────────────────────
 window.renderDashboard = function() {
-  const periods = getAvailablePeriods();
+  try {
+    const periods = getAvailablePeriods();
 
-  // Period navigator UI
-  const navLabel = document.getElementById('period-nav-label');
-  if(periods.length) {
-    const currentPeriod = periods[dashPeriodIdx] || periods[0];
-    navLabel.textContent = periodLabel(currentPeriod);
-    document.getElementById('period-prev').disabled = dashPeriodIdx >= periods.length-1;
-    document.getElementById('period-next').disabled = dashPeriodIdx <= 0;
+    // Period navigator UI
+    const navLabel = document.getElementById('period-nav-label');
+    if(!navLabel) return; // dashboard page not active yet
 
-    // Social media KPIs — aggregate across channels
-    const pms = getPeriodMetrics(currentPeriod);
-    const views = getMVal('Instagram Views',pms) + getMVal('TikTok Views',pms);
-    const reach = getMVal('Instagram Reach',pms) + getMVal('X Reach',pms) + getMVal('LinkedIn Reach',pms);
-    const eng   = getMVal('Instagram Engagements',pms);
-    const conv  = getMVal('Instagram Conversations',pms);
-    document.getElementById('kpi-views').textContent = fmt(views)||'—';
-    document.getElementById('kpi-reach').textContent = fmt(reach)||'—';
-    document.getElementById('kpi-eng').textContent   = fmt(eng)||'—';
-    document.getElementById('kpi-conv').textContent  = fmt(conv)||'—';
-  } else {
-    navLabel.textContent = 'No monthly data yet';
-    document.getElementById('period-prev').disabled = true;
-    document.getElementById('period-next').disabled = true;
-    ['kpi-views','kpi-reach','kpi-eng','kpi-conv'].forEach(id=>document.getElementById(id).textContent='—');
+    if(periods.length) {
+      const currentPeriod = periods[dashPeriodIdx] || periods[0];
+      navLabel.textContent = periodLabel(currentPeriod);
+      const prevBtn = document.getElementById('period-prev');
+      const nextBtn = document.getElementById('period-next');
+      if(prevBtn) prevBtn.disabled = dashPeriodIdx >= periods.length-1;
+      if(nextBtn) nextBtn.disabled = dashPeriodIdx <= 0;
+
+      // Social media KPIs — aggregate across channels
+      const pms  = getPeriodMetrics(currentPeriod);
+      const views = getMVal('Instagram Views',pms) + getMVal('TikTok Views',pms);
+      const reach = getMVal('Instagram Reach',pms) + getMVal('X Reach',pms) + getMVal('LinkedIn Reach',pms);
+      const eng   = getMVal('Instagram Engagements',pms);
+      const conv  = getMVal('Instagram Conversations',pms);
+      document.getElementById('kpi-views').textContent = fmt(views)||'0';
+      document.getElementById('kpi-reach').textContent = fmt(reach)||'0';
+      document.getElementById('kpi-eng').textContent   = fmt(eng)||'0';
+      document.getElementById('kpi-conv').textContent  = fmt(conv)||'0';
+    } else {
+      navLabel.textContent = 'No monthly data yet';
+      const prevBtn = document.getElementById('period-prev');
+      const nextBtn = document.getElementById('period-next');
+      if(prevBtn) prevBtn.disabled = true;
+      if(nextBtn) nextBtn.disabled = true;
+      ['kpi-views','kpi-reach','kpi-eng','kpi-conv'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(el) el.textContent = '0';
+      });
+    }
+
+    // Website chart — full year, real data only
+    const year = new Date().getFullYear();
+    const yearEl = document.getElementById('web-chart-year');
+    if(yearEl) yearEl.textContent = year;
+    const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const webData = MONTH_LABELS.map((_,i)=>{
+      const p = `${year}-${String(i+1).padStart(2,'0')}`;
+      return getMVal('Website Visits', getPeriodMetrics(p));
+    });
+
+    const canvas = document.getElementById('webChart');
+    if(canvas) {
+      if(chartWeb) chartWeb.destroy();
+      chartWeb = new Chart(canvas,{
+        type:'line',
+        data:{labels:MONTH_LABELS,datasets:[{
+          label:'Visitors',data:webData,
+          borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.08)',
+          tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#1DB87A',borderWidth:2
+        }]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+          scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
+      });
+    }
+
+    // Campaigns/health days month list
+    const now = new Date();
+    const campTarget = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
+    const campLabelEl = document.getElementById('camp-month-label');
+    if(campLabelEl) campLabelEl.textContent = campTarget.toLocaleString('en',{month:'long',year:'numeric'});
+    renderCampMonthList();
+
+    // Featured initiatives
+    renderFeatured();
+
+  } catch(err) {
+    console.error('Dashboard render error:', err);
   }
-
-  // Website chart — full year, real data only, zeros if missing
-  const year = new Date().getFullYear();
-  document.getElementById('web-chart-year').textContent = year;
-  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const webData = MONTH_LABELS.map((_,i)=>{
-    const p = `${year}-${String(i+1).padStart(2,'0')}`;
-    return getMVal('Website Visits', getPeriodMetrics(p));
-  });
-
-  if(chartWeb) chartWeb.destroy();
-  chartWeb = new Chart(document.getElementById('webChart'),{
-    type:'line',
-    data:{labels:MONTH_LABELS,datasets:[{
-      label:'Visitors',data:webData,
-      borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.08)',
-      tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#1DB87A',borderWidth:2
-    }]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{y:{
-        beginAtZero:true,
-        ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},
-        grid:{color:'rgba(0,0,0,0.04)'}
-      }}}
-  });
-
-  // Campaigns/health days month list
-  const now = new Date();
-  const campTarget = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
-  document.getElementById('camp-month-label').textContent =
-    campTarget.toLocaleString('en',{month:'long',year:'numeric'});
-  renderCampMonthList();
-
-  // Featured initiatives
-  renderFeatured();
 }
 
 // ── TIMELINE ─────────────────────────────────────────────────────────
