@@ -316,6 +316,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
     <nav class="nav">
       <div class="nav-section">Overview</div>
       <div class="nav-item active" onclick="nav('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</div>
+      <div class="nav-item" onclick="nav('smanalytics',this)"><span class="nav-icon">📊</span> SM Analytics</div>
       <div class="nav-item" onclick="nav('timeline',this)"><span class="nav-icon">◎</span> Timeline</div>
       <div class="nav-item" onclick="nav('smcalendar',this)"><span class="nav-icon">▤</span> SM Calendar</div>
       <div class="nav-item" onclick="nav('promotions',this)"><span class="nav-icon">🏷</span> Promotions</div>
@@ -397,6 +398,16 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         <div class="dash-section-title">Featured Initiatives</div>
         <div class="dept-camp-grid" id="featured-grid"><div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">⭐</div>No featured initiatives yet — tick the star checkbox on any initiative in the admin panel</div></div>
 
+      </div>
+
+      <!-- SM ANALYTICS -->
+      <div class="page" id="page-smanalytics">
+        <div class="period-nav-bar" style="margin-bottom:24px">
+          <button class="period-nav-btn" onclick="shiftPeriod(-1)">←</button>
+          <div class="period-nav-label" id="sma-period-label">Loading...</div>
+          <button class="period-nav-btn" onclick="shiftPeriod(1)">→</button>
+        </div>
+        <div id="sma-content"><div class="loading">Loading analytics...</div></div>
       </div>
 
       <!-- TIMELINE -->
@@ -556,6 +567,7 @@ let campMonthOffset = 0;  // 0 = this month, -1 = prev, +1 = next
 
 const PAGE_META = {
   dashboard:     {title:'Dashboard', sub:'Performance overview — current month'},
+  smanalytics:   {title:'SM Analytics', sub:'Detailed social media metrics by channel'},
   timeline:      {title:'Strategy Timeline', sub:'Monthly department focus — executive view'},
   smcalendar:    {title:'SM Calendar', sub:'Social media content calendar'},
   campaigns:     {title:'All Campaigns', sub:'Full campaign registry — performance & reach'},
@@ -678,6 +690,7 @@ function renderAll() {
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
   if(!activePage) return;
   if(activePage==='dashboard')     window.renderDashboard();
+  if(activePage==='smanalytics')   renderSmAnalytics();
   if(activePage==='timeline')      renderTimeline();
   if(activePage==='smcalendar')    window.renderCalendar();
   if(activePage==='campaigns')     window.renderCampaigns();
@@ -745,8 +758,9 @@ function periodLabel(p) {
 window.shiftPeriod = function(dir) {
   const periods = getAvailablePeriods();
   if(!periods.length) return;
-  dashPeriodIdx = Math.max(0, Math.min(periods.length-1, dashPeriodIdx+dir));
-  window.renderDashboard();
+  // periods[0] = most recent. ← (dir=-1) goes older = increase index. → (dir=+1) goes newer = decrease index
+  dashPeriodIdx = Math.max(0, Math.min(periods.length-1, dashPeriodIdx - dir));
+  renderDashboardKPIs();
 }
 
 // ── CAMPAIGN MONTH NAVIGATION ────────────────────────────────────────────
@@ -765,6 +779,9 @@ function renderCampMonthList() {
   const y = target.getFullYear();
   const m = target.getMonth();
   const targetStr = `${y}-${String(m+1).padStart(2,'0')}`;
+
+  const labelEl = document.getElementById('camp-month-label');
+  if(labelEl) labelEl.textContent = target.toLocaleString('en',{month:'long',year:'numeric'});
 
   const items = ALL.filter(i=>{
     if(!['Campaign','Event','Health Day'].includes(i.type)) return false;
@@ -821,12 +838,18 @@ function renderFeatured() {
 
 // ── MAIN DASHBOARD RENDER ────────────────────────────────────────────────
 window.renderDashboard = function() {
+  renderDashboardKPIs();
+  renderWebChart();
+  renderCampMonthList();
+  renderFeatured();
+}
+
+// Only KPIs — called by period navigation, no chart re-render
+function renderDashboardKPIs() {
   try {
     const periods = getAvailablePeriods();
-
-    // Period navigator UI
     const navLabel = document.getElementById('period-nav-label');
-    if(!navLabel) return; // dashboard page not active yet
+    if(!navLabel) return;
 
     if(periods.length) {
       const currentPeriod = periods[dashPeriodIdx] || periods[0];
@@ -836,29 +859,30 @@ window.renderDashboard = function() {
       if(prevBtn) prevBtn.disabled = dashPeriodIdx >= periods.length-1;
       if(nextBtn) nextBtn.disabled = dashPeriodIdx <= 0;
 
-      // Social media KPIs — aggregate across channels
-      const pms  = getPeriodMetrics(currentPeriod);
+      const pms   = getPeriodMetrics(currentPeriod);
       const views = getMVal('Instagram Views',pms) + getMVal('TikTok Views',pms);
       const reach = getMVal('Instagram Reach',pms) + getMVal('X Reach',pms) + getMVal('LinkedIn Reach',pms);
-      const eng   = getMVal('Instagram Engagements',pms);
-      const conv  = getMVal('Instagram Conversations',pms);
+      const eng   = getMVal('Instagram Engagements',pms) + getMVal('TikTok Engagements',pms);
+      const conv  = getMVal('SM Messages Received',pms); // conversations = SM messages received
       document.getElementById('kpi-views').textContent = fmt(views)||'0';
       document.getElementById('kpi-reach').textContent = fmt(reach)||'0';
       document.getElementById('kpi-eng').textContent   = fmt(eng)||'0';
       document.getElementById('kpi-conv').textContent  = fmt(conv)||'0';
     } else {
-      navLabel.textContent = 'No monthly data yet';
-      const prevBtn = document.getElementById('period-prev');
-      const nextBtn = document.getElementById('period-next');
-      if(prevBtn) prevBtn.disabled = true;
-      if(nextBtn) nextBtn.disabled = true;
-      ['kpi-views','kpi-reach','kpi-eng','kpi-conv'].forEach(id=>{
-        const el = document.getElementById(id);
-        if(el) el.textContent = '0';
-      });
+      navLabel.textContent = 'No monthly data yet — add metrics in admin';
+      ['period-prev','period-next'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=true; });
+      ['kpi-views','kpi-reach','kpi-eng','kpi-conv'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
     }
+    // Keep SM Analytics in sync if open
+    if(document.getElementById('page-smanalytics')?.classList.contains('active')) renderSmAnalytics();
+  } catch(e) { console.error('Dashboard KPI error:', e); }
+}
 
-    // Website chart — full year, real data only
+// Website chart — always full year, never re-renders on period change
+function renderWebChart() {
+  try {
+    const canvas = document.getElementById('webChart');
+    if(!canvas) return;
     const year = new Date().getFullYear();
     const yearEl = document.getElementById('web-chart-year');
     if(yearEl) yearEl.textContent = year;
@@ -867,35 +891,110 @@ window.renderDashboard = function() {
       const p = `${year}-${String(i+1).padStart(2,'0')}`;
       return getMVal('Website Visits', getPeriodMetrics(p));
     });
+    if(chartWeb) chartWeb.destroy();
+    chartWeb = new Chart(canvas,{
+      type:'line',
+      data:{labels:MONTH_LABELS,datasets:[{
+        label:'Visitors',data:webData,
+        borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.08)',
+        tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#1DB87A',borderWidth:2
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
+    });
+  } catch(e) { console.error('Web chart error:', e); }
+}
 
-    const canvas = document.getElementById('webChart');
-    if(canvas) {
-      if(chartWeb) chartWeb.destroy();
-      chartWeb = new Chart(canvas,{
-        type:'line',
-        data:{labels:MONTH_LABELS,datasets:[{
-          label:'Visitors',data:webData,
-          borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.08)',
-          tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#1DB87A',borderWidth:2
-        }]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-          scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
-      });
+// ── SM ANALYTICS PAGE ────────────────────────────────────────────────────
+const SMA_CHANNELS = [
+  {
+    key:'Instagram', icon:'📸', color:'#E1306C',
+    metrics:[
+      {name:'Instagram Reach',      label:'Reach'},
+      {name:'Instagram Views',      label:'Views'},
+      {name:'Instagram Engagements',label:'Engagements'},
+      {name:'Instagram Engagement Rate', label:'Engagement Rate', pct:true},
+      {name:'Instagram New Followers',   label:'New Followers'},
+      {name:'Instagram Conversations',   label:'Conversations'},
+    ]
+  },
+  {
+    key:'TikTok', icon:'🎵', color:'#000000',
+    metrics:[
+      {name:'TikTok Views',        label:'Views'},
+      {name:'TikTok Engagements',  label:'Engagements'},
+      {name:'TikTok New Followers',label:'New Followers'},
+    ]
+  },
+  {
+    key:'X (Twitter)', icon:'𝕏', color:'#1DA1F2',
+    metrics:[{name:'X Reach', label:'Reach'}]
+  },
+  {
+    key:'LinkedIn', icon:'💼', color:'#0A66C2',
+    metrics:[{name:'LinkedIn Reach', label:'Reach'}]
+  },
+  {
+    key:'Social Media', icon:'✉️', color:'#6C5CE7',
+    metrics:[
+      {name:'SM Messages Received', label:'Messages Received'},
+      {name:'PR Mentions',          label:'PR Mentions'},
+    ]
+  },
+  {
+    key:'Website', icon:'🌐', color:'#1DB87A',
+    metrics:[{name:'Website Visits', label:'Monthly Visitors'}]
+  },
+];
+
+function renderSmAnalytics() {
+  try {
+    const periods = getAvailablePeriods();
+    const labelEl = document.getElementById('sma-period-label');
+
+    if(!periods.length) {
+      if(labelEl) labelEl.textContent = 'No data yet';
+      document.getElementById('sma-content').innerHTML =
+        '<div class="empty-state"><div class="empty-state-icon">📊</div>No metrics entered yet — add monthly data in the admin panel</div>';
+      return;
     }
 
-    // Campaigns/health days month list
-    const now = new Date();
-    const campTarget = new Date(now.getFullYear(), now.getMonth()+campMonthOffset, 1);
-    const campLabelEl = document.getElementById('camp-month-label');
-    if(campLabelEl) campLabelEl.textContent = campTarget.toLocaleString('en',{month:'long',year:'numeric'});
-    renderCampMonthList();
+    const currentPeriod = periods[dashPeriodIdx] || periods[0];
+    const prevPeriod    = periods[dashPeriodIdx+1] || null;
+    if(labelEl) labelEl.textContent = periodLabel(currentPeriod);
 
-    // Featured initiatives
-    renderFeatured();
+    const pms     = getPeriodMetrics(currentPeriod);
+    const prevPms = prevPeriod ? getPeriodMetrics(prevPeriod) : [];
 
-  } catch(err) {
-    console.error('Dashboard render error:', err);
-  }
+    let html = '';
+    SMA_CHANNELS.forEach(ch => {
+      html += `<div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="margin-bottom:12px">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:18px">${ch.icon}</span>
+            <span style="color:${ch.color}">${ch.key}</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
+          ${ch.metrics.map(m=>{
+            const val  = getMVal(m.name, pms);
+            const prev = getMVal(m.name, prevPms);
+            const pct  = prev > 0 ? Math.round((val-prev)/prev*100) : null;
+            const unit = m.pct ? '%' : '';
+            const delta = pct !== null
+              ? `<div style="font-size:10px;margin-top:4px;${pct>=0?'color:var(--green)':'color:var(--red)'}">${pct>=0?'▲':'▼'} ${Math.abs(pct)}% vs last month</div>`
+              : '';
+            return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;border:1px solid var(--border)">
+              <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">${m.label}</div>
+              <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);line-height:1">${val?fmt(val)+''+unit:'—'}</div>
+              ${delta}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    });
+    document.getElementById('sma-content').innerHTML = html;
+  } catch(e) { console.error('SM Analytics error:', e); }
 }
 
 // ── TIMELINE ─────────────────────────────────────────────────────────
@@ -927,6 +1026,7 @@ function renderTimeline() {
     const isPastMonth = monthDate < new Date(now.getFullYear(), now.getMonth(), 1);
     const items = monthMap[key]||[];
     const deptCount={};
+
     items.forEach(i=>{ if(i.department){ deptCount[i.department]=(deptCount[i.department]||0)+1; } });
     const focusDepts = Object.entries(deptCount).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([d])=>d);
     html += `<div class="tl-month${isCurrent?' current':''}${isPastMonth?' past':''}">

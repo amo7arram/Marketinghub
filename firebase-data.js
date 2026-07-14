@@ -106,6 +106,7 @@ export const METRIC_NAMES = [
   "Instagram New Followers",
   "Instagram Conversations",
   "TikTok Views",
+  "TikTok Engagements",
   "TikTok New Followers",
   "X Reach",
   "LinkedIn Reach",
