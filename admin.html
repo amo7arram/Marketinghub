@@ -1907,7 +1907,8 @@ window.seedLoyaltyCards = async function(){
   if(!confirm(`This will add the 3 sample loyalty cards. Run only once. Proceed?`))return;
   let added=0;
   for(const card of SAMPLE_LOYALTY_CARDS){
-    try{await addLoyaltyCard(card);added++;}catch(e){}
+    try{ await addLoyaltyCard(card); added++; }
+    catch(e){ showToast('Seed failed: '+e.message+' — check Firestore rules for loyalty_cards', true); return; }
   }
   showToast(`${added} sample cards added ✓`);
 }

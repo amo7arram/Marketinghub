@@ -254,9 +254,10 @@ export function promoStatus(startDate, endDate) {
 // ── BD TARGETS ───────────────────────────────────────────────────────────
 // Stored as config/bd_targets — single doc with all 2026 KPI targets
 export function watchBdTargets(callback) {
-  return onSnapshot(doc(db, CONFIG, "bd_targets"), snap => {
-    callback(snap.exists() ? snap.data() : {});
-  });
+  return onSnapshot(doc(db, CONFIG, "bd_targets"),
+    snap => { callback(snap.exists() ? snap.data() : {}); },
+    err  => { console.error('watchBdTargets:', err.code); callback({}); }
+  );
 }
 export function setBdTargets(data) {
   return setDoc(doc(db, CONFIG, "bd_targets"), data, { merge: true });
@@ -347,11 +348,10 @@ export const DEPT_BG = {
 
 // ── BUSINESS DEVELOPMENT CARDS ───────────────────────────────────────────
 export function watchBdCards(callback) {
-  return onSnapshot(collection(db, BD_CARDS), snap => {
-    const data = snap.docs.map(d=>({id:d.id,...d.data()}));
-    data.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    callback(data);
-  });
+  return onSnapshot(collection(db, BD_CARDS),
+    snap => { const data=snap.docs.map(d=>({id:d.id,...d.data()})); data.sort((a,b)=>(b.date||'').localeCompare(a.date||'')); callback(data); },
+    err  => { console.error('watchBdCards:', err.code, '— add Firestore rules for bd_cards'); callback([]); }
+  );
 }
 export function addBdCard(data) {
   return addDoc(collection(db, BD_CARDS), {...data, createdAt:Timestamp.now()});
@@ -365,11 +365,10 @@ export function deleteBdCard(id) {
 
 // ── WELLSPAN PACKAGES ─────────────────────────────────────────────────────
 export function watchWellspanPackages(callback) {
-  return onSnapshot(collection(db, WELLSPAN_PACKAGES), snap => {
-    const data = snap.docs.map(d=>({id:d.id,...d.data()}));
-    data.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-    callback(data);
-  });
+  return onSnapshot(collection(db, WELLSPAN_PACKAGES),
+    snap => { const data=snap.docs.map(d=>({id:d.id,...d.data()})); data.sort((a,b)=>(a.name||'').localeCompare(b.name||'')); callback(data); },
+    err  => { console.error('watchWellspanPackages:', err.code, '— add Firestore rules for wellspan_packages'); callback([]); }
+  );
 }
 export function addWellspanPackage(data) {
   return addDoc(collection(db, WELLSPAN_PACKAGES), {...data, createdAt:Timestamp.now()});
@@ -384,11 +383,10 @@ export const WELLSPAN_ITEM_TYPES = ["Test","Consultation","Service","Vaccine","I
 
 // ── LOYALTY CARDS ─────────────────────────────────────────────────────────
 export function watchLoyaltyCards(callback) {
-  return onSnapshot(collection(db, LOYALTY_CARDS), snap => {
-    const data = snap.docs.map(d=>({id:d.id,...d.data()}));
-    data.sort((a,b)=>(a.tierOrder||0)-(b.tierOrder||0));
-    callback(data);
-  });
+  return onSnapshot(collection(db, LOYALTY_CARDS),
+    snap => { const data=snap.docs.map(d=>({id:d.id,...d.data()})); data.sort((a,b)=>(a.tierOrder||0)-(b.tierOrder||0)); callback(data); },
+    err  => { console.error('watchLoyaltyCards:', err.code, '— add Firestore rules for loyalty_cards'); callback([]); }
+  );
 }
 export function addLoyaltyCard(data) {
   return addDoc(collection(db, LOYALTY_CARDS), {...data, createdAt:Timestamp.now()});
