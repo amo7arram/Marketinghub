@@ -33,6 +33,9 @@ const REQUESTS    = "requests";
 const EXPENSES    = "expenses";
 const CONFIG      = "config";
 const PROMOTIONS  = "promotions";
+const BD_CARDS          = "bd_cards";
+const WELLSPAN_PACKAGES = "wellspan_packages";
+const LOYALTY_CARDS     = "loyalty_cards";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -248,6 +251,17 @@ export function promoStatus(startDate, endDate) {
 }
 
 
+// ── BD TARGETS ───────────────────────────────────────────────────────────
+// Stored as config/bd_targets — single doc with all 2026 KPI targets
+export function watchBdTargets(callback) {
+  return onSnapshot(doc(db, CONFIG, "bd_targets"), snap => {
+    callback(snap.exists() ? snap.data() : {});
+  });
+}
+export function setBdTargets(data) {
+  return setDoc(doc(db, CONFIG, "bd_targets"), data, { merge: true });
+}
+
 // Stored as a single document: config/budget → { annualBudget: number, year: number }
 export async function getAnnualBudget() {
   const snap = await getDoc(doc(db, CONFIG, "budget"));
@@ -330,3 +344,109 @@ export const DEPT_BG = {
   "Diabetes & Chronic":"#EEEAFF","Dermatology & Plastics":"#FFF6E0",
   "Orthopedics":"#E4F0FF","Oncology":"#FFF0E4","General Surgery":"#E4F8FF","General / Brand":"#EEF0FF"
 };
+
+// ── BUSINESS DEVELOPMENT CARDS ───────────────────────────────────────────
+export function watchBdCards(callback) {
+  return onSnapshot(collection(db, BD_CARDS), snap => {
+    const data = snap.docs.map(d=>({id:d.id,...d.data()}));
+    data.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    callback(data);
+  });
+}
+export function addBdCard(data) {
+  return addDoc(collection(db, BD_CARDS), {...data, createdAt:Timestamp.now()});
+}
+export function updateBdCard(id, data) {
+  return updateDoc(doc(db, BD_CARDS, id), data);
+}
+export function deleteBdCard(id) {
+  return deleteDoc(doc(db, BD_CARDS, id));
+}
+
+// ── WELLSPAN PACKAGES ─────────────────────────────────────────────────────
+export function watchWellspanPackages(callback) {
+  return onSnapshot(collection(db, WELLSPAN_PACKAGES), snap => {
+    const data = snap.docs.map(d=>({id:d.id,...d.data()}));
+    data.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    callback(data);
+  });
+}
+export function addWellspanPackage(data) {
+  return addDoc(collection(db, WELLSPAN_PACKAGES), {...data, createdAt:Timestamp.now()});
+}
+export function updateWellspanPackage(id, data) {
+  return updateDoc(doc(db, WELLSPAN_PACKAGES, id), data);
+}
+export function deleteWellspanPackage(id) {
+  return deleteDoc(doc(db, WELLSPAN_PACKAGES, id));
+}
+export const WELLSPAN_ITEM_TYPES = ["Test","Consultation","Service","Vaccine","Imaging","Other"];
+
+// ── LOYALTY CARDS ─────────────────────────────────────────────────────────
+export function watchLoyaltyCards(callback) {
+  return onSnapshot(collection(db, LOYALTY_CARDS), snap => {
+    const data = snap.docs.map(d=>({id:d.id,...d.data()}));
+    data.sort((a,b)=>(a.tierOrder||0)-(b.tierOrder||0));
+    callback(data);
+  });
+}
+export function addLoyaltyCard(data) {
+  return addDoc(collection(db, LOYALTY_CARDS), {...data, createdAt:Timestamp.now()});
+}
+export function updateLoyaltyCard(id, data) {
+  return updateDoc(doc(db, LOYALTY_CARDS, id), data);
+}
+export function deleteLoyaltyCard(id) {
+  return deleteDoc(doc(db, LOYALTY_CARDS, id));
+}
+
+// Sample loyalty cards — used to seed admin on first setup
+export const SAMPLE_LOYALTY_CARDS = [
+  {
+    name:"Sehat Card", tier:"Silver", tierOrder:1,
+    price:299, priceLabel:"SAR / year",
+    description:"Our entry-level wellness card — the perfect start for proactive health management.",
+    color:"#8890A8", bgColor:"#F0F2F7",
+    benefits:[
+      {text:"Annual checkup — 10 tests (CBC, lipid profile, blood sugar, kidney & liver function)"},
+      {text:"10% discount on all outpatient specialist consultations"},
+      {text:"Free annual flu vaccination"},
+      {text:"Priority appointment booking via dedicated hotline"},
+      {text:"Digital health record access via IMC app"},
+    ]
+  },
+  {
+    name:"Sehat Plus Card", tier:"Gold", tierOrder:2,
+    price:699, priceLabel:"SAR / year",
+    description:"Our most popular card — comprehensive coverage for you and your family.",
+    color:"#9B6000", bgColor:"#FFF6E0",
+    benefits:[
+      {text:"Comprehensive annual checkup — 20+ tests including thyroid and vitamin D"},
+      {text:"15% discount on all outpatient specialist consultations"},
+      {text:"10% discount on procedures and minor surgeries"},
+      {text:"1 annual professional dental cleaning"},
+      {text:"Free flu + pneumonia vaccinations annually"},
+      {text:"VIP waiting area access for all visits"},
+      {text:"Priority appointment + same-day slots"},
+      {text:"Digital health record access via IMC app"},
+    ]
+  },
+  {
+    name:"Sehat Premium Card", tier:"Platinum", tierOrder:3,
+    price:1499, priceLabel:"SAR / year",
+    description:"Our elite platinum card — executive-level care with the highest level of attention.",
+    color:"#00539B", bgColor:"#E4EDFF",
+    benefits:[
+      {text:"Executive annual checkup — 30+ tests including full cardiac profile and tumor markers"},
+      {text:"20% discount on all outpatient services and consultations"},
+      {text:"15% discount on all procedures and elective surgeries"},
+      {text:"3 specialist consultations fully covered per year"},
+      {text:"Annual dermatology assessment + skin care session"},
+      {text:"VIP lounge access with concierge service"},
+      {text:"Dedicated patient coordinator for all bookings"},
+      {text:"Free flu, pneumonia, and shingles vaccines annually"},
+      {text:"Free home lab collection for annual checkup"},
+      {text:"Family member 10% discount (up to 3 members)"},
+    ]
+  }
+];

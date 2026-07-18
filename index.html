@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IMC Marketing Strategy 2026 — المركز الطبي الدولي</title>
+<title>IMC Marketing & Business Development Hub</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -263,6 +263,53 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .featured-card-body{padding:0 16px 10px;font-size:11px;color:var(--text-3);line-height:1.55}
 .featured-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
 
+/* LOYALTY CARDS */
+.loyalty-card{border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow-lg);transition:all var(--transition);position:relative}
+.loyalty-card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.18)}
+.loyalty-card-header{padding:28px 24px 20px;text-align:center}
+.loyalty-tier{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;opacity:0.7;margin-bottom:8px}
+.loyalty-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px}
+.loyalty-price{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;line-height:1;margin:12px 0 4px}
+.loyalty-price-label{font-size:11px;opacity:0.65}
+.loyalty-divider{height:1px;background:currentColor;opacity:0.15;margin:16px 24px}
+.loyalty-benefits{padding:0 24px 24px;list-style:none}
+.loyalty-benefit{display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.loyalty-benefit:last-child{border:none}
+.loyalty-check{flex-shrink:0;font-size:13px;margin-top:1px}
+
+/* WELLSPAN PACKAGES */
+.ws-package-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);transition:all var(--transition)}
+.ws-package-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.ws-package-header{padding:16px 18px;background:linear-gradient(135deg,#E4F8F0,#B8F0DC)}
+.ws-package-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:#0E7A55;margin-bottom:2px}
+.ws-package-audience{font-size:11px;color:#2D9E75}
+.ws-package-price{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#0E7A55;margin-top:8px}
+.ws-items{padding:12px 18px 16px;list-style:none}
+.ws-item{display:flex;align-items:center;gap:6px;padding:5px 0;font-size:11px;color:var(--text-2);border-bottom:1px solid var(--border)}
+.ws-item:last-child{border:none}
+.ws-item-type{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:#E4F8F0;color:#0E7A55;white-space:nowrap}
+
+/* BD CARDS */
+.bd-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);transition:all var(--transition)}
+.bd-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.bd-card-header{padding:14px 16px;background:linear-gradient(135deg,#E4EDFF,#C5D8FF);display:flex;align-items:flex-start;justify-content:space-between}
+.bd-card-title{font-size:13px;font-weight:700;color:var(--navy);flex:1;line-height:1.3}
+.bd-card-body{padding:12px 16px;font-size:11px;color:var(--text-3);line-height:1.55}
+.bd-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
+
+/* BD KPI PROGRESS */
+.kpi-row{display:grid;grid-template-columns:160px 1fr 80px 60px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.kpi-row:last-child{border:none}
+.kpi-row-label{font-size:12px;font-weight:600;color:var(--text)}
+.kpi-row-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.kpi-row-fill{height:100%;border-radius:4px;transition:width 0.6s ease}
+.kpi-row-fill.on-track{background:var(--green)}
+.kpi-row-fill.behind{background:var(--orange)}
+.kpi-row-fill.far-behind{background:var(--red)}
+.kpi-row-fill.exceeded{background:var(--navy)}
+.kpi-row-values{font-size:11px;color:var(--text-3);white-space:nowrap;text-align:right}
+.kpi-row-pct{font-family:'Syne',sans-serif;font-size:14px;font-weight:800;text-align:right}
+
 /* PROMOTIONS */
 .promotions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .promo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:all var(--transition)}
@@ -311,13 +358,17 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
   <aside class="sidebar">
     <div class="sidebar-logo">
       <img class="sidebar-logo-img" src="logo.jpg" alt="IMC">
-      <div class="sidebar-logo-text">Marketing<br>Strategy 2026</div>
+      <div class="sidebar-logo-text">Marketing &amp; BD Hub</div>
     </div>
     <nav class="nav">
       <div class="nav-section">Overview</div>
       <div class="nav-item active" onclick="nav('dashboard',this)"><span class="nav-icon">▦</span> Dashboard</div>
       <div class="nav-item" onclick="nav('smanalytics',this)"><span class="nav-icon">📊</span> SM Analytics</div>
-      <div class="nav-item" onclick="nav('timeline',this)"><span class="nav-icon">◎</span> Timeline</div>
+      <div class="nav-item" onclick="nav('timeline',this)" style="display:none"><span class="nav-icon">◎</span> Timeline</div>
+      <div class="nav-section">Programs</div>
+      <div class="nav-item" onclick="nav('wellspan',this)"><span class="nav-icon">💚</span> Well-span Program</div>
+      <div class="nav-item" onclick="nav('loyalty',this)"><span class="nav-icon">🏅</span> Loyalty Program</div>
+      <div class="nav-item" onclick="nav('bd',this)"><span class="nav-icon">🤝</span> Business Development</div>
       <div class="nav-item" onclick="nav('smcalendar',this)"><span class="nav-icon">▤</span> SM Calendar</div>
       <div class="nav-item" onclick="nav('promotions',this)"><span class="nav-icon">🏷</span> Promotions</div>
       <div class="nav-section">Campaigns</div>
@@ -333,7 +384,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
     <div class="sidebar-footer">
       <span class="sync-dot"></span>Live · Firebase<br>
       Last update: <span id="sync-time">—</span><br>
-      <span style="opacity:0.45">IMC Marketing Strategy 2026</span>
+      <span style="opacity:0.45">IMC Marketing & Business Development Hub</span>
     </div>
   </aside>
 
@@ -518,6 +569,36 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         </div>
       </div>
 
+      <!-- WELL-SPAN PROGRAM -->
+      <div class="page" id="page-wellspan">
+        <div class="cal-controls" style="margin-bottom:20px">
+          <select class="cal-select" id="ws-entity-f" onchange="renderWellspan()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+        </div>
+        <div class="dash-section-title">Wellness Packages</div>
+        <div class="promotions-grid" id="wellspan-packages-grid" style="margin-bottom:28px"><div class="loading">Loading...</div></div>
+        <div class="dash-section-title">Wellspan Promotions</div>
+        <div class="promotions-grid" id="wellspan-promos-grid"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- LOYALTY PROGRAM -->
+      <div class="page" id="page-loyalty">
+        <div id="loyalty-cards-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- BUSINESS DEVELOPMENT -->
+      <div class="page" id="page-bd">
+        <!-- KPI Progress -->
+        <div class="card" style="margin-bottom:24px" id="bd-kpi-section">
+          <div class="card-header"><div class="card-title">2026 Performance Progress</div><span style="font-size:11px;color:var(--text-3)">YTD actuals vs annual targets</span></div>
+          <div id="bd-kpi-progress"><div style="font-size:12px;color:var(--text-3);padding:8px 0">Set targets in the admin Business Development tab to see progress here</div></div>
+        </div>
+        <div class="cal-controls" style="margin-bottom:20px">
+          <select class="cal-select" id="bd-entity-f" onchange="renderBD()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+        </div>
+        <div class="dash-section-title">BD Activities & Initiatives</div>
+        <div class="dept-camp-grid" id="bd-grid"><div class="loading">Loading...</div></div>
+      </div>
+
       <!-- BRAND RESOURCES -->
       <div class="page" id="page-resources">
         <div class="cal-controls" style="margin-bottom:16px">
@@ -553,6 +634,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 <script type="module">
 import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
+  watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets,
   promoStatus,
   DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES
 } from './firebase-data.js';
@@ -561,6 +643,10 @@ let RESOURCES   = [];
 let METRICS     = [];
 let PROMOTIONS  = [];
 let ALL         = [];
+let BD_CARDS    = [];
+let WELLSPAN    = [];
+let LOYALTY     = [];
+let BD_TARGETS  = {};
 let campSortDir = null;
 let dashPeriodIdx   = 0;  // 0 = most recent period, 1 = one before, 2 = two before
 let campMonthOffset = 0;  // 0 = this month, -1 = prev, +1 = next
@@ -577,6 +663,9 @@ const PAGE_META = {
   library:   {title:'Content Library',  sub:'Browse and link to all published SM content'},
   print:     {title:'Print Materials',  sub:'Brochures, flyers, signage and other print assets'},
   promotions:{title:'Promotions Calendar', sub:'Active and upcoming sales promotions by entity'},
+  wellspan:  {title:'Well-span Program', sub:'Wellness packages and preventive health programs'},
+  loyalty:   {title:'Loyalty Program', sub:'IMC loyalty cards — benefits and pricing'},
+  bd:        {title:'Business Development', sub:'Outreach, collaborations, and external activations'},
   resources: {title:'Brand Resources',  sub:'Logos, templates, and brand guidelines to download'},
 };
 
@@ -665,6 +754,7 @@ function populateFilters() {
   document.getElementById('res-type-filter').innerHTML += RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('print-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('promo-dept-f').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  // wellspan and BD entity filters are pre-populated in HTML
 }
 
 // ── DATA LOAD ─────────────────────────────────────────────────────────
@@ -677,6 +767,10 @@ watchMetrics(data => {
   METRICS = data;
   renderAll();
 });
+watchBdCards(data    => { BD_CARDS  = data; renderAll(); });
+watchWellspanPackages(data => { WELLSPAN = data; renderAll(); });
+watchLoyaltyCards(data => { LOYALTY  = data; renderAll(); });
+watchBdTargets(data => { BD_TARGETS = data; renderAll(); });
 watchPromotions(data => {
   PROMOTIONS = data;
   renderAll();
@@ -700,6 +794,9 @@ function renderAll() {
   if(activePage==='library')       window.renderLibrary();
   if(activePage==='print')         window.renderPrint();
   if(activePage==='promotions')    window.renderPromotions();
+  if(activePage==='wellspan')      window.renderWellspan();
+  if(activePage==='loyalty')       window.renderLoyalty();
+  if(activePage==='bd')            window.renderBD();
   if(activePage==='resources')     window.renderResources();
 }
 
@@ -1441,6 +1538,197 @@ window.openPromoDetail = function(p) {
   `;
   document.getElementById('detail-overlay').classList.add('open');
   document.getElementById('detail-panel').classList.add('open');
+}
+
+// ── WELL-SPAN PROGRAM ────────────────────────────────────────────────────
+window.renderWellspan = function() {
+  const entityF = document.getElementById('ws-entity-f').value;
+
+  // Packages
+  const packages = WELLSPAN;
+  const pgrid = document.getElementById('wellspan-packages-grid');
+  if(!packages.length) {
+    pgrid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">💚</div>No packages yet</div>';
+  } else {
+    pgrid.innerHTML = packages.map(p=>`<div class="ws-package-card">
+      <div class="ws-package-header">
+        <div class="ws-package-name">${p.name||''}</div>
+        <div class="ws-package-audience">${p.targetAudience||''}</div>
+        <div class="ws-package-price">${p.price?.toLocaleString()||'—'} SAR</div>
+        ${p.startDate?`<div style="font-size:10px;color:#2D9E75;margin-top:4px">${p.startDate}${p.endDate?' → '+p.endDate:''}</div>`:''}
+      </div>
+      <ul class="ws-items">
+        ${(p.items||[]).map(item=>`<li class="ws-item">
+          <span class="ws-item-type">${item.type}</span>
+          <span>${item.name}</span>
+        </li>`).join('')}
+        ${!p.items?.length?'<li style="font-size:11px;color:var(--text-3);padding:8px 0">No items listed</li>':''}
+      </ul>
+      ${p.description?`<div style="padding:0 18px 14px;font-size:11px;color:var(--text-3)">${p.description}</div>`:''}
+    </div>`).join('');
+  }
+
+  // Wellspan promotions
+  const promos = PROMOTIONS.filter(p=>p.isWellspan && (!entityF || (p.entity||[]).includes(entityF)));
+  const PROMO_STATUS_CLASS = {'Active':'b-published','Upcoming':'b-planned','Expired':'b-past'};
+  const prGrid = document.getElementById('wellspan-promos-grid');
+  if(!promos.length) {
+    prGrid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🏷️</div>No wellspan promotions — mark promotions as Wellspan in the admin panel</div>';
+  } else {
+    prGrid.innerHTML = promos.map(p=>{
+      const status = promoStatus(p.startDate, p.endDate);
+      const ds = deptStyle(p.department);
+      return `<div class="promo-card ${status==='Active'?'active-promo':status==='Expired'?'expired-promo':''}">
+        <div class="promo-card-header">
+          <div class="promo-card-title">${p.title||''}</div>
+          <div class="promo-discount-badge">${p.discountPct||0}%</div>
+        </div>
+        <div class="promo-card-body">
+          <div style="margin-bottom:8px">${p.description?p.description.substring(0,90)+(p.description.length>90?'...':''):''}</div>
+          <div class="promo-price-row"><div>
+            <div class="promo-price-orig">${p.originalPrice?.toLocaleString()||''} SAR</div>
+            <div class="promo-price-new">${p.discountedPrice?.toLocaleString()||''}</div>
+            <div class="promo-price-sar">SAR</div>
+          </div></div>
+        </div>
+        <div class="promo-card-footer">
+          <span class="badge" style="background:${ds.bg};color:${ds.t}">${p.department||''}</span>
+          <span class="badge ${PROMO_STATUS_CLASS[status]||'b-planned'}">${status}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ── LOYALTY PROGRAM ───────────────────────────────────────────────────────
+window.renderLoyalty = function() {
+  const grid = document.getElementById('loyalty-cards-grid');
+  if(!LOYALTY.length) {
+    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🏅</div>No loyalty cards yet — click "Seed 3 Sample Cards" in the admin panel to get started</div>';
+    return;
+  }
+  grid.innerHTML = LOYALTY.map(card=>{
+    const bg   = card.bgColor  || '#EEF0FF';
+    const color= card.color    || '#2E3BAA';
+    return `<div class="loyalty-card" style="background:${bg};color:${color}">
+      <div class="loyalty-card-header">
+        <div class="loyalty-tier">${card.tier||''}</div>
+        <div class="loyalty-name" style="color:${color}">${card.name||''}</div>
+        <div class="loyalty-price" style="color:${color}">${card.price?.toLocaleString()||'—'}</div>
+        <div class="loyalty-price-label">${card.priceLabel||'SAR / year'}</div>
+        ${card.description?`<div style="font-size:11px;margin-top:10px;opacity:0.75;line-height:1.5">${card.description}</div>`:''}
+      </div>
+      <div class="loyalty-divider"></div>
+      <ul class="loyalty-benefits">
+        ${(card.benefits||[]).map(b=>`<li class="loyalty-benefit" style="color:${color}">
+          <span class="loyalty-check">✓</span>
+          <span>${b.text}</span>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+  }).join('');
+}
+
+// ── BUSINESS DEVELOPMENT ──────────────────────────────────────────────────
+window.renderBD = function() {
+  renderBdKpiProgress();
+  renderBdGrid();
+}
+
+function renderBdKpiProgress() {
+  const el = document.getElementById('bd-kpi-progress');
+  if(!el) return;
+  const hasTargets = Object.values(BD_TARGETS).some(v=>v>0);
+  if(!hasTargets) {
+    el.innerHTML='<div style="font-size:12px;color:var(--text-3);padding:8px 0">Set targets in the admin Business Development tab to see progress here</div>';
+    return;
+  }
+
+  // YTD actuals from METRICS — sum all 2026 periods
+  const year = new Date().getFullYear();
+  const ytdMetrics = METRICS.filter(m=>(m.period||'').startsWith(String(year)));
+  function ytdSum(name) {
+    return ytdMetrics.filter(m=>m.metricName===name).reduce((s,m)=>s+(m.value||m.currentValue||0),0);
+  }
+
+  // Leads and bookings — sum from BD cards + BD-featured initiatives
+  const allBdItems = [
+    ...BD_CARDS,
+    ...ALL.filter(i=>i.featuredBD===true)
+  ];
+  const totalLeads    = allBdItems.reduce((s,i)=>s+(i.leadsGenerated||0),0);
+  const totalBookings = allBdItems.reduce((s,i)=>s+(i.estimatedBookings||0),0);
+
+  const kpis = [
+    { label:'Views',              actual: ytdSum('Instagram Views')+ytdSum('TikTok Views'),                       target: BD_TARGETS.views            ||0 },
+    { label:'Impressions / Reach',actual: ytdSum('Instagram Reach')+ytdSum('X Reach')+ytdSum('LinkedIn Reach'),  target: BD_TARGETS.impressions       ||0 },
+    { label:'Engagements',        actual: ytdSum('Instagram Engagements')+ytdSum('TikTok Engagements'),          target: BD_TARGETS.engagements       ||0 },
+    { label:'Website Visitors',   actual: ytdSum('Website Visits'),                                              target: BD_TARGETS.websiteVisitors   ||0 },
+    { label:'Leads Generated',    actual: totalLeads,                                                            target: BD_TARGETS.leadsGenerated    ||0 },
+    { label:'Estimated Bookings', actual: totalBookings,                                                         target: BD_TARGETS.estimatedBookings ||0 },
+  ];
+
+  el.innerHTML = kpis.map(kpi=>{
+    if(!kpi.target) return ''; // skip if no target set
+    const pct   = Math.min(100, Math.round(kpi.actual / kpi.target * 100));
+    const cls   = pct >= 100 ? 'exceeded' : pct >= 70 ? 'on-track' : pct >= 40 ? 'behind' : 'far-behind';
+    const color = pct >= 100 ? 'var(--navy)' : pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
+    return `<div class="kpi-row">
+      <div class="kpi-row-label">${kpi.label}</div>
+      <div class="kpi-row-bar"><div class="kpi-row-fill ${cls}" style="width:${pct}%"></div></div>
+      <div class="kpi-row-values">${fmt(kpi.actual)} / ${fmt(kpi.target)}</div>
+      <div class="kpi-row-pct" style="color:${color}">${pct}%</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if(!el.innerHTML) {
+    el.innerHTML='<div style="font-size:12px;color:var(--text-3);padding:8px 0">No targets set yet — add targets in the admin Business Development tab</div>';
+  }
+}
+
+function renderBdGrid() {
+  const entityF = document.getElementById('bd-entity-f').value;
+  const grid = document.getElementById('bd-grid');
+
+  const cards       = BD_CARDS.filter(c=>!entityF || (c.entity||'')===entityF);
+  const initiatives = ALL.filter(i=>i.featuredBD===true && (!entityF || (i.entity||[]).includes(entityF)));
+
+  const allItems = [
+    ...cards.map(c=>({...c, _source:'card'})),
+    ...initiatives.map(i=>({...i, _source:'initiative', title:i.title, date:i.startDate, description:i.objective, link:i.postLink}))
+  ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  if(!allItems.length) {
+    grid.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">🤝</div>No BD activities yet — add BD cards or mark initiatives as BD-featured in the admin panel</div>';
+    return;
+  }
+  grid.innerHTML = allItems.map(item=>{
+    const isInit = item._source==='initiative';
+    const ds = isInit ? deptStyle(item.department) : {bg:'#E4EDFF', t:'#1649A3'};
+    const leads    = item.leadsGenerated    || 0;
+    const bookings = item.estimatedBookings || 0;
+    return `<div class="bd-card">
+      <div class="bd-card-header">
+        <div class="bd-card-title">${item.title||''}</div>
+        ${isInit ? `<span class="badge b-planned" style="font-size:9px;white-space:nowrap">Initiative</span>` : ''}
+      </div>
+      <div class="bd-card-body">
+        ${item.description?`<div style="margin-bottom:8px">${item.description.substring(0,120)}${item.description.length>120?'...':''}</div>`:''}
+        ${isInit ? `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">${entityBadge(item.entity)}<span class="badge" style="background:${ds.bg};color:${ds.t}">${item.department||''}</span></div>` : ''}
+        ${(leads||bookings)?`<div style="display:flex;gap:14px;margin-top:6px">
+          ${leads?`<div style="font-size:11px"><strong style="font-family:'Syne',sans-serif;font-size:15px;color:var(--navy)">${leads}</strong> <span style="color:var(--text-3)">leads</span></div>`:''}
+          ${bookings?`<div style="font-size:11px"><strong style="font-family:'Syne',sans-serif;font-size:15px;color:var(--green)">${bookings}</strong> <span style="color:var(--text-3)">bookings</span></div>`:''}
+        </div>`:''}
+      </div>
+      <div class="bd-card-footer">
+        <span>${item.date||'—'}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${item.entity && !isInit ? `<span class="badge ent-${(item.entity||'').toLowerCase()}">${item.entity}</span>` : ''}
+          ${item.link ? `<a class="post-link" href="${item.link}" target="_blank" rel="noopener">🔗 View</a>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── BRAND RESOURCES ──────────────────────────────────────────────────

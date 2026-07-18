@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IMC Admin — Marketing Strategy 2026</title>
+<title>IMC Admin — Marketing & Business Development Hub</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -132,7 +132,7 @@ tr.row-done:hover td{background:#DCF2E5}
 <div class="login-wrap" id="login-wrap">
   <div class="login-card">
     <img class="login-logo-img" src="logo.jpg" alt="IMC">
-    <div class="login-sub">Marketing Strategy Admin Panel</div>
+    <div class="login-sub">Marketing & Business Development Hub — Admin</div>
     <div class="login-error" id="login-error"></div>
     <div class="login-field">
       <label class="login-label">Email</label>
@@ -151,7 +151,7 @@ tr.row-done:hover td{background:#DCF2E5}
   <div class="topbar">
     <div class="topbar-logo">
       <img class="topbar-logo-img" src="logo.jpg" alt="IMC">
-      <span class="topbar-logo-text">Marketing Hub</span>
+      <span class="topbar-logo-text">Marketing & BD Hub</span>
     </div>
     <div class="topbar-right">
       <span class="user-email" id="user-email"></span>
@@ -162,6 +162,9 @@ tr.row-done:hover td{background:#DCF2E5}
   <div class="tabs">
     <div class="tab active" onclick="switchTab('initiatives',this)">Initiatives</div>
     <div class="tab" onclick="switchTab('promotions',this)">Promotions</div>
+    <div class="tab" onclick="switchTab('bd',this)">Business Dev</div>
+    <div class="tab" onclick="switchTab('wellspan',this)">Well-span</div>
+    <div class="tab" onclick="switchTab('loyalty',this)">Loyalty</div>
     <div class="tab" onclick="switchTab('budget',this)">Budget</div>
     <div class="tab" onclick="switchTab('requests',this)">Requests</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
@@ -210,6 +213,83 @@ tr.row-done:hover td{background:#DCF2E5}
           <th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="promotions-table-body"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- BUSINESS DEVELOPMENT PAGE -->
+    <div class="page" id="page-bd">
+      <!-- 2026 KPI Targets -->
+      <div class="budget-header" style="margin-bottom:20px">
+        <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px">
+          2026 BD Targets & KPIs
+          <span style="font-size:11px;font-weight:400;color:var(--text-3);margin-left:8px">Set your annual targets — progress is shown on the public BD page</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Views Target</label>
+            <input class="filter-input" type="number" id="bdt-views" placeholder="e.g. 500000" style="width:100%;padding:8px 10px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Impressions / Reach Target</label>
+            <input class="filter-input" type="number" id="bdt-impressions" placeholder="e.g. 1000000" style="width:100%;padding:8px 10px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Engagements Target</label>
+            <input class="filter-input" type="number" id="bdt-engagements" placeholder="e.g. 50000" style="width:100%;padding:8px 10px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Website Visitors Target</label>
+            <input class="filter-input" type="number" id="bdt-website" placeholder="e.g. 120000" style="width:100%;padding:8px 10px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Leads Generated Target</label>
+            <input class="filter-input" type="number" id="bdt-leads" placeholder="e.g. 5000" style="width:100%;padding:8px 10px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Estimated Bookings Target</label>
+            <input class="filter-input" type="number" id="bdt-bookings" placeholder="e.g. 2000" style="width:100%;padding:8px 10px">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn btn-primary" onclick="saveBdTargets()">Save Targets</button>
+          <span id="bdt-save-status" style="font-size:11px;color:var(--green);display:none">✓ Saved</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div style="font-size:12px;color:var(--text-3)">BD cards + initiatives marked as BD-featured appear on the public Business Development page</div>
+        <button class="btn btn-primary" onclick="openBdForm()">+ New BD Card</button>
+      </div>
+      <table>
+        <thead><tr><th>Title</th><th>Entity</th><th>Date</th><th>Leads</th><th>Bookings</th><th>Description</th><th>Link</th><th>Actions</th></tr></thead>
+        <tbody id="bd-table-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- WELLSPAN PROGRAM PAGE -->
+    <div class="page" id="page-wellspan">
+      <div class="toolbar">
+        <div style="font-size:12px;color:var(--text-3)">Packages you create here + promotions marked as Well-span appear on the Well-span public page</div>
+        <button class="btn btn-primary" onclick="openWellspanForm()">+ New Package</button>
+      </div>
+      <table>
+        <thead><tr><th>Package Name</th><th>Target Audience</th><th>Price (SAR)</th><th>Dates</th><th>Items</th><th>Actions</th></tr></thead>
+        <tbody id="wellspan-table-body"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- LOYALTY PROGRAM PAGE -->
+    <div class="page" id="page-loyalty">
+      <div class="toolbar">
+        <div style="font-size:12px;color:var(--text-3)">Loyalty cards displayed on the public Loyalty Program page</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="seedLoyaltyCards()">Seed 3 Sample Cards</button>
+          <button class="btn btn-primary" onclick="openLoyaltyForm()">+ New Card</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Card Name</th><th>Tier</th><th>Price (SAR/yr)</th><th>Benefits</th><th>Actions</th></tr></thead>
+        <tbody id="loyalty-table-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -393,9 +473,15 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
       <div class="field-group" id="fld-postlink-wrap"><label class="field-label" id="fld-postlink-label">Post / Content Link</label><input class="field-input" id="fld-postLink" placeholder="https://..."></div>
       <div class="field-group" id="fld-cost-wrap"><label class="field-label">Cost (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, appears in Budget tab</span></label><input class="field-input" type="number" id="fld-cost" placeholder="0.00" min="0" step="0.01"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Leads Generated <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label><input class="field-input" type="number" id="fld-leads" placeholder="0" min="0"></div>
+        <div class="field-group"><label class="field-label">Estimated Bookings <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label><input class="field-input" type="number" id="fld-bookings" placeholder="0" min="0"></div>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);margin-top:6px">
         <input type="checkbox" id="fld-featured" style="width:16px;height:16px;cursor:pointer;accent-color:var(--gold)">
-        <label for="fld-featured" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">⭐ Feature this initiative on the public dashboard</label>
+        <label for="fld-featured" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer;flex:1">⭐ Feature on public dashboard</label>
+        <input type="checkbox" id="fld-featuredBD" style="width:16px;height:16px;cursor:pointer;accent-color:var(--navy)">
+        <label for="fld-featuredBD" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">🤝 Feature on Business Development page</label>
       </div>
 
       <div class="field-section-title" id="section-perf">Performance (optional)</div>
@@ -449,10 +535,105 @@ tr.row-done:hover td{background:#DCF2E5}
         <div class="field-group"><label class="field-label">End Date</label><input class="field-input" type="date" id="promo-end"></div>
       </div>
       <div class="field-group"><label class="field-label">Special Conditions</label><textarea class="field-textarea" style="min-height:50px" id="promo-conditions" placeholder="e.g. Valid for new patients only. Not combinable with other offers."></textarea></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);margin-top:6px">
+        <input type="checkbox" id="promo-iswellspan" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
+        <label for="promo-iswellspan" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">💚 Include in Well-span Program page</label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closePromoForm()">Cancel</button>
       <button class="btn btn-primary" onclick="savePromotion()">Save Promotion</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── BD CARD FORM MODAL ── -->
+<div class="modal-overlay" id="bd-overlay">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="bd-form-title">New BD Card</div>
+      <button class="modal-close" onclick="closeBdForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="bd-title" placeholder="e.g. Corporate Health Talk — Al Faisaliah Group"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Date<span style="color:var(--red)">*</span></label><input class="field-input" type="date" id="bd-date"></div>
+        <div class="field-group"><label class="field-label">Entity</label><select class="field-select" id="bd-entity"><option value="">All / General</option></select></div>
+      </div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" id="bd-description" placeholder="What was the BD activity? Who was involved? What was the outcome?"></textarea></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Leads Generated</label><input class="field-input" type="number" id="bd-leads" placeholder="0" min="0"></div>
+        <div class="field-group"><label class="field-label">Estimated Bookings</label><input class="field-input" type="number" id="bd-bookings" placeholder="0" min="0"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Link (optional)</label><input class="field-input" id="bd-link" placeholder="https://... (media coverage, LinkedIn post, etc.)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeBdForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBdCard()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── WELLSPAN PACKAGE FORM MODAL ── -->
+<div class="modal-overlay" id="wellspan-overlay">
+  <div class="modal" style="width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="wellspan-form-title">New Well-span Package</div>
+      <button class="modal-close" onclick="closeWellspanForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Package Name<span style="color:var(--red)">*</span></label><input class="field-input" id="ws-name" placeholder="e.g. Corporate Wellness Package"></div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" style="min-height:60px" id="ws-description"></textarea></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Target Audience</label><input class="field-input" id="ws-audience" placeholder="e.g. Adults 30+, Corporate employees"></div>
+        <div class="field-group"><label class="field-label">Price (SAR)<span style="color:var(--red)">*</span></label><input class="field-input" type="number" id="ws-price" min="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Start Date</label><input class="field-input" type="date" id="ws-start"></div>
+        <div class="field-group"><label class="field-label">End Date</label><input class="field-input" type="date" id="ws-end"></div>
+      </div>
+      <div class="field-section-title">Included Tests & Services</div>
+      <div id="ws-items-list" style="margin-bottom:10px"></div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+        <input class="field-input" id="ws-item-name" placeholder="Item name (e.g. CBC Blood Test)">
+        <select class="field-select" id="ws-item-type" style="width:130px"></select>
+        <button class="btn" onclick="addWsItem()" style="white-space:nowrap">+ Add</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeWellspanForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveWellspanPackage()">Save Package</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LOYALTY CARD FORM MODAL ── -->
+<div class="modal-overlay" id="loyalty-overlay">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="loyalty-form-title">New Loyalty Card</div>
+      <button class="modal-close" onclick="closeLoyaltyForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Card Name<span style="color:var(--red)">*</span></label><input class="field-input" id="lc-name" placeholder="e.g. Sehat Plus Card"></div>
+        <div class="field-group"><label class="field-label">Tier</label><input class="field-input" id="lc-tier" placeholder="e.g. Silver, Gold, Platinum"></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Price (SAR/year)<span style="color:var(--red)">*</span></label><input class="field-input" type="number" id="lc-price" min="0"></div>
+        <div class="field-group"><label class="field-label">Display Order</label><input class="field-input" type="number" id="lc-order" placeholder="1 = first" min="1"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" style="min-height:55px" id="lc-description"></textarea></div>
+      <div class="field-section-title">Benefits</div>
+      <div id="lc-benefits-list" style="margin-bottom:10px"></div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+        <input class="field-input" id="lc-benefit-text" placeholder="Benefit description">
+        <button class="btn" onclick="addLcBenefit()">+ Add</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeLoyaltyForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLoyaltyCard()">Save Card</button>
     </div>
   </div>
 </div>
@@ -515,6 +696,10 @@ import {
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
   getAnnualBudget, setAnnualBudget,
   watchPromotions, addPromotion, updatePromotion, deletePromotion, promoStatus,
+  watchBdCards, addBdCard, updateBdCard, deleteBdCard,
+  watchBdTargets, setBdTargets,
+  watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
+  watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES
 } from './firebase-data.js';
@@ -525,7 +710,11 @@ let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let ALL_EXPENSES = [];
 let ALL_PROMOTIONS = [];
+let ALL_BD_CARDS = [];
+let ALL_WELLSPAN = [];
+let ALL_LOYALTY = [];
 let ALL_METRIC_PERIODS = [];
+let BD_TARGETS = {};
 let ANNUAL_BUDGET = 0;
 let currentType = 'Campaign';
 let editingId = null;
@@ -542,6 +731,10 @@ let unsubResources = null;
 let unsubRequests = null;
 let unsubExpenses = null;
 let unsubPromotions = null;
+let unsubBdCards = null;
+let unsubWellspan = null;
+let unsubLoyalty = null;
+let unsubBdTargets = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
 
@@ -603,6 +796,10 @@ watchAuth(async user => {
     if(unsubRequests) unsubRequests();
     if(unsubExpenses) unsubExpenses();
     if(unsubPromotions) unsubPromotions();
+    if(unsubBdCards) unsubBdCards();
+    if(unsubWellspan) unsubWellspan();
+    if(unsubLoyalty) unsubLoyalty();
+    if(unsubBdTargets) unsubBdTargets();
   }
 });
 
@@ -613,6 +810,10 @@ function initData() {
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
   unsubPromotions   = watchPromotions(data   => { ALL_PROMOTIONS  = data; renderPromotionsTable(); });
+  unsubBdCards      = watchBdCards(data      => { ALL_BD_CARDS    = data; renderBdTable(); });
+  unsubWellspan     = watchWellspanPackages(data => { ALL_WELLSPAN = data; renderWellspanTable(); });
+  unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
+  unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
   initMetricsTab();
   initBudgetTab();
 }
@@ -648,6 +849,8 @@ function populateStaticSelects() {
   const rType = document.getElementById('r-type');
   rType.innerHTML = RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
 
+  document.getElementById('bd-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
+  document.getElementById('ws-item-type').innerHTML = WELLSPAN_ITEM_TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
 
@@ -751,7 +954,10 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
   document.getElementById('fld-cost').value = initiative?.cost ?? '';
+  document.getElementById('fld-leads').value    = initiative?.leadsGenerated ?? '';
+  document.getElementById('fld-bookings').value = initiative?.estimatedBookings ?? '';
   document.getElementById('fld-featured').checked = initiative?.featured || false;
+  document.getElementById('fld-featuredBD').checked = initiative?.featuredBD || false;
   document.getElementById('fld-reach').value = initiative?.reach || '';
   document.getElementById('fld-impressions').value = initiative?.impressions || '';
   document.getElementById('fld-engagements').value = initiative?.engagements || '';
@@ -795,7 +1001,10 @@ window.saveInitiative = async function() {
     hdCategory: document.getElementById('fld-hdCategory').value,
     postLink: document.getElementById('fld-postLink').value.trim(),
     cost: parseFloat(document.getElementById('fld-cost').value) || null,
+    leadsGenerated:    parseInt(document.getElementById('fld-leads').value)    || null,
+    estimatedBookings: parseInt(document.getElementById('fld-bookings').value) || null,
     featured: document.getElementById('fld-featured').checked,
+    featuredBD: document.getElementById('fld-featuredBD').checked,
     reach: Number(document.getElementById('fld-reach').value) || null,
     impressions: Number(document.getElementById('fld-impressions').value) || null,
     engagements: Number(document.getElementById('fld-engagements').value) || null,
@@ -932,6 +1141,7 @@ window.openPromoForm = function(p=null) {
   document.getElementById('promo-start').value       = p?.startDate || '';
   document.getElementById('promo-end').value         = p?.endDate || '';
   document.getElementById('promo-conditions').value  = p?.conditions || '';
+  document.getElementById('promo-iswellspan').checked = p?.isWellspan || false;
   document.querySelectorAll('#promo-entity .chip').forEach(c=>
     c.classList.toggle('active', selectedPromoEntities.includes(c.dataset.val))
   );
@@ -961,6 +1171,7 @@ window.savePromotion = async function() {
     startDate:      start,
     endDate:        document.getElementById('promo-end').value,
     conditions:     document.getElementById('promo-conditions').value.trim(),
+    isWellspan:     document.getElementById('promo-iswellspan').checked,
   };
   try {
     if(editingPromoId) { await updatePromotion(editingPromoId, data); showToast('Promotion updated'); }
@@ -1464,6 +1675,241 @@ window.renderRequestsTable = function() {
         </tr>`;
       }).join('')
     : '<tr><td colspan="10" class="empty">No requests found</td></tr>';
+}
+
+// ── BUSINESS DEVELOPMENT TARGETS ─────────────────────────────────────────
+function loadBdTargetsForm() {
+  const fields = ['views','impressions','engagements','website','leads','bookings'];
+  const keys   = ['views','impressions','engagements','websiteVisitors','leadsGenerated','estimatedBookings'];
+  fields.forEach((f,i)=>{
+    const el = document.getElementById('bdt-'+f);
+    if(el) el.value = BD_TARGETS[keys[i]] || '';
+  });
+}
+window.saveBdTargets = async function() {
+  const data = {
+    year:               2026,
+    views:              parseFloat(document.getElementById('bdt-views').value)||0,
+    impressions:        parseFloat(document.getElementById('bdt-impressions').value)||0,
+    engagements:        parseFloat(document.getElementById('bdt-engagements').value)||0,
+    websiteVisitors:    parseFloat(document.getElementById('bdt-website').value)||0,
+    leadsGenerated:     parseFloat(document.getElementById('bdt-leads').value)||0,
+    estimatedBookings:  parseFloat(document.getElementById('bdt-bookings').value)||0,
+  };
+  try {
+    await setBdTargets(data);
+    const s = document.getElementById('bdt-save-status');
+    s.style.display='inline'; setTimeout(()=>s.style.display='none',2500);
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── BUSINESS DEVELOPMENT CARDS ─────────────────────────────────────────
+// ── BUSINESS DEVELOPMENT CARDS ─────────────────────────────────────────
+let editingBdId = null;
+window.openBdForm = function(card=null) {
+  editingBdId = card?.id||null;
+  document.getElementById('bd-form-title').textContent = card ? 'Edit BD Card' : 'New BD Card';
+  document.getElementById('bd-title').value       = card?.title||'';
+  document.getElementById('bd-date').value        = card?.date||'';
+  document.getElementById('bd-entity').value      = card?.entity||'';
+  document.getElementById('bd-description').value = card?.description||'';
+  document.getElementById('bd-leads').value       = card?.leadsGenerated??'';
+  document.getElementById('bd-bookings').value    = card?.estimatedBookings??'';
+  document.getElementById('bd-link').value        = card?.link||'';
+  document.getElementById('bd-overlay').classList.add('open');
+}
+window.closeBdForm = function() { document.getElementById('bd-overlay').classList.remove('open'); }
+window.saveBdCard = async function() {
+  const title = document.getElementById('bd-title').value.trim();
+  const date  = document.getElementById('bd-date').value;
+  if(!title||!date){showToast('Title and date are required',true);return;}
+  const data = { title, date,
+    entity:            document.getElementById('bd-entity').value,
+    description:       document.getElementById('bd-description').value.trim(),
+    leadsGenerated:    parseInt(document.getElementById('bd-leads').value)||0,
+    estimatedBookings: parseInt(document.getElementById('bd-bookings').value)||0,
+    link:              document.getElementById('bd-link').value.trim(),
+  };
+  try {
+    if(editingBdId){await updateBdCard(editingBdId,data);showToast('BD card updated');}
+    else{await addBdCard(data);showToast('BD card added');}
+    closeBdForm();
+  } catch(e){showToast('Save failed: '+e.message,true);}
+}
+window.editBdCard = function(id){const c=ALL_BD_CARDS.find(x=>x.id===id);if(c)openBdForm(c);}
+window.removeBdCard = async function(id,title){
+  if(!confirm(`Delete BD card "${title}"?`))return;
+  try{await deleteBdCard(id);showToast('Deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
+}
+window.renderBdTable = function() {
+  document.getElementById('bd-table-body').innerHTML = ALL_BD_CARDS.length
+    ? ALL_BD_CARDS.map(c=>`<tr>
+        <td style="font-weight:600">${c.title||''}</td>
+        <td style="font-size:11px">${c.entity||'—'}</td>
+        <td style="font-size:11px;color:var(--text-3)">${c.date||'—'}</td>
+        <td style="font-weight:600;color:var(--navy)">${c.leadsGenerated||0}</td>
+        <td style="font-weight:600;color:var(--green)">${c.estimatedBookings||0}</td>
+        <td style="font-size:11px;color:var(--text-3);max-width:180px">${c.description||''}</td>
+        <td>${c.link?`<a href="${c.link}" target="_blank" style="font-size:11px;color:var(--navy)">🔗</a>`:'—'}</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editBdCard('${c.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeBdCard('${c.id}','${(c.title||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="8" class="empty">No BD cards yet</td></tr>';
+}
+
+// ── WELLSPAN PACKAGES ─────────────────────────────────────────────────────
+let editingWsId = null;
+let wsItems = []; // current package items being edited
+
+window.openWellspanForm = function(pkg=null) {
+  editingWsId = pkg?.id||null;
+  wsItems = pkg ? [...(pkg.items||[])] : [];
+  document.getElementById('wellspan-form-title').textContent = pkg ? 'Edit Package' : 'New Well-span Package';
+  document.getElementById('ws-name').value        = pkg?.name||'';
+  document.getElementById('ws-description').value = pkg?.description||'';
+  document.getElementById('ws-audience').value    = pkg?.targetAudience||'';
+  document.getElementById('ws-price').value       = pkg?.price??'';
+  document.getElementById('ws-start').value       = pkg?.startDate||'';
+  document.getElementById('ws-end').value         = pkg?.endDate||'';
+  document.getElementById('ws-item-name').value   = '';
+  renderWsItemsList();
+  document.getElementById('wellspan-overlay').classList.add('open');
+}
+window.closeWellspanForm = function(){document.getElementById('wellspan-overlay').classList.remove('open');}
+function renderWsItemsList(){
+  document.getElementById('ws-items-list').innerHTML = wsItems.length
+    ? wsItems.map((item,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg);border-radius:5px;margin-bottom:5px;font-size:12px">
+        <span class="type-pill">${item.type}</span>
+        <span style="flex:1">${item.name}</span>
+        <button class="btn btn-sm btn-danger" onclick="removeWsItem(${i})">×</button>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--text-3);padding:4px 0">No items added yet</div>';
+}
+window.addWsItem = function(){
+  const name = document.getElementById('ws-item-name').value.trim();
+  const type = document.getElementById('ws-item-type').value;
+  if(!name){showToast('Enter item name',true);return;}
+  wsItems.push({name,type});
+  document.getElementById('ws-item-name').value='';
+  renderWsItemsList();
+}
+window.removeWsItem = function(idx){wsItems.splice(idx,1);renderWsItemsList();}
+window.saveWellspanPackage = async function(){
+  const name  = document.getElementById('ws-name').value.trim();
+  const price = parseFloat(document.getElementById('ws-price').value);
+  if(!name||isNaN(price)){showToast('Name and price are required',true);return;}
+  const data = { name, price,
+    description:    document.getElementById('ws-description').value.trim(),
+    targetAudience: document.getElementById('ws-audience').value.trim(),
+    startDate:      document.getElementById('ws-start').value,
+    endDate:        document.getElementById('ws-end').value,
+    items:          wsItems,
+  };
+  try {
+    if(editingWsId){await updateWellspanPackage(editingWsId,data);showToast('Package updated');}
+    else{await addWellspanPackage(data);showToast('Package created');}
+    closeWellspanForm();
+  } catch(e){showToast('Save failed: '+e.message,true);}
+}
+window.editWellspan = function(id){const p=ALL_WELLSPAN.find(x=>x.id===id);if(p)openWellspanForm(p);}
+window.removeWellspan = async function(id,name){
+  if(!confirm(`Delete package "${name}"?`))return;
+  try{await deleteWellspanPackage(id);showToast('Deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
+}
+window.renderWellspanTable = function(){
+  document.getElementById('wellspan-table-body').innerHTML = ALL_WELLSPAN.length
+    ? ALL_WELLSPAN.map(p=>`<tr>
+        <td style="font-weight:600">${p.name||''}</td>
+        <td style="font-size:11px;color:var(--text-3)">${p.targetAudience||'—'}</td>
+        <td style="font-weight:600">${p.price?.toLocaleString()||'—'}</td>
+        <td style="font-size:11px;color:var(--text-3)">${p.startDate||''}${p.endDate?' → '+p.endDate:''}</td>
+        <td style="font-size:11px;color:var(--text-3)">${(p.items||[]).length} items</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editWellspan('${p.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeWellspan('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No packages yet</td></tr>';
+}
+
+// ── LOYALTY CARDS ─────────────────────────────────────────────────────────
+let editingLcId = null;
+let lcBenefits = [];
+
+window.openLoyaltyForm = function(card=null){
+  editingLcId = card?.id||null;
+  lcBenefits = card ? [...(card.benefits||[])] : [];
+  document.getElementById('loyalty-form-title').textContent = card ? 'Edit Loyalty Card' : 'New Loyalty Card';
+  document.getElementById('lc-name').value        = card?.name||'';
+  document.getElementById('lc-tier').value        = card?.tier||'';
+  document.getElementById('lc-price').value       = card?.price??'';
+  document.getElementById('lc-order').value       = card?.tierOrder??'';
+  document.getElementById('lc-description').value = card?.description||'';
+  document.getElementById('lc-benefit-text').value = '';
+  renderLcBenefitsList();
+  document.getElementById('loyalty-overlay').classList.add('open');
+}
+window.closeLoyaltyForm = function(){document.getElementById('loyalty-overlay').classList.remove('open');}
+function renderLcBenefitsList(){
+  document.getElementById('lc-benefits-list').innerHTML = lcBenefits.length
+    ? lcBenefits.map((b,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg);border-radius:5px;margin-bottom:5px;font-size:12px">
+        <span style="flex:1">✓ ${b.text}</span>
+        <button class="btn btn-sm btn-danger" onclick="removeLcBenefit(${i})">×</button>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--text-3);padding:4px 0">No benefits added yet</div>';
+}
+window.addLcBenefit = function(){
+  const text = document.getElementById('lc-benefit-text').value.trim();
+  if(!text){showToast('Enter benefit text',true);return;}
+  lcBenefits.push({text});
+  document.getElementById('lc-benefit-text').value='';
+  renderLcBenefitsList();
+}
+window.removeLcBenefit = function(idx){lcBenefits.splice(idx,1);renderLcBenefitsList();}
+window.saveLoyaltyCard = async function(){
+  const name  = document.getElementById('lc-name').value.trim();
+  const price = parseFloat(document.getElementById('lc-price').value);
+  if(!name||isNaN(price)){showToast('Name and price are required',true);return;}
+  const data = { name, price,
+    tier:       document.getElementById('lc-tier').value.trim(),
+    tierOrder:  parseInt(document.getElementById('lc-order').value)||1,
+    description:document.getElementById('lc-description').value.trim(),
+    benefits:   lcBenefits,
+  };
+  try {
+    if(editingLcId){await updateLoyaltyCard(editingLcId,data);showToast('Card updated');}
+    else{await addLoyaltyCard(data);showToast('Card created');}
+    closeLoyaltyForm();
+  } catch(e){showToast('Save failed: '+e.message,true);}
+}
+window.editLoyaltyCard = function(id){const c=ALL_LOYALTY.find(x=>x.id===id);if(c)openLoyaltyForm(c);}
+window.removeLoyaltyCard = async function(id,name){
+  if(!confirm(`Delete loyalty card "${name}"?`))return;
+  try{await deleteLoyaltyCard(id);showToast('Deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
+}
+window.renderLoyaltyTable = function(){
+  document.getElementById('loyalty-table-body').innerHTML = ALL_LOYALTY.length
+    ? ALL_LOYALTY.map(c=>`<tr>
+        <td style="font-weight:600">${c.name||''}</td>
+        <td><span class="type-pill">${c.tier||''}</span></td>
+        <td style="font-weight:600">${c.price?.toLocaleString()||'—'} SAR</td>
+        <td style="font-size:11px;color:var(--text-3)">${(c.benefits||[]).length} benefits</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editLoyaltyCard('${c.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeLoyaltyCard('${c.id}','${(c.name||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No loyalty cards yet — click "Seed 3 Sample Cards" to start</td></tr>';
+}
+window.seedLoyaltyCards = async function(){
+  if(!confirm(`This will add the 3 sample loyalty cards. Run only once. Proceed?`))return;
+  let added=0;
+  for(const card of SAMPLE_LOYALTY_CARDS){
+    try{await addLoyaltyCard(card);added++;}catch(e){}
+  }
+  showToast(`${added} sample cards added ✓`);
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
