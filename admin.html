@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IMC Admin — Marketing & Business Development Hub</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -165,6 +166,7 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="tab" onclick="switchTab('bd',this)">Business Dev</div>
     <div class="tab" onclick="switchTab('wellspan',this)">Well-span</div>
     <div class="tab" onclick="switchTab('loyalty',this)">Loyalty</div>
+    <div class="tab" onclick="switchTab('leads',this)">Leads CRM</div>
     <div class="tab" onclick="switchTab('budget',this)">Budget</div>
     <div class="tab" onclick="switchTab('requests',this)">Requests</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
@@ -291,6 +293,48 @@ tr.row-done:hover td{background:#DCF2E5}
         <thead><tr><th>Card Name</th><th>Tier</th><th>Price (SAR/yr)</th><th>Benefits</th><th>Actions</th></tr></thead>
         <tbody id="loyalty-table-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
       </table>
+    </div>
+
+    <!-- LEADS CRM PAGE -->
+    <div class="page" id="page-leads">
+      <!-- Stats row -->
+      <div class="budget-stats" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
+        <div class="budget-stat"><div class="budget-stat-label">Total Leads</div><div class="budget-stat-val" id="ls-total">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid #1649A3"><div class="budget-stat-label">Lead</div><div class="budget-stat-val" id="ls-lead" style="color:#1649A3">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid #9B5800"><div class="budget-stat-label">Open File</div><div class="budget-stat-val" id="ls-open" style="color:#9B5800">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid var(--green)"><div class="budget-stat-label">Booked</div><div class="budget-stat-val" id="ls-booked" style="color:var(--green)">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid var(--text-3)"><div class="budget-stat-label">Closed</div><div class="budget-stat-val" id="ls-closed" style="color:var(--text-3)">—</div></div>
+      </div>
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="filters">
+          <input class="filter-input" type="text" id="lead-search" placeholder="Search name or phone..." oninput="renderLeadsTable()" style="width:200px">
+          <select class="filter-select" id="lead-filter-status" onchange="renderLeadsTable()">
+            <option value="">All Status</option>
+            <option>Lead</option><option>Open File</option><option>Booked</option><option>Closed</option>
+          </select>
+          <select class="filter-select" id="lead-filter-dept" onchange="renderLeadsTable()">
+            <option value="">All Departments</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <label class="btn" style="cursor:pointer">
+            📁 Upload Excel
+            <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(this)">
+          </label>
+          <button class="btn btn-primary" onclick="openLeadForm()">+ Add Lead</button>
+        </div>
+      </div>
+      <!-- Table -->
+      <div style="overflow-x:auto">
+        <table style="min-width:900px">
+          <thead><tr>
+            <th>Name</th><th>Phone</th><th>Department</th><th>Source</th>
+            <th>Campaign</th><th>Date Created</th><th>Status</th><th>Notes</th><th></th>
+          </tr></thead>
+          <tbody id="leads-table-body"><tr><td colspan="9" class="empty">Loading leads...</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- BUDGET PAGE -->
@@ -537,7 +581,12 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="field-group"><label class="field-label">Special Conditions</label><textarea class="field-textarea" style="min-height:50px" id="promo-conditions" placeholder="e.g. Valid for new patients only. Not combinable with other offers."></textarea></div>
       <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);margin-top:6px">
         <input type="checkbox" id="promo-iswellspan" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
-        <label for="promo-iswellspan" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">💚 Include in Well-span Program page</label>
+        <label for="promo-iswellspan" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer;flex:1">💚 Include in Well-span Program page</label>
+      </div>
+      <div class="field-section-title">Results (optional — fill after campaign ends)</div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Leads Generated</label><input class="field-input" type="number" id="promo-leads" placeholder="0" min="0"></div>
+        <div class="field-group"><label class="field-label">Estimated Bookings</label><input class="field-input" type="number" id="promo-bookings" placeholder="0" min="0"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -638,6 +687,69 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
 </div>
 
+<!-- ── EXCEL IMPORT PREVIEW MODAL ── -->
+<div class="modal-overlay" id="excel-overlay">
+  <div class="modal" style="width:720px">
+    <div class="modal-header">
+      <div class="modal-title">Import Leads from Excel</div>
+      <button class="modal-close" onclick="closeExcelPreview()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label class="field-label">Department for all imported leads</label>
+          <select class="field-select" id="import-dept"></select>
+        </div>
+        <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius);font-size:12px;color:var(--text-3)">
+          <strong id="import-count" style="font-size:18px;color:var(--navy)">0</strong> leads ready to import<br>
+          <span id="import-col-info" style="font-size:11px"></span>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">Preview (first 10 rows)</div>
+      <div style="overflow-x:auto;max-height:280px;overflow-y:auto">
+        <table id="excel-preview-table" style="font-size:11px;width:100%;border-collapse:collapse"></table>
+      </div>
+      <div id="import-progress" style="display:none;margin-top:12px;font-size:12px;color:var(--navy);font-weight:600"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeExcelPreview()">Cancel</button>
+      <button class="btn btn-primary" id="confirm-import-btn" onclick="confirmImport()">Import Leads</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SINGLE LEAD FORM MODAL ── -->
+<div class="modal-overlay" id="lead-overlay">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="lead-form-title">New Lead</div>
+      <button class="modal-close" onclick="closeLeadForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span></label><input class="field-input" id="lead-name"></div>
+        <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span></label><input class="field-input" id="lead-phone" type="tel"></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="lead-dept"></select></div>
+        <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="lead-status"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Source</label><input class="field-input" id="lead-source" placeholder="e.g. Event, Call, Walk-in"></div>
+        <div class="field-group"><label class="field-label">Campaign</label><input class="field-input" id="lead-campaign" placeholder="e.g. Maternity Package 2026"></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Date Created</label><input class="field-input" type="date" id="lead-date"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" style="min-height:60px" id="lead-notes" placeholder="Follow-up notes, preferences, etc."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeLeadForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLead()">Save Lead</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── EXPENSE FORM MODAL ── -->
 <div class="modal-overlay" id="expense-overlay">
   <div class="modal" style="width:480px">
@@ -700,6 +812,7 @@ import {
   watchBdTargets, setBdTargets,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
+  watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, LEAD_STATUSES, LEAD_STATUS_COLORS,
   DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES
 } from './firebase-data.js';
@@ -713,6 +826,7 @@ let ALL_PROMOTIONS = [];
 let ALL_BD_CARDS = [];
 let ALL_WELLSPAN = [];
 let ALL_LOYALTY = [];
+let ALL_LEADS = [];
 let ALL_METRIC_PERIODS = [];
 let BD_TARGETS = {};
 let ANNUAL_BUDGET = 0;
@@ -735,6 +849,7 @@ let unsubBdCards = null;
 let unsubWellspan = null;
 let unsubLoyalty = null;
 let unsubBdTargets = null;
+let unsubLeads = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
 
@@ -800,6 +915,7 @@ watchAuth(async user => {
     if(unsubWellspan) unsubWellspan();
     if(unsubLoyalty) unsubLoyalty();
     if(unsubBdTargets) unsubBdTargets();
+    if(unsubLeads) unsubLeads();
   }
 });
 
@@ -814,6 +930,7 @@ function initData() {
   unsubWellspan     = watchWellspanPackages(data => { ALL_WELLSPAN = data; renderWellspanTable(); });
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
   unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
+  unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); });
   initMetricsTab();
   initBudgetTab();
 }
@@ -851,6 +968,12 @@ function populateStaticSelects() {
 
   document.getElementById('bd-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
   document.getElementById('ws-item-type').innerHTML = WELLSPAN_ITEM_TYPES.map(t=>`<option>${t}</option>`).join('');
+  // Leads CRM
+  const leadDeptHtml = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('lead-dept').innerHTML = leadDeptHtml;
+  document.getElementById('lead-filter-dept').innerHTML += leadDeptHtml;
+  document.getElementById('import-dept').innerHTML = leadDeptHtml;
+  document.getElementById('lead-status').innerHTML = LEAD_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
 
@@ -1142,6 +1265,8 @@ window.openPromoForm = function(p=null) {
   document.getElementById('promo-end').value         = p?.endDate || '';
   document.getElementById('promo-conditions').value  = p?.conditions || '';
   document.getElementById('promo-iswellspan').checked = p?.isWellspan || false;
+  document.getElementById('promo-leads').value        = p?.leadsGenerated??'';
+  document.getElementById('promo-bookings').value     = p?.estimatedBookings??'';
   document.querySelectorAll('#promo-entity .chip').forEach(c=>
     c.classList.toggle('active', selectedPromoEntities.includes(c.dataset.val))
   );
@@ -1170,8 +1295,10 @@ window.savePromotion = async function() {
     discountPct,
     startDate:      start,
     endDate:        document.getElementById('promo-end').value,
-    conditions:     document.getElementById('promo-conditions').value.trim(),
-    isWellspan:     document.getElementById('promo-iswellspan').checked,
+    conditions:        document.getElementById('promo-conditions').value.trim(),
+    isWellspan:        document.getElementById('promo-iswellspan').checked,
+    leadsGenerated:    parseInt(document.getElementById('promo-leads').value)||0,
+    estimatedBookings: parseInt(document.getElementById('promo-bookings').value)||0,
   };
   try {
     if(editingPromoId) { await updatePromotion(editingPromoId, data); showToast('Promotion updated'); }
@@ -1911,6 +2038,203 @@ window.seedLoyaltyCards = async function(){
     catch(e){ showToast('Seed failed: '+e.message+' — check Firestore rules for loyalty_cards', true); return; }
   }
   showToast(`${added} sample cards added ✓`);
+}
+
+// ── LEADS CRM ─────────────────────────────────────────────────────────────
+let editingLeadId = null;
+let pendingImportRows = [];
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+window.renderLeadsStats = function() {
+  const total   = ALL_LEADS.length;
+  const counts  = {"Lead":0,"Open File":0,"Booked":0,"Closed":0};
+  ALL_LEADS.forEach(l => { if(counts[l.status]!==undefined) counts[l.status]++; });
+  document.getElementById('ls-total').textContent  = total;
+  document.getElementById('ls-lead').textContent   = counts['Lead'];
+  document.getElementById('ls-open').textContent   = counts['Open File'];
+  document.getElementById('ls-booked').textContent = counts['Booked'];
+  document.getElementById('ls-closed').textContent = counts['Closed'];
+}
+
+// ── Table ──────────────────────────────────────────────────────────────────
+window.renderLeadsTable = function() {
+  const q      = (document.getElementById('lead-search')?.value||'').toLowerCase();
+  const statusF= document.getElementById('lead-filter-status')?.value||'';
+  const deptF  = document.getElementById('lead-filter-dept')?.value||'';
+
+  let data = ALL_LEADS.filter(l=>{
+    if(statusF && l.status!==statusF) return false;
+    if(deptF && l.department!==deptF) return false;
+    if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  document.getElementById('leads-table-body').innerHTML = data.length
+    ? data.map(l=>{
+        const sc = LEAD_STATUS_COLORS[l.status]||{bg:'#F0F2F7',t:'#8890A8'};
+        return `<tr>
+          <td style="font-weight:600">${l.name||'—'}</td>
+          <td style="font-size:12px">${l.phone||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.source||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.campaign||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${l.dateCreated||'—'}</td>
+          <td>
+            <select style="font-size:11px;padding:3px 6px;border:1px solid ${sc.bg};border-radius:4px;background:${sc.bg};color:${sc.t};font-weight:600;cursor:pointer;font-family:inherit"
+              onchange="changeLeadStatus('${l.id}',this.value)">
+              ${LEAD_STATUSES.map(s=>`<option${l.status===s?' selected':''}>${s}</option>`).join('')}
+            </select>
+          </td>
+          <td style="font-size:11px;color:var(--text-3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.notes||''}">${l.notes||'—'}</td>
+          <td class="row-actions">
+            <button class="btn btn-sm" onclick="editLeadRow('${l.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="removeLeadRow('${l.id}','${(l.name||'').replace(/'/g,"\\'")}')">Delete</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="9" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel or add manually'}</td></tr>`;
+}
+
+window.changeLeadStatus = async function(id, status) {
+  try { await updateLead(id, {status}); }
+  catch(e) { showToast('Update failed: '+e.message, true); }
+}
+
+// ── Single lead form ──────────────────────────────────────────────────────
+window.openLeadForm = function(lead=null) {
+  editingLeadId = lead?.id||null;
+  document.getElementById('lead-form-title').textContent = lead ? 'Edit Lead' : 'New Lead';
+  document.getElementById('lead-name').value     = lead?.name||'';
+  document.getElementById('lead-phone').value    = lead?.phone||'';
+  document.getElementById('lead-dept').value     = lead?.department||DEPARTMENTS[0];
+  document.getElementById('lead-status').value   = lead?.status||'Lead';
+  document.getElementById('lead-source').value   = lead?.source||'';
+  document.getElementById('lead-campaign').value = lead?.campaign||'';
+  document.getElementById('lead-date').value     = lead?.dateCreated||new Date().toISOString().split('T')[0];
+  document.getElementById('lead-notes').value    = lead?.notes||'';
+  document.getElementById('lead-overlay').classList.add('open');
+}
+window.closeLeadForm = function() { document.getElementById('lead-overlay').classList.remove('open'); }
+window.saveLead = async function() {
+  const name  = document.getElementById('lead-name').value.trim();
+  const phone = document.getElementById('lead-phone').value.trim();
+  if(!name||!phone){showToast('Name and phone are required',true);return;}
+  const data = {
+    name, phone,
+    department:  document.getElementById('lead-dept').value,
+    status:      document.getElementById('lead-status').value,
+    source:      document.getElementById('lead-source').value.trim(),
+    campaign:    document.getElementById('lead-campaign').value.trim(),
+    dateCreated: document.getElementById('lead-date').value,
+    notes:       document.getElementById('lead-notes').value.trim(),
+  };
+  try {
+    if(editingLeadId){await updateLead(editingLeadId,data);showToast('Lead updated');}
+    else{await addLead(data);showToast('Lead added');}
+    closeLeadForm();
+  } catch(e){showToast('Save failed: '+e.message,true);}
+}
+window.editLeadRow = function(id){const l=ALL_LEADS.find(x=>x.id===id);if(l)openLeadForm(l);}
+window.removeLeadRow = async function(id,name){
+  if(!confirm(`Delete lead "${name}"?`))return;
+  try{await deleteLead(id);showToast('Lead deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
+}
+
+// ── Excel upload ──────────────────────────────────────────────────────────
+window.handleExcelUpload = function(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb   = XLSX.read(e.target.result, {type:'binary'});
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length){showToast('No data found in the file',true);return;}
+
+      // Auto-map columns (case-insensitive)
+      const headers = Object.keys(rows[0]);
+      const map = col => headers.find(h=>h.toLowerCase().includes(col.toLowerCase()))||null;
+      const nameCol     = map('name');
+      const phoneCol    = map('phone')||map('mobile')||map('number');
+      const sourceCol   = map('source');
+      const campaignCol = map('campaign');
+      const dateCol     = map('date');
+      const statusCol   = map('status');
+      const notesCol    = map('note')||map('comment')||map('notes');
+
+      if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
+
+      // Map rows to lead objects
+      pendingImportRows = rows.map(r=>({
+        name:        r[nameCol]||'',
+        phone:       String(r[phoneCol]||''),
+        source:      sourceCol ? r[sourceCol]||'' : '',
+        campaign:    campaignCol ? r[campaignCol]||'' : '',
+        dateCreated: dateCol ? String(r[dateCol]||'').substring(0,10) : '',
+        status:      statusCol ? mapStatus(r[statusCol]) : 'Lead',
+        notes:       notesCol ? r[notesCol]||'' : '',
+        department:  DEPARTMENTS[0], // will be overridden by import-dept select
+      })).filter(r=>r.name&&r.phone);
+
+      // Build preview table
+      const previewRows = pendingImportRows.slice(0,10);
+      const thCols = ['Name','Phone','Source','Campaign','Date','Status'];
+      document.getElementById('excel-preview-table').innerHTML =
+        `<thead style="background:var(--navy);color:#fff"><tr>${thCols.map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
+        <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}</td>
+          <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
+          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
+          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
+          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated}</td>
+          <td style="padding:5px 10px;font-size:11px">${r.status}</td>
+        </tr>`).join('')}
+        ${pendingImportRows.length>10?`<tr><td colspan="6" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${pendingImportRows.length-10} more rows</td></tr>`:''}</tbody>`;
+
+      document.getElementById('import-count').textContent = pendingImportRows.length;
+      document.getElementById('import-col-info').textContent = `Detected: ${[nameCol,phoneCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}`;
+      document.getElementById('import-dept').value = DEPARTMENTS[0]; // default Women's Health for maternity
+      document.getElementById('import-progress').style.display='none';
+      document.getElementById('confirm-import-btn').disabled=false;
+      document.getElementById('excel-overlay').classList.add('open');
+    } catch(err) {
+      showToast('Failed to read file: '+err.message, true);
+    }
+  };
+  reader.readAsBinaryString(file);
+  input.value=''; // reset so same file can be re-uploaded
+}
+
+function mapStatus(raw) {
+  const r = String(raw).toLowerCase().trim();
+  if(r.includes('book')) return 'Booked';
+  if(r.includes('open')||r.includes('file')) return 'Open File';
+  if(r.includes('close')) return 'Closed';
+  return 'Lead';
+}
+
+window.closeExcelPreview = function(){document.getElementById('excel-overlay').classList.remove('open');}
+
+window.confirmImport = async function() {
+  if(!pendingImportRows.length) return;
+  const dept = document.getElementById('import-dept').value;
+  const leadsToImport = pendingImportRows.map(r=>({...r, department:dept}));
+  const btn = document.getElementById('confirm-import-btn');
+  const progress = document.getElementById('import-progress');
+  btn.disabled=true;
+  progress.style.display='block';
+  try {
+    await bulkAddLeads(leadsToImport, (done,total)=>{
+      progress.textContent=`Importing... ${done} / ${total}`;
+    });
+    progress.textContent=`✓ ${leadsToImport.length} leads imported successfully!`;
+    setTimeout(()=>closeExcelPreview(), 1500);
+    showToast(`${leadsToImport.length} leads imported ✓`);
+  } catch(e){
+    showToast('Import failed: '+e.message, true);
+    btn.disabled=false;
+  }
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────

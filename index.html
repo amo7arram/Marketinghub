@@ -425,13 +425,24 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-conv">—</div><div class="sm-kpi-label">✉️ Conversations</div><div class="sm-kpi-sub">Instagram DMs</div></div>
         </div>
 
-        <!-- Website Chart -->
-        <div class="card" style="margin-bottom:24px">
+        <!-- Website Chart — hidden, data kept for admin metrics -->
+        <div class="card" style="margin-bottom:24px;display:none">
           <div class="card-header">
             <div class="card-title">Website Visitors — <span id="web-chart-year">2026</span></div>
-            <span style="font-size:11px;color:var(--text-3)">Monthly unique visitors</span>
           </div>
           <div class="chart-container"><canvas id="webChart"></canvas></div>
+        </div>
+
+        <!-- Leads Charts -->
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Leads Generated — Monthly</div><span style="font-size:11px;color:var(--text-3)">BD cards + initiatives + promotions</span></div>
+            <div class="chart-container"><canvas id="leadsMonthChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Leads by Department</div></div>
+            <div class="chart-container"><canvas id="leadsDeptChart"></canvas></div>
+          </div>
         </div>
 
         <!-- Campaigns & Health Days by Month -->
@@ -937,6 +948,7 @@ function renderFeatured() {
 window.renderDashboard = function() {
   renderDashboardKPIs();
   renderWebChart();
+  renderLeadsCharts();
   renderCampMonthList();
   renderFeatured();
 }
@@ -976,30 +988,66 @@ function renderDashboardKPIs() {
 }
 
 // Website chart — always full year, never re-renders on period change
+// Website chart — hidden on dashboard but canvas kept for data integrity
 function renderWebChart() {
+  // Chart hidden — skipping render
+}
+
+// ── LEADS CHARTS ─────────────────────────────────────────────────────────
+let leadsMonthChart = null;
+let leadsDeptChart  = null;
+
+function renderLeadsCharts() {
   try {
-    const canvas = document.getElementById('webChart');
-    if(!canvas) return;
     const year = new Date().getFullYear();
-    const yearEl = document.getElementById('web-chart-year');
-    if(yearEl) yearEl.textContent = year;
     const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const webData = MONTH_LABELS.map((_,i)=>{
-      const p = `${year}-${String(i+1).padStart(2,'0')}`;
-      return getMVal('Website Visits', getPeriodMetrics(p));
+    const monthly = Array(12).fill(0);
+    const byDept  = {};
+
+    BD_CARDS.forEach(c => {
+      if(!c.leadsGenerated || !c.date?.startsWith(String(year))) return;
+      const m = parseInt(c.date.split('-')[1])-1;
+      if(m>=0&&m<12) monthly[m] += c.leadsGenerated;
     });
-    if(chartWeb) chartWeb.destroy();
-    chartWeb = new Chart(canvas,{
-      type:'line',
-      data:{labels:MONTH_LABELS,datasets:[{
-        label:'Visitors',data:webData,
-        borderColor:'#1DB87A',backgroundColor:'rgba(29,184,122,0.08)',
-        tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:'#1DB87A',borderWidth:2
-      }]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
+    ALL.filter(i=>i.featuredBD && i.leadsGenerated && i.startDate?.startsWith(String(year))).forEach(i=>{
+      const m = parseInt(i.startDate.split('-')[1])-1;
+      if(m>=0&&m<12) monthly[m] += i.leadsGenerated;
+      if(i.department) byDept[i.department] = (byDept[i.department]||0) + i.leadsGenerated;
     });
-  } catch(e) { console.error('Web chart error:', e); }
+    PROMOTIONS.filter(p=>p.leadsGenerated && p.startDate?.startsWith(String(year))).forEach(p=>{
+      const m = parseInt(p.startDate.split('-')[1])-1;
+      if(m>=0&&m<12) monthly[m] += p.leadsGenerated;
+    });
+
+    const mc = document.getElementById('leadsMonthChart');
+    if(mc) {
+      if(leadsMonthChart) leadsMonthChart.destroy();
+      leadsMonthChart = new Chart(mc,{
+        type:'bar',
+        data:{labels:MONTH_LABELS,datasets:[{data:monthly,backgroundColor:'#00539B',borderRadius:4,hoverBackgroundColor:'#003f7a'}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+          scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
+      });
+    }
+
+    const dc = document.getElementById('leadsDeptChart');
+    if(dc) {
+      const deptLabels = Object.keys(byDept);
+      const deptData   = Object.values(byDept);
+      const colors = deptLabels.map(d=>DEPT_COLORS[d]||'#2E3BAA');
+      if(leadsDeptChart) leadsDeptChart.destroy();
+      if(!deptLabels.length) {
+        if(dc.parentElement) dc.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:200px;font-size:12px;color:var(--text-3)">No department-level lead data yet</div>';
+        return;
+      }
+      leadsDeptChart = new Chart(dc,{
+        type:'doughnut',
+        data:{labels:deptLabels,datasets:[{data:deptData,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:6}}}}
+      });
+    }
+  } catch(e) { console.error('Leads chart error:', e); }
 }
 
 // ── SM ANALYTICS PAGE ────────────────────────────────────────────────────

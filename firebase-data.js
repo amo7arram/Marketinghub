@@ -448,3 +448,43 @@ export const SAMPLE_LOYALTY_CARDS = [
     ]
   }
 ];
+
+// ── LEADS CRM ─────────────────────────────────────────────────────────────
+const LEADS = "leads";
+
+export const LEAD_STATUSES = ["Lead", "Open File", "Booked", "Closed"];
+export const LEAD_STATUS_COLORS = {
+  "Lead":      {bg:"#E4EDFF", t:"#1649A3"},
+  "Open File": {bg:"#FFF0D4", t:"#9B5800"},
+  "Booked":    {bg:"#D4F0E2", t:"#0D6E44"},
+  "Closed":    {bg:"#F0F2F7", t:"#8890A8"},
+};
+
+export function watchLeads(callback) {
+  return onSnapshot(collection(db, LEADS),
+    snap => {
+      const data = snap.docs.map(d=>({id:d.id,...d.data()}));
+      data.sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+      callback(data);
+    },
+    err => { console.error('watchLeads:', err.code, '— add Firestore rules for leads'); callback([]); }
+  );
+}
+export function addLead(data) {
+  return addDoc(collection(db, LEADS), {...data, createdAt:Timestamp.now()});
+}
+export function updateLead(id, data) {
+  return updateDoc(doc(db, LEADS, id), {...data, updatedAt:Timestamp.now()});
+}
+export function deleteLead(id) {
+  return deleteDoc(doc(db, LEADS, id));
+}
+export async function bulkAddLeads(leadsArray, onProgress) {
+  let done = 0;
+  for(const lead of leadsArray) {
+    await addDoc(collection(db, LEADS), {...lead, createdAt:Timestamp.now()});
+    done++;
+    if(onProgress) onProgress(done, leadsArray.length);
+  }
+  return done;
+}
