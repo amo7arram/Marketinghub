@@ -343,6 +343,25 @@ export function watchBrandVoice(callback) {
 
 
 // Stored as config/bd_targets — single doc with all 2026 KPI targets
+// ── AI / ANTHROPIC API KEY ───────────────────────────────────────────────
+// Stored as config/ai_settings — required for the caption generator to work
+// once deployed outside claude.ai (see admin.html for the security note
+// shown alongside the input field).
+export async function getAnthropicKey() {
+  const snap = await getDoc(doc(db, CONFIG, "ai_settings"));
+  return snap.exists() ? (snap.data().apiKey || '') : '';
+}
+export function setAnthropicKey(apiKey) {
+  return setDoc(doc(db, CONFIG, "ai_settings"), { apiKey }, { merge: true });
+}
+export function watchAnthropicKey(callback) {
+  return onSnapshot(doc(db, CONFIG, "ai_settings"),
+    snap => callback(snap.exists() ? (snap.data().apiKey || '') : ''),
+    err  => { console.error('watchAnthropicKey:', err.code); callback(''); }
+  );
+}
+
+
 // ── BD TARGETS ───────────────────────────────────────────────────────────
 export function watchBdTargets(callback) {
   return onSnapshot(doc(db, CONFIG, "bd_targets"),
