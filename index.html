@@ -1009,7 +1009,8 @@ function renderLeadsCharts() {
       const m = parseInt(c.date.split('-')[1])-1;
       if(m>=0&&m<12) monthly[m] += c.leadsGenerated;
     });
-    ALL.filter(i=>i.featuredBD && i.leadsGenerated && i.startDate?.startsWith(String(year))).forEach(i=>{
+    // From all initiatives (campaigns, events, health days, etc.) with leadsGenerated
+    ALL.filter(i=>i.leadsGenerated && i.startDate?.startsWith(String(year))).forEach(i=>{
       const m = parseInt(i.startDate.split('-')[1])-1;
       if(m>=0&&m<12) monthly[m] += i.leadsGenerated;
       if(i.department) byDept[i.department] = (byDept[i.department]||0) + i.leadsGenerated;
