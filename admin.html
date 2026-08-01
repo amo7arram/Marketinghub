@@ -308,12 +308,12 @@ tr.row-done:hover td{background:#DCF2E5}
       <!-- Toolbar -->
       <div class="toolbar">
         <div class="filters">
-          <input class="filter-input" type="text" id="lead-search" placeholder="Search name or phone..." oninput="renderLeadsTable()" style="width:200px">
-          <select class="filter-select" id="lead-filter-status" onchange="renderLeadsTable()">
+          <input class="filter-input" type="text" id="lead-search" placeholder="Search name or phone..." oninput="resetLeadsPageAndRender()" style="width:200px">
+          <select class="filter-select" id="lead-filter-status" onchange="resetLeadsPageAndRender()">
             <option value="">All Status</option>
             <option>Lead</option><option>Open File</option><option>Booked</option><option>Closed</option>
           </select>
-          <select class="filter-select" id="lead-filter-dept" onchange="renderLeadsTable()">
+          <select class="filter-select" id="lead-filter-dept" onchange="resetLeadsPageAndRender()">
             <option value="">All Departments</option>
           </select>
         </div>
@@ -344,6 +344,7 @@ tr.row-done:hover td{background:#DCF2E5}
           <tbody id="leads-table-body"><tr><td colspan="10" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
+      <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
     </div>
 
     <!-- BUDGET PAGE -->
@@ -2190,6 +2191,13 @@ window.renderLeadsStats = function() {
 
 // ── Table ──────────────────────────────────────────────────────────────────
 let selectedLeadIds = new Set();
+let currentLeadsPage = 1;
+const LEADS_PER_PAGE = 50;
+
+window.resetLeadsPageAndRender = function() {
+  currentLeadsPage = 1;
+  renderLeadsTable();
+}
 
 window.renderLeadsTable = function() {
   const q      = (document.getElementById('lead-search')?.value||'').toLowerCase();
@@ -2207,8 +2215,15 @@ window.renderLeadsTable = function() {
   const validIds = new Set(ALL_LEADS.map(l=>l.id));
   selectedLeadIds.forEach(id => { if(!validIds.has(id)) selectedLeadIds.delete(id); });
 
-  document.getElementById('leads-table-body').innerHTML = data.length
-    ? data.map(l=>{
+  // Pagination — 50 per page
+  const totalPages = Math.max(1, Math.ceil(data.length / LEADS_PER_PAGE));
+  if(currentLeadsPage > totalPages) currentLeadsPage = totalPages;
+  if(currentLeadsPage < 1) currentLeadsPage = 1;
+  const startIdx = (currentLeadsPage - 1) * LEADS_PER_PAGE;
+  const pageData = data.slice(startIdx, startIdx + LEADS_PER_PAGE);
+
+  document.getElementById('leads-table-body').innerHTML = pageData.length
+    ? pageData.map(l=>{
         const sc = LEAD_STATUS_COLORS[l.status]||{bg:'#F0F2F7',t:'#8890A8'};
         const isChecked = selectedLeadIds.has(l.id);
         return `<tr style="${isChecked?'background:#F0F7FF':''}">
@@ -2234,14 +2249,37 @@ window.renderLeadsTable = function() {
       }).join('')
     : `<tr><td colspan="10" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel or add manually'}</td></tr>`;
 
-  // Keep "select all" checkbox in sync with current visible selection state
+  // Keep "select all" checkbox in sync — scoped to the CURRENT PAGE only
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
-    const visibleIds = data.map(l=>l.id);
+    const visibleIds = pageData.map(l=>l.id);
     selectAllCb.checked = visibleIds.length>0 && visibleIds.every(id=>selectedLeadIds.has(id));
     selectAllCb.indeterminate = visibleIds.some(id=>selectedLeadIds.has(id)) && !selectAllCb.checked;
   }
   updateBulkActionBar();
+  renderLeadsPagination(data.length, totalPages, startIdx, pageData.length);
+}
+
+function renderLeadsPagination(totalCount, totalPages, startIdx, pageCount) {
+  const el = document.getElementById('leads-pagination');
+  if(!el) return;
+  if(totalCount === 0) { el.innerHTML = ''; return; }
+  const rangeStart = totalCount === 0 ? 0 : startIdx + 1;
+  const rangeEnd   = startIdx + pageCount;
+  el.innerHTML = `
+    <span>Showing ${rangeStart}–${rangeEnd} of ${totalCount} leads</span>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="btn btn-sm" ${currentLeadsPage<=1?'disabled':''} onclick="goToLeadsPage(1)">« First</button>
+      <button class="btn btn-sm" ${currentLeadsPage<=1?'disabled':''} onclick="goToLeadsPage(${currentLeadsPage-1})">‹ Prev</button>
+      <span style="padding:0 8px;font-weight:600;color:var(--text)">Page ${currentLeadsPage} of ${totalPages}</span>
+      <button class="btn btn-sm" ${currentLeadsPage>=totalPages?'disabled':''} onclick="goToLeadsPage(${currentLeadsPage+1})">Next ›</button>
+      <button class="btn btn-sm" ${currentLeadsPage>=totalPages?'disabled':''} onclick="goToLeadsPage(${totalPages})">Last »</button>
+    </div>`;
+}
+
+window.goToLeadsPage = function(page) {
+  currentLeadsPage = page;
+  renderLeadsTable();
 }
 
 window.toggleLeadSelect = function(id, checked) {
