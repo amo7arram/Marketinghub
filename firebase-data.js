@@ -388,8 +388,14 @@ export const PRIORITIES = ["Normal","High","Urgent"];
 
 // ── SHARED CONSTANTS (used by both admin + portal for consistency) ──────
 export const DEPARTMENTS = [
+  // Existing — unchanged
   "Women's Health","Cardiology","Children's Health","Diabetes & Chronic",
-  "Dermatology & Plastics","Orthopedics","Oncology","General Surgery","General / Brand"
+  "Dermatology & Plastics","Orthopedics","Oncology","General Surgery","General / Brand",
+  // Added
+  "Internal Medicine","ENT (Otolaryngology)","Ophthalmology","Urology","Neurology",
+  "Nephrology","Gastroenterology","Pulmonology","Physiotherapy & Rehabilitation","Dental",
+  "Family Medicine","Psychiatry & Mental Health","Nutrition & Dietetics","Home Healthcare",
+  "Fertility & IVF","Radiology & Imaging","Emergency Medicine (ER)"
 ];
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
 export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
@@ -399,6 +405,8 @@ export const CONTENT_TYPES = ["Post","Reel","Video","Story","Carousel"];
 export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop"];
 export const HEALTH_DAY_CATEGORIES = ["MOH Health Day","Saudi Occasion","Islamic Occasion","IMC Campaign"];
 
+// Explicit colors for the original 9 departments — preserved exactly as before
+// so nothing already on screen changes color.
 export const DEPT_COLORS = {
   "Women's Health":"#8C1F47","Cardiology":"#992020","Children's Health":"#0E7A55",
   "Diabetes & Chronic":"#4535B0","Dermatology & Plastics":"#9B6000",
@@ -409,6 +417,31 @@ export const DEPT_BG = {
   "Diabetes & Chronic":"#EEEAFF","Dermatology & Plastics":"#FFF6E0",
   "Orthopedics":"#E4F0FF","Oncology":"#FFF0E4","General Surgery":"#E4F8FF","General / Brand":"#EEF0FF"
 };
+
+// Fallback palette for any department NOT in the explicit maps above (all newly
+// added departments, and any future ones). A department name is hashed to a
+// stable index into this palette, so the same department always gets the same
+// color — no manual color entry needed as the list grows.
+const DEPT_PALETTE = [
+  {t:"#A3266B", bg:"#FCE8F3"}, {t:"#0F7B6C", bg:"#E1F5F0"}, {t:"#B45309", bg:"#FEF3E2"},
+  {t:"#5B3FA8", bg:"#F0EBFB"}, {t:"#1D6FA5", bg:"#E5F2FB"}, {t:"#B0234A", bg:"#FCE7EE"},
+  {t:"#4D7C0F", bg:"#EEF7E0"}, {t:"#A34B0F", bg:"#FDECE0"}, {t:"#0E6E8C", bg:"#E2F3F8"},
+  {t:"#7C3F9E", bg:"#F3E9FA"}, {t:"#9E3F3F", bg:"#FAEAEA"}, {t:"#2A6E4E", bg:"#E4F5EC"},
+  {t:"#9E7A0F", bg:"#FBF3DC"}, {t:"#3F5C9E", bg:"#E7EDFB"}, {t:"#8C3F73", bg:"#F7E7F1"},
+  {t:"#5C7A2A", bg:"#EEF4E2"}, {t:"#7A3F2A", bg:"#F5E9E2"}
+];
+function hashDeptName(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) { hash = (hash * 31 + name.charCodeAt(i)) >>> 0; }
+  return hash;
+}
+// Returns {t, bg} for ANY department — explicit map first, hash-based fallback after.
+export function getDeptColor(dept) {
+  if (!dept) return { t: "#2E3BAA", bg: "#EEF0FF" };
+  if (DEPT_COLORS[dept]) return { t: DEPT_COLORS[dept], bg: DEPT_BG[dept] };
+  const idx = hashDeptName(dept) % DEPT_PALETTE.length;
+  return { t: DEPT_PALETTE[idx].t, bg: DEPT_PALETTE[idx].bg };
+}
 
 // ── BUSINESS DEVELOPMENT CARDS ───────────────────────────────────────────
 export function watchBdCards(callback) {

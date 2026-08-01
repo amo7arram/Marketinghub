@@ -433,15 +433,18 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="chart-container"><canvas id="webChart"></canvas></div>
         </div>
 
-        <!-- Leads Charts -->
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px">
-          <div class="card">
-            <div class="card-header"><div class="card-title">Leads Generated — Monthly</div><span style="font-size:11px;color:var(--text-3)">BD cards + initiatives + promotions</span></div>
-            <div class="chart-container"><canvas id="leadsMonthChart"></canvas></div>
-          </div>
+        <!-- Leads by Department + Department Activity -->
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:24px">
           <div class="card">
             <div class="card-header"><div class="card-title">Leads by Department</div></div>
             <div class="chart-container"><canvas id="leadsDeptChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Department Activity — <span id="dept-activity-month-label">This Month</span></div><span style="font-size:11px;color:var(--text-3)">Share of marketing activity per department</span></div>
+            <div id="dept-activity-bar-wrap">
+              <div id="dept-activity-bar" style="display:flex;height:36px;border-radius:8px;overflow:hidden;margin-top:8px"></div>
+              <div id="dept-activity-legend" style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px"></div>
+            </div>
           </div>
         </div>
 
@@ -647,7 +650,7 @@ import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
   watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets,
   promoStatus,
-  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES
+  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
 
 let RESOURCES   = [];
@@ -829,7 +832,8 @@ function entityBadge(arr) {
   return arr.map(e=>`<span class="badge ${map[e]||'ent-imc'}">${e}</span>`).join(' ');
 }
 function deptStyle(d) {
-  return {bg: DEPT_BG[d]||'#EEF0FF', t: DEPT_COLORS[d]||'#2E3BAA'};
+  const c = getDeptColor(d);
+  return {bg: c.bg, t: c.t};
 }
 function eventStatus(start, end) {
   const today = new Date().setHours(0,0,0,0);
@@ -949,6 +953,7 @@ window.renderDashboard = function() {
   renderDashboardKPIs();
   renderWebChart();
   renderLeadsCharts();
+  renderDeptActivityBar();
   renderCampMonthList();
   renderFeatured();
 }
@@ -993,49 +998,28 @@ function renderWebChart() {
   // Chart hidden — skipping render
 }
 
-// ── LEADS CHARTS ─────────────────────────────────────────────────────────
-let leadsMonthChart = null;
-let leadsDeptChart  = null;
+// ── LEADS BY DEPARTMENT (pie chart) ────────────────────────────────────────
+let leadsDeptChart = null;
 
 function renderLeadsCharts() {
   try {
-    const year = new Date().getFullYear();
-    const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const monthly = Array(12).fill(0);
-    const byDept  = {};
+    const year   = new Date().getFullYear();
+    const byDept = {};
 
-    BD_CARDS.forEach(c => {
-      if(!c.leadsGenerated || !c.date?.startsWith(String(year))) return;
-      const m = parseInt(c.date.split('-')[1])-1;
-      if(m>=0&&m<12) monthly[m] += c.leadsGenerated;
+    // Initiatives — any type, with a department and leadsGenerated
+    ALL.filter(i=>i.leadsGenerated && i.department && i.startDate?.startsWith(String(year))).forEach(i=>{
+      byDept[i.department] = (byDept[i.department]||0) + i.leadsGenerated;
     });
-    // From all initiatives (campaigns, events, health days, etc.) with leadsGenerated
-    ALL.filter(i=>i.leadsGenerated && i.startDate?.startsWith(String(year))).forEach(i=>{
-      const m = parseInt(i.startDate.split('-')[1])-1;
-      if(m>=0&&m<12) monthly[m] += i.leadsGenerated;
-      if(i.department) byDept[i.department] = (byDept[i.department]||0) + i.leadsGenerated;
+    // Promotions also carry a department — include their leads too
+    PROMOTIONS.filter(p=>p.leadsGenerated && p.department && p.startDate?.startsWith(String(year))).forEach(p=>{
+      byDept[p.department] = (byDept[p.department]||0) + p.leadsGenerated;
     });
-    PROMOTIONS.filter(p=>p.leadsGenerated && p.startDate?.startsWith(String(year))).forEach(p=>{
-      const m = parseInt(p.startDate.split('-')[1])-1;
-      if(m>=0&&m<12) monthly[m] += p.leadsGenerated;
-    });
-
-    const mc = document.getElementById('leadsMonthChart');
-    if(mc) {
-      if(leadsMonthChart) leadsMonthChart.destroy();
-      leadsMonthChart = new Chart(mc,{
-        type:'bar',
-        data:{labels:MONTH_LABELS,datasets:[{data:monthly,backgroundColor:'#00539B',borderRadius:4,hoverBackgroundColor:'#003f7a'}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-          scales:{y:{beginAtZero:true,ticks:{callback:v=>v>=1000?(v/1000)+'K':v,font:{size:9}},grid:{color:'rgba(0,0,0,0.04)'}}}}
-      });
-    }
 
     const dc = document.getElementById('leadsDeptChart');
     if(dc) {
       const deptLabels = Object.keys(byDept);
       const deptData   = Object.values(byDept);
-      const colors = deptLabels.map(d=>DEPT_COLORS[d]||'#2E3BAA');
+      const colors     = deptLabels.map(d=>getDeptColor(d).t);
       if(leadsDeptChart) leadsDeptChart.destroy();
       if(!deptLabels.length) {
         if(dc.parentElement) dc.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:200px;font-size:12px;color:var(--text-3)">No department-level lead data yet</div>';
@@ -1049,6 +1033,52 @@ function renderLeadsCharts() {
       });
     }
   } catch(e) { console.error('Leads chart error:', e); }
+}
+
+// ── DEPARTMENT ACTIVITY BAR (this month) ────────────────────────────────────
+// Shows which departments marketing supported most this month, as a single
+// horizontal bar segmented by % share of total activity (initiatives count).
+function renderDeptActivityBar() {
+  try {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const monthStr = `${y}-${String(m+1).padStart(2,'0')}`;
+    document.getElementById('dept-activity-month-label').textContent =
+      now.toLocaleString('en',{month:'long',year:'numeric'});
+
+    const counts = {};
+    ALL.filter(i=>i.department && i.startDate?.startsWith(monthStr)).forEach(i=>{
+      counts[i.department] = (counts[i.department]||0) + 1;
+    });
+
+    const barEl = document.getElementById('dept-activity-bar');
+    const legendEl = document.getElementById('dept-activity-legend');
+    const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const total = entries.reduce((s,[,c])=>s+c,0);
+
+    if(!total) {
+      barEl.innerHTML = '';
+      barEl.style.background = 'var(--bg)';
+      legendEl.innerHTML = '<div style="font-size:12px;color:var(--text-3);padding:6px 0">No marketing activity recorded for this month yet</div>';
+      return;
+    }
+
+    barEl.innerHTML = entries.map(([dept,count])=>{
+      const pct = (count/total*100);
+      const color = getDeptColor(dept).t;
+      return `<div title="${dept}: ${count} activities (${pct.toFixed(0)}%)" style="width:${pct}%;background:${color};transition:width 0.5s ease"></div>`;
+    }).join('');
+
+    legendEl.innerHTML = entries.map(([dept,count])=>{
+      const pct = (count/total*100).toFixed(0);
+      const color = getDeptColor(dept).t;
+      return `<div style="display:flex;align-items:center;gap:6px;font-size:11px">
+        <span style="width:9px;height:9px;border-radius:2px;background:${color};flex-shrink:0"></span>
+        <span style="color:var(--text-2);font-weight:500">${dept}</span>
+        <span style="color:var(--text-3)">${pct}% · ${count}</span>
+      </div>`;
+    }).join('');
+  } catch(e) { console.error('Dept activity bar error:', e); }
 }
 
 // ── SM ANALYTICS PAGE ────────────────────────────────────────────────────
@@ -1700,13 +1730,16 @@ function renderBdKpiProgress() {
     return ytdMetrics.filter(m=>m.metricName===name).reduce((s,m)=>s+(m.value||m.currentValue||0),0);
   }
 
-  // Leads and bookings — sum from BD cards + BD-featured initiatives
-  const allBdItems = [
+  // Leads and bookings — sum from ALL sources: BD cards, ALL initiatives
+  // (any type, not just BD-featured), and promotions. This must match the
+  // dashboard's leads chart total exactly, or the two pages disagree.
+  const allLeadSources = [
     ...BD_CARDS,
-    ...ALL.filter(i=>i.featuredBD===true)
+    ...ALL,        // every initiative type: Campaign, Event, SM Content, Print, Health Day
+    ...PROMOTIONS,
   ];
-  const totalLeads    = allBdItems.reduce((s,i)=>s+(i.leadsGenerated||0),0);
-  const totalBookings = allBdItems.reduce((s,i)=>s+(i.estimatedBookings||0),0);
+  const totalLeads    = allLeadSources.reduce((s,i)=>s+(i.leadsGenerated||0),0);
+  const totalBookings = allLeadSources.reduce((s,i)=>s+(i.estimatedBookings||0),0);
 
   const kpis = [
     { label:'Views',              actual: ytdSum('Instagram Views')+ytdSum('TikTok Views'),                       target: BD_TARGETS.views            ||0 },

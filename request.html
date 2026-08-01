@@ -96,9 +96,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
       <div class="field-group"><label class="field-label">Department<span class="req">*</span></label>
         <select class="field-select" id="f-department">
           <option value="">Select department</option>
-          <option>Women's Health</option><option>Cardiology</option><option>Children's Health</option>
-          <option>Diabetes & Chronic</option><option>Dermatology & Plastics</option><option>Orthopedics</option>
-          <option>Oncology</option><option>General Surgery</option><option>General / Brand</option><option>Other</option>
+          <option>Other</option>
         </select>
       </div>
       <div class="field-group"><label class="field-label">Request Type<span class="req">*</span></label><select class="field-select" id="f-type"></select></div>
@@ -126,7 +124,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { login, logout, watchAuth, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES } from './firebase-data.js';
+import { login, logout, watchAuth, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS } from './firebase-data.js';
 
 let currentUserEmail = null;
 
@@ -149,6 +147,9 @@ watchAuth(user => {
 function populateSelects() {
   document.getElementById('f-type').innerHTML = '<option value="">Select request type</option>' + REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('f-priority').innerHTML = PRIORITIES.map(p=>`<option>${p}</option>`).join('');
+  document.getElementById('f-department').innerHTML = '<option value="">Select department</option>'
+    + DEPARTMENTS.map(d=>`<option>${d}</option>`).join('')
+    + '<option>Other</option>';
 }
 
 const MAX_WORDS = 200;
