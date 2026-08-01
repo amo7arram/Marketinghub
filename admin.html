@@ -325,14 +325,23 @@ tr.row-done:hover td{background:#DCF2E5}
           <button class="btn btn-primary" onclick="openLeadForm()">+ Add Lead</button>
         </div>
       </div>
+      <!-- Bulk action bar — shown only when leads are selected -->
+      <div id="bulk-action-bar" style="display:none;align-items:center;gap:12px;background:#EAF4FF;border:1px solid var(--navy);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px">
+        <span id="bulk-selected-count" style="font-size:12px;font-weight:700;color:var(--navy)">0 selected</span>
+        <button class="btn btn-sm btn-primary" onclick="openBulkEditModal()">✏️ Bulk Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="bulkDeleteLeads()">🗑 Delete Selected</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-sm" onclick="clearLeadSelection()">Clear selection</button>
+      </div>
       <!-- Table -->
       <div style="overflow-x:auto">
-        <table style="min-width:900px">
+        <table style="min-width:940px">
           <thead><tr>
+            <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
             <th>Name</th><th>Phone</th><th>Department</th><th>Source</th>
             <th>Campaign</th><th>Date Created</th><th>Status</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="9" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="10" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -696,6 +705,38 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
 </div>
 
+<!-- ── BULK EDIT LEADS MODAL ── -->
+<div class="modal-overlay" id="bulk-edit-overlay">
+  <div class="modal" style="width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Bulk Edit <span id="bulk-edit-count" style="color:var(--text-3);font-weight:400;font-size:13px"></span></div>
+      <button class="modal-close" onclick="closeBulkEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:16px;background:var(--bg);padding:10px 12px;border-radius:var(--radius)">
+        Only fields you set below will be changed. Leave a field on "— No change —" to skip it.
+      </div>
+      <div class="field-group">
+        <label class="field-label">Date Created</label>
+        <input class="field-input" type="date" id="bulk-date">
+        <div class="form-hint" style="font-size:10px;color:var(--text-3);margin-top:3px">Leave blank to skip</div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Department</label>
+        <select class="field-select" id="bulk-department"><option value="">— No change —</option></select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Status</label>
+        <select class="field-select" id="bulk-status"><option value="">— No change —</option></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeBulkEditModal()">Cancel</button>
+      <button class="btn btn-primary" id="confirm-bulk-edit-btn" onclick="confirmBulkEdit()">Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── EXCEL IMPORT PREVIEW MODAL ── -->
 <div class="modal-overlay" id="excel-overlay">
   <div class="modal" style="width:720px">
@@ -706,7 +747,7 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div>
-          <label class="field-label">Department for all imported leads</label>
+          <label class="field-label">Default department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used only for rows with no department match)</span></label>
           <select class="field-select" id="import-dept"></select>
         </div>
         <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius);font-size:12px;color:var(--text-3)">
@@ -983,6 +1024,8 @@ function populateStaticSelects() {
   document.getElementById('lead-filter-dept').innerHTML += leadDeptHtml;
   document.getElementById('import-dept').innerHTML = leadDeptHtml;
   document.getElementById('lead-status').innerHTML = LEAD_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('bulk-department').innerHTML += leadDeptHtml;
+  document.getElementById('bulk-status').innerHTML += LEAD_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
 
@@ -2146,6 +2189,8 @@ window.renderLeadsStats = function() {
 }
 
 // ── Table ──────────────────────────────────────────────────────────────────
+let selectedLeadIds = new Set();
+
 window.renderLeadsTable = function() {
   const q      = (document.getElementById('lead-search')?.value||'').toLowerCase();
   const statusF= document.getElementById('lead-filter-status')?.value||'';
@@ -2158,10 +2203,16 @@ window.renderLeadsTable = function() {
     return true;
   });
 
+  // Drop selections for leads no longer in ALL_LEADS (e.g. deleted elsewhere)
+  const validIds = new Set(ALL_LEADS.map(l=>l.id));
+  selectedLeadIds.forEach(id => { if(!validIds.has(id)) selectedLeadIds.delete(id); });
+
   document.getElementById('leads-table-body').innerHTML = data.length
     ? data.map(l=>{
         const sc = LEAD_STATUS_COLORS[l.status]||{bg:'#F0F2F7',t:'#8890A8'};
-        return `<tr>
+        const isChecked = selectedLeadIds.has(l.id);
+        return `<tr style="${isChecked?'background:#F0F7FF':''}">
+          <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
           <td style="font-weight:600">${l.name||'—'}</td>
           <td style="font-size:12px">${l.phone||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
@@ -2181,7 +2232,105 @@ window.renderLeadsTable = function() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="9" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel or add manually'}</td></tr>`;
+    : `<tr><td colspan="10" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel or add manually'}</td></tr>`;
+
+  // Keep "select all" checkbox in sync with current visible selection state
+  const selectAllCb = document.getElementById('lead-select-all');
+  if(selectAllCb) {
+    const visibleIds = data.map(l=>l.id);
+    selectAllCb.checked = visibleIds.length>0 && visibleIds.every(id=>selectedLeadIds.has(id));
+    selectAllCb.indeterminate = visibleIds.some(id=>selectedLeadIds.has(id)) && !selectAllCb.checked;
+  }
+  updateBulkActionBar();
+}
+
+window.toggleLeadSelect = function(id, checked) {
+  if(checked) selectedLeadIds.add(id); else selectedLeadIds.delete(id);
+  updateBulkActionBar();
+  // Re-render just to update row highlight + select-all state (cheap, list is small)
+  renderLeadsTable();
+}
+
+window.toggleSelectAllLeads = function(checkbox) {
+  // Applies to currently visible/filtered rows only, not the entire dataset
+  const rows = document.querySelectorAll('#leads-table-body .lead-select-cb');
+  rows.forEach(cb => {
+    const tr = cb.closest('tr');
+    const id = cb.getAttribute('onchange').match(/'([^']+)'/)[1];
+    if(checkbox.checked) selectedLeadIds.add(id); else selectedLeadIds.delete(id);
+  });
+  renderLeadsTable();
+}
+
+window.clearLeadSelection = function() {
+  selectedLeadIds.clear();
+  renderLeadsTable();
+}
+
+function updateBulkActionBar() {
+  const bar = document.getElementById('bulk-action-bar');
+  const count = selectedLeadIds.size;
+  if(count > 0) {
+    bar.style.display = 'flex';
+    document.getElementById('bulk-selected-count').textContent = `${count} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+window.bulkDeleteLeads = async function() {
+  const count = selectedLeadIds.size;
+  if(!count) return;
+  if(!confirm(`Delete ${count} selected lead${count===1?'':'s'}? This cannot be undone.`)) return;
+  try {
+    await Promise.all([...selectedLeadIds].map(id => deleteLead(id)));
+    showToast(`✓ ${count} lead${count===1?'':'s'} deleted`);
+    selectedLeadIds.clear();
+  } catch(e) { showToast('Bulk delete failed: '+e.message, true); }
+}
+
+window.openBulkEditModal = function() {
+  const count = selectedLeadIds.size;
+  if(!count) return;
+  document.getElementById('bulk-edit-count').textContent = `(${count} lead${count===1?'':'s'})`;
+  document.getElementById('bulk-date').value = '';
+  document.getElementById('bulk-department').value = '';
+  document.getElementById('bulk-status').value = '';
+  document.getElementById('bulk-edit-overlay').classList.add('open');
+}
+window.closeBulkEditModal = function() {
+  document.getElementById('bulk-edit-overlay').classList.remove('open');
+}
+window.confirmBulkEdit = async function() {
+  const dateVal = document.getElementById('bulk-date').value;
+  const deptVal = document.getElementById('bulk-department').value;
+  const statusVal = document.getElementById('bulk-status').value;
+
+  const updateObj = {};
+  if(dateVal)   updateObj.dateCreated = dateVal;
+  if(deptVal)   updateObj.department  = deptVal;
+  if(statusVal) updateObj.status      = statusVal;
+
+  if(!Object.keys(updateObj).length) {
+    showToast('Set at least one field to apply', true);
+    return;
+  }
+
+  const ids = [...selectedLeadIds];
+  const btn = document.getElementById('confirm-bulk-edit-btn');
+  btn.disabled = true;
+  btn.textContent = `Applying to ${ids.length}...`;
+  try {
+    await Promise.all(ids.map(id => updateLead(id, updateObj)));
+    showToast(`✓ ${ids.length} lead${ids.length===1?'':'s'} updated`);
+    closeBulkEditModal();
+    selectedLeadIds.clear();
+  } catch(e) {
+    showToast('Bulk edit failed: '+e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Apply to Selected';
+  }
 }
 
 window.changeLeadStatus = async function(id, status) {
@@ -2230,15 +2379,59 @@ window.removeLeadRow = async function(id,name){
 }
 
 // ── Excel upload ──────────────────────────────────────────────────────────
+// Robust Excel date parser — handles ISO strings, DD/MM/YYYY, MM/DD/YYYY,
+// JS Date objects, and raw Excel serial numbers (the common causes of a
+// date column silently failing to import).
+function parseExcelDate(raw) {
+  if (!raw) return '';
+  if (raw instanceof Date && !isNaN(raw)) {
+    return raw.toISOString().split('T')[0];
+  }
+  const s = String(raw).trim();
+  if (!s) return '';
+  // Already ISO: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+  // Raw Excel serial number (days since 1899-12-30)
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    const serial = parseFloat(s);
+    const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+    if (!isNaN(date)) return date.toISOString().split('T')[0];
+  }
+  // DD/MM/YYYY or DD-MM-YYYY
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) {
+    const [, d, mo, y] = m;
+    if (parseInt(d) <= 31 && parseInt(mo) <= 12) {
+      return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+  }
+  // Fallback: let the browser try
+  const parsed = new Date(s);
+  if (!isNaN(parsed)) return parsed.toISOString().split('T')[0];
+  return '';
+}
+
+// Matches a raw department string from the sheet to our canonical
+// DEPARTMENTS spelling, case-insensitively. Returns null if no match.
+function matchDepartment(raw) {
+  if (!raw) return null;
+  const clean = String(raw).trim().toLowerCase();
+  const found = DEPARTMENTS.find(d => d.toLowerCase() === clean);
+  if (found) return found;
+  // Loose partial match as a second attempt (e.g. "ortho" → "Orthopedics")
+  const partial = DEPARTMENTS.find(d => d.toLowerCase().includes(clean) || clean.includes(d.toLowerCase()));
+  return partial || null;
+}
+
 window.handleExcelUpload = function(input) {
   const file = input.files[0];
   if(!file) return;
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb   = XLSX.read(e.target.result, {type:'binary'});
+      const wb   = XLSX.read(e.target.result, {type:'binary', cellDates:true});
       const ws   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false, dateNF:'yyyy-mm-dd'});
       if(!rows.length){showToast('No data found in the file',true);return;}
 
       // Auto-map columns (case-insensitive)
@@ -2250,40 +2443,54 @@ window.handleExcelUpload = function(input) {
       const campaignCol = map('campaign');
       const dateCol     = map('date');
       const statusCol   = map('status');
+      const deptCol     = map('department')||map('dept');
       const notesCol    = map('note')||map('comment')||map('notes');
 
       if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
 
       // Map rows to lead objects
-      pendingImportRows = rows.map(r=>({
-        name:        r[nameCol]||'',
-        phone:       String(r[phoneCol]||''),
-        source:      sourceCol ? r[sourceCol]||'' : '',
-        campaign:    campaignCol ? r[campaignCol]||'' : '',
-        dateCreated: dateCol ? String(r[dateCol]||'').substring(0,10) : '',
-        status:      statusCol ? mapStatus(r[statusCol]) : 'Lead',
-        notes:       notesCol ? r[notesCol]||'' : '',
-        department:  DEPARTMENTS[0], // will be overridden by import-dept select
-      })).filter(r=>r.name&&r.phone);
+      pendingImportRows = rows.map(r=>{
+        const rawDept = deptCol ? r[deptCol] : '';
+        const matchedDept = matchDepartment(rawDept);
+        return {
+          name:          r[nameCol]||'',
+          phone:         String(r[phoneCol]||''),
+          source:        sourceCol ? r[sourceCol]||'' : '',
+          campaign:      campaignCol ? r[campaignCol]||'' : '',
+          dateCreated:   dateCol ? parseExcelDate(r[dateCol]) : '',
+          status:        statusCol ? mapStatus(r[statusCol]) : 'Lead',
+          notes:         notesCol ? r[notesCol]||'' : '',
+          department:    matchedDept,       // null if sheet had no match — fallback applied at import time
+          _rawDept:      rawDept ? String(rawDept) : '',
+        };
+      }).filter(r=>r.name&&r.phone);
+
+      const matchedCount   = pendingImportRows.filter(r=>r.department).length;
+      const unmatchedCount = pendingImportRows.length - matchedCount;
 
       // Build preview table
       const previewRows = pendingImportRows.slice(0,10);
-      const thCols = ['Name','Phone','Source','Campaign','Date','Status'];
+      const thCols = ['Name','Phone','Department','Source','Campaign','Date','Status'];
       document.getElementById('excel-preview-table').innerHTML =
         `<thead style="background:var(--navy);color:#fff"><tr>${thCols.map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
         <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}</td>
           <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
+          <td style="padding:5px 10px;font-size:11px">${r.department?`<span style="color:var(--navy);font-weight:600">${r.department}</span>`:`<span style="color:var(--orange)">${r._rawDept?'No match: "'+r._rawDept+'"':'Not in sheet'} → uses default</span>`}</td>
           <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
           <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
-          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated}</td>
+          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'<span style="color:var(--red)">not parsed</span>'}</td>
           <td style="padding:5px 10px;font-size:11px">${r.status}</td>
         </tr>`).join('')}
-        ${pendingImportRows.length>10?`<tr><td colspan="6" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${pendingImportRows.length-10} more rows</td></tr>`:''}</tbody>`;
+        ${pendingImportRows.length>10?`<tr><td colspan="7" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${pendingImportRows.length-10} more rows</td></tr>`:''}</tbody>`;
 
       document.getElementById('import-count').textContent = pendingImportRows.length;
-      document.getElementById('import-col-info').textContent = `Detected: ${[nameCol,phoneCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}`;
-      document.getElementById('import-dept').value = DEPARTMENTS[0]; // default Women's Health for maternity
+      const deptStatus = deptCol
+        ? `${matchedCount} matched to a department${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`
+        : `No department column found — all rows will use the default below`;
+      document.getElementById('import-col-info').innerHTML =
+        `Detected: ${[nameCol,phoneCol,deptCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}`;
+      document.getElementById('import-dept').value = DEPARTMENTS[0];
       document.getElementById('import-progress').style.display='none';
       document.getElementById('confirm-import-btn').disabled=false;
       document.getElementById('excel-overlay').classList.add('open');
@@ -2307,8 +2514,13 @@ window.closeExcelPreview = function(){document.getElementById('excel-overlay').c
 
 window.confirmImport = async function() {
   if(!pendingImportRows.length) return;
-  const dept = document.getElementById('import-dept').value;
-  const leadsToImport = pendingImportRows.map(r=>({...r, department:dept}));
+  const fallbackDept = document.getElementById('import-dept').value;
+  // Use each row's matched department from the sheet; only fall back to the
+  // selected default for rows where the sheet had no department or no match.
+  const leadsToImport = pendingImportRows.map(r=>{
+    const { _rawDept, ...clean } = r;
+    return { ...clean, department: r.department || fallbackDept };
+  });
   const btn = document.getElementById('confirm-import-btn');
   const progress = document.getElementById('import-progress');
   btn.disabled=true;
