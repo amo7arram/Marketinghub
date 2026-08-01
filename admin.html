@@ -453,21 +453,28 @@ tr.row-done:hover td{background:#DCF2E5}
 
     <!-- METRICS PAGE -->
     <div class="page" id="page-metrics">
-      <div class="toolbar">
-        <div class="filters">
-          <label style="font-size:12px;font-weight:600;color:var(--text-2)">Month:</label>
-          <input type="month" class="filter-select" id="metrics-period" style="width:160px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)">
+        <!-- Year navigation -->
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+          <button class="period-nav-btn" onclick="shiftMetricsYear(-1)" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:14px">←</button>
+          <span id="metrics-year-label" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy);min-width:60px;text-align:center"></span>
+          <button class="period-nav-btn" onclick="shiftMetricsYear(1)" id="metrics-year-next" style="width:32px;height:32px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;font-size:14px">→</button>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span id="metrics-save-status" style="font-size:11px;color:var(--green);display:none">✓ Saved</span>
+        <!-- 12-month grid -->
+        <div id="metrics-month-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px"></div>
+        <!-- Save bar -->
+        <div style="display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--border)">
           <button class="btn btn-primary" onclick="saveMonthMetrics()">Save Month</button>
+          <span id="metrics-save-status" style="font-size:12px;font-weight:600;color:var(--green);display:none">✓ Saved successfully</span>
+          <span id="metrics-save-error" style="font-size:12px;font-weight:600;color:var(--red);display:none"></span>
+          <span id="metrics-saving-indicator" style="font-size:12px;color:var(--text-3);display:none">Saving...</span>
         </div>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)">
         <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
           <div>
-            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)" id="metrics-month-label">Select a month to enter or update metrics</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:2px">Enter numbers for the selected month — leave blank for metrics you don't have yet</div>
+            <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)" id="metrics-month-label">Select a month above</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px">Enter numbers — Engagement Rate is calculated automatically</div>
           </div>
           <div id="metrics-history-links" style="display:flex;gap:6px;flex-wrap:wrap"></div>
         </div>
@@ -1584,20 +1591,61 @@ const METRIC_CATEGORIES = {
   "PR Mentions":"PR","Website Visits":"Website",
 };
 const METRIC_ICONS = {"Instagram":"📸","TikTok":"🎵","X":"𝕏","LinkedIn":"💼","Social Media":"✉️","PR":"📰","Website":"🌐"};
+const MONTH_SHORT_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let metricsYear  = new Date().getFullYear();
+let metricsMonth = new Date().getMonth() + 1; // 1-based
+
+function getMetricsPeriod() {
+  return `${metricsYear}-${String(metricsMonth).padStart(2,'0')}`;
+}
 
 async function initMetricsTab() {
-  const now = new Date();
-  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  document.getElementById('metrics-period').value = defaultPeriod;
-  document.getElementById('metrics-period').addEventListener('change', loadMetricsForPeriod);
   ALL_METRIC_PERIODS = await getMetricPeriods();
-  renderMetricHistoryLinks();
+  renderMetricsYearGrid();
+  await loadMetricsForPeriod();
+}
+
+function renderMetricsYearGrid() {
+  document.getElementById('metrics-year-label').textContent = metricsYear;
+  const nextBtn = document.getElementById('metrics-year-next');
+  if(nextBtn) nextBtn.disabled = metricsYear >= new Date().getFullYear() + 1;
+  const periodsSet = new Set(ALL_METRIC_PERIODS);
+  document.getElementById('metrics-month-grid').innerHTML = MONTH_SHORT_NAMES.map((name, i) => {
+    const m        = i + 1;
+    const period   = `${metricsYear}-${String(m).padStart(2,'0')}`;
+    const hasData  = periodsSet.has(period);
+    const isSel    = m === metricsMonth;
+    const isCurrent= m===new Date().getMonth()+1 && metricsYear===new Date().getFullYear();
+    const isFuture = new Date(metricsYear, i, 1) > new Date();
+    return `<button onclick="selectMetricsMonth(${m})" title="${hasData?'Has data':'No data yet'}"
+      style="padding:10px 8px;border-radius:8px;border:2px solid ${isSel?'var(--navy)':'var(--border)'};
+      background:${isSel?'var(--navy)':hasData?'#EAF4FF':'var(--bg)'};
+      color:${isSel?'#fff':hasData?'var(--navy)':'var(--text-3)'};
+      cursor:pointer;font-family:inherit;font-size:12px;font-weight:${isSel?'700':'500'};
+      opacity:${isFuture?'0.35':'1'};transition:all 0.15s;position:relative;text-align:center">
+      ${name}${hasData?`<span style="position:absolute;top:3px;right:5px;width:6px;height:6px;background:${isSel?'rgba(255,255,255,0.8)':'var(--navy)'};border-radius:50%"></span>`:''}
+      ${isCurrent&&!isSel?`<span style="font-size:8px;display:block;color:var(--text-3)">now</span>`:''}
+    </button>`;
+  }).join('');
+}
+
+window.shiftMetricsYear = async function(dir) {
+  const newYear = metricsYear + dir;
+  if(newYear < 2024 || newYear > new Date().getFullYear() + 1) return;
+  metricsYear = newYear;
+  renderMetricsYearGrid();
+  await loadMetricsForPeriod();
+}
+
+window.selectMetricsMonth = async function(m) {
+  metricsMonth = m;
+  renderMetricsYearGrid();
   await loadMetricsForPeriod();
 }
 
 async function loadMetricsForPeriod() {
-  const period = document.getElementById('metrics-period').value;
-  if(!period) return;
+  const period = getMetricsPeriod();
   const [year, month] = period.split('-');
   const monthName = new Date(year, month-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
   document.getElementById('metrics-month-label').textContent = `${monthName} — Performance Metrics`;
@@ -1628,6 +1676,10 @@ async function loadMetricsForPeriod() {
   });
   document.getElementById('metrics-grid-wrap').innerHTML = html;
   setupEngagementRateCalc();
+  // Reset save status indicators when loading new month
+  ['metrics-save-status','metrics-save-error','metrics-saving-indicator'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display='none';
+  });
 }
 
 function setupEngagementRateCalc() {
@@ -1635,42 +1687,58 @@ function setupEngagementRateCalc() {
   const engEl   = document.getElementById('metric-input-Instagram_Engagements');
   const rateEl  = document.getElementById('metric-input-Instagram_Engagement_Rate');
   if(!viewsEl || !engEl || !rateEl) return;
-  // Make rate field read-only and visually distinct
   rateEl.readOnly = true;
   rateEl.style.cssText += ';background:var(--bg);color:var(--green);font-weight:700;cursor:default';
   rateEl.title = 'Auto-calculated: (Engagements ÷ Views) × 100';
   const calc = () => {
-    const v = parseFloat(viewsEl.value) || 0;
-    const e = parseFloat(engEl.value) || 0;
-    rateEl.value = v > 0 ? (e / v * 100).toFixed(2) : '';
+    const v = parseFloat(viewsEl.value)||0;
+    const e = parseFloat(engEl.value)||0;
+    rateEl.value = v > 0 ? (e/v*100).toFixed(2) : '';
   };
   viewsEl.addEventListener('input', calc);
   engEl.addEventListener('input', calc);
-  calc(); // calculate immediately with existing values
+  calc();
 }
 
 window.saveMonthMetrics = async function() {
-  const period = document.getElementById('metrics-period').value;
-  if(!period) { showToast('Select a month first', true); return; }
+  const period     = getMetricsPeriod();
   const metricsObj = {};
   METRIC_NAMES.forEach(name => {
     const el = document.getElementById('metric-input-'+name.replace(/\s+/g,'_'));
     if(el && el.value !== '') metricsObj[name] = parseFloat(el.value)||0;
   });
-  if(!Object.keys(metricsObj).length) { showToast('Enter at least one value', true); return; }
+  if(!Object.keys(metricsObj).length) { showToast('Enter at least one value before saving', true); return; }
+
+  const statusEl  = document.getElementById('metrics-save-status');
+  const errorEl   = document.getElementById('metrics-save-error');
+  const savingEl  = document.getElementById('metrics-saving-indicator');
+  statusEl.style.display = 'none';
+  errorEl.style.display  = 'none';
+  savingEl.style.display = 'inline';
+
   try {
     await saveMonthMetricsToDb(period, metricsObj);
-    const s = document.getElementById('metrics-save-status');
-    s.style.display='inline'; setTimeout(()=>s.style.display='none', 3000);
+    savingEl.style.display = 'none';
+    statusEl.style.display = 'inline';
+    setTimeout(() => { statusEl.style.display='none'; }, 5000);
+    const [y,m] = period.split('-');
+    const label = new Date(y,m-1,1).toLocaleString('en',{month:'long',year:'numeric'});
+    showToast(`✓ ${Object.keys(metricsObj).length} metrics saved for ${label}`);
     ALL_METRIC_PERIODS = await getMetricPeriods();
+    renderMetricsYearGrid();
     renderMetricHistoryLinks();
-  } catch(e) { showToast('Save failed: '+e.message, true); }
+  } catch(e) {
+    savingEl.style.display = 'none';
+    errorEl.textContent    = 'Save failed: ' + e.message;
+    errorEl.style.display  = 'inline';
+    showToast('Save failed: ' + e.message, true);
+  }
 }
 
 function renderMetricHistoryLinks() {
   const el = document.getElementById('metrics-history-links');
-  if(!ALL_METRIC_PERIODS.length){el.innerHTML='';return;}
-  el.innerHTML='<span style="font-size:11px;color:var(--text-3);margin-right:4px">History:</span>'+
+  if(!ALL_METRIC_PERIODS.length){el.innerHTML='<span style="font-size:11px;color:var(--text-3)">No data saved yet</span>';return;}
+  el.innerHTML='<span style="font-size:11px;color:var(--text-3);margin-right:4px">Saved:</span>'+
     ALL_METRIC_PERIODS.slice(0,6).map(p=>{
       const [y,m]=p.split('-');
       const label=new Date(y,m-1,1).toLocaleString('en',{month:'short',year:'2-digit'});
@@ -1678,7 +1746,10 @@ function renderMetricHistoryLinks() {
     }).join('');
 }
 window.jumpToPeriod = async function(period) {
-  document.getElementById('metrics-period').value = period;
+  const [y,m] = period.split('-');
+  metricsYear  = parseInt(y);
+  metricsMonth = parseInt(m);
+  renderMetricsYearGrid();
   await loadMetricsForPeriod();
 }
 

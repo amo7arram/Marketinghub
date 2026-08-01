@@ -149,19 +149,18 @@ export async function getAllMetrics() {
 // Save (upsert) a full month's metrics in one batch
 // data = { period: "2026-06", metrics: { "Instagram Reach": 45000, ... } }
 export async function saveMonthMetrics(period, metricsObj) {
+  // Use setDoc with a deterministic document ID: "MetricName_YYYY-MM"
+  // setDoc creates the doc if it doesn't exist, or fully overwrites it if it does.
+  // This is intentional — we always want a clean write at a known, predictable ID.
+  // The old updateDoc → addDoc fallback was broken: addDoc created random IDs,
+  // so repeat saves always failed the updateDoc and kept stacking new random-ID docs.
   const writes = Object.entries(metricsObj).map(([name, value]) => {
     const docId = `${name}_${period}`.replace(/\s+/g, "_");
-    const unit = METRIC_UNITS[name] || "Number";
-    return updateDoc(doc(db, METRICS, docId), {
+    const unit  = METRIC_UNITS[name] || "Number";
+    return setDoc(doc(db, METRICS, docId), {
       metricName: name, period, value: Number(value) || 0, unit,
-      updatedAt: Timestamp.now(),
-    }).catch(() =>
-      // doc doesn't exist yet — create it
-      addDoc(collection(db, METRICS), {
-        metricName: name, period, value: Number(value) || 0, unit,
-        updatedAt: Timestamp.now(),
-      })
-    );
+      updatedAt:  Timestamp.now(),
+    });
   });
   return Promise.all(writes);
 }
