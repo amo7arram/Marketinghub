@@ -468,6 +468,8 @@ tr.row-done:hover td{background:#DCF2E5}
           <span id="metrics-save-status" style="font-size:12px;font-weight:600;color:var(--green);display:none">✓ Saved successfully</span>
           <span id="metrics-save-error" style="font-size:12px;font-weight:600;color:var(--red);display:none"></span>
           <span id="metrics-saving-indicator" style="font-size:12px;color:var(--text-3);display:none">Saving...</span>
+          <span style="flex:1"></span>
+          <button class="btn btn-sm" onclick="runCleanupDuplicates()" title="Removes leftover duplicate metric entries from an old bug — safe to run any time">🧹 Clean Up Duplicates</button>
         </div>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)">
@@ -809,7 +811,7 @@ tr.row-done:hover td{background:#DCF2E5}
 import {
   login, logout, watchAuth, getUserRole,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
-  getMetricsForPeriod, getMetricPeriods, saveMonthMetrics as saveMonthMetricsToDb, deleteMetric,
+  getMetricsForPeriod, getMetricPeriods, saveMonthMetrics as saveMonthMetricsToDb, deleteMetric, cleanupDuplicateMetrics,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
@@ -1595,6 +1597,7 @@ const MONTH_SHORT_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'
 
 let metricsYear  = new Date().getFullYear();
 let metricsMonth = new Date().getMonth() + 1; // 1-based
+let loadedMetricValues = {}; // snapshot of values as-loaded, used to detect true changes on save
 
 function getMetricsPeriod() {
   return `${metricsYear}-${String(metricsMonth).padStart(2,'0')}`;
@@ -1652,6 +1655,7 @@ async function loadMetricsForPeriod() {
   const existing = await getMetricsForPeriod(period);
   const valueMap = {};
   existing.forEach(m => { valueMap[m.metricName] = m.value; });
+  loadedMetricValues = { ...valueMap }; // snapshot for change detection on save
   const byCategory = {};
   METRIC_NAMES.forEach(name => {
     const cat = METRIC_CATEGORIES[name]||'Other';
@@ -1709,6 +1713,14 @@ window.saveMonthMetrics = async function() {
   });
   if(!Object.keys(metricsObj).length) { showToast('Enter at least one value before saving', true); return; }
 
+  // Precisely count only fields that are new or actually changed vs what was loaded
+  let changedCount = 0;
+  Object.entries(metricsObj).forEach(([name, val]) => {
+    const prev = loadedMetricValues[name];
+    if(prev === undefined || Number(prev) !== Number(val)) changedCount++;
+  });
+  if(changedCount === 0) { showToast('No changes to save — values match what\'s already stored', true); return; }
+
   const statusEl  = document.getElementById('metrics-save-status');
   const errorEl   = document.getElementById('metrics-save-error');
   const savingEl  = document.getElementById('metrics-saving-indicator');
@@ -1723,7 +1735,8 @@ window.saveMonthMetrics = async function() {
     setTimeout(() => { statusEl.style.display='none'; }, 5000);
     const [y,m] = period.split('-');
     const label = new Date(y,m-1,1).toLocaleString('en',{month:'long',year:'numeric'});
-    showToast(`✓ ${Object.keys(metricsObj).length} metrics saved for ${label}`);
+    showToast(`✓ ${changedCount} metric${changedCount===1?'':'s'} updated for ${label}`);
+    loadedMetricValues = { ...metricsObj }; // reset baseline so a second save without edits reports 0 changes
     ALL_METRIC_PERIODS = await getMetricPeriods();
     renderMetricsYearGrid();
     renderMetricHistoryLinks();
@@ -1733,6 +1746,20 @@ window.saveMonthMetrics = async function() {
     errorEl.style.display  = 'inline';
     showToast('Save failed: ' + e.message, true);
   }
+}
+
+window.runCleanupDuplicates = async function() {
+  if(!confirm('This scans the entire metrics collection and permanently removes leftover duplicate entries from an old bug, keeping only the correct value for each metric+month. This cannot be undone. Proceed?')) return;
+  try {
+    const removed = await cleanupDuplicateMetrics();
+    if(removed === 0) { showToast('No duplicates found — your data is clean ✓'); }
+    else {
+      showToast(`✓ Removed ${removed} duplicate entr${removed===1?'y':'ies'}. Reloading current month...`);
+      ALL_METRIC_PERIODS = await getMetricPeriods();
+      renderMetricsYearGrid();
+      await loadMetricsForPeriod();
+    }
+  } catch(e) { showToast('Cleanup failed: '+e.message, true); }
 }
 
 function renderMetricHistoryLinks() {

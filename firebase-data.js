@@ -90,10 +90,73 @@ export function deleteInitiative(id) {
 }
 
 
+// Canonical deterministic ID for a metric doc — the ONLY id new saves ever use.
+function canonicalMetricId(name, period) {
+  return `${name}_${period}`.replace(/\s+/g, "_");
+}
+
+// Collapses duplicate docs (same metricName + period) down to one.
+// Prefers the doc at the canonical deterministic ID; if none match
+// (shouldn't happen going forward), falls back to the most recently updated.
+// This guards every read against stale leftover duplicates from the old
+// updateDoc→addDoc bug, so a query can never silently return an old value.
+function dedupeMetricDocs(docs) {
+  const groups = {};
+  docs.forEach(d => {
+    const key = `${d.metricName}__${d.period}`;
+    (groups[key] = groups[key] || []).push(d);
+  });
+  const result = [];
+  Object.values(groups).forEach(group => {
+    if (group.length === 1) { result.push(group[0]); return; }
+    const canonicalId = canonicalMetricId(group[0].metricName, group[0].period);
+    let winner = group.find(g => g.id === canonicalId);
+    if (!winner) {
+      winner = group.reduce((latest, cur) => {
+        const lt = latest.updatedAt?.toMillis ? latest.updatedAt.toMillis() : 0;
+        const ct = cur.updatedAt?.toMillis ? cur.updatedAt.toMillis() : 0;
+        return ct > lt ? cur : latest;
+      });
+    }
+    result.push(winner);
+  });
+  return result;
+}
+
+// One-click cleanup — permanently deletes stale duplicate metric docs left
+// over from the old buggy save logic, keeping only the canonical doc per
+// metric+period. Safe to run any time; a no-op if there are no duplicates.
+export async function cleanupDuplicateMetrics() {
+  const snap = await getDocs(collection(db, METRICS));
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const groups = {};
+  docs.forEach(d => {
+    const key = `${d.metricName}__${d.period}`;
+    (groups[key] = groups[key] || []).push(d);
+  });
+  const deletions = [];
+  Object.values(groups).forEach(group => {
+    if (group.length <= 1) return;
+    const canonicalId = canonicalMetricId(group[0].metricName, group[0].period);
+    let winner = group.find(g => g.id === canonicalId);
+    if (!winner) {
+      winner = group.reduce((latest, cur) => {
+        const lt = latest.updatedAt?.toMillis ? latest.updatedAt.toMillis() : 0;
+        const ct = cur.updatedAt?.toMillis ? cur.updatedAt.toMillis() : 0;
+        return ct > lt ? cur : latest;
+      });
+    }
+    group.forEach(g => { if (g.id !== winner.id) deletions.push(deleteDoc(doc(db, METRICS, g.id))); });
+  });
+  await Promise.all(deletions);
+  return deletions.length;
+}
+
 // watchMetrics — real-time listener for dashboard (reads any format metric doc)
 export function watchMetrics(callback) {
   return onSnapshot(collection(db, METRICS), snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    callback(dedupeMetricDocs(docs));
   });
 }
 
@@ -127,7 +190,8 @@ export async function getMetricsForPeriod(period) {
   const snap = await getDocs(
     query(collection(db, METRICS), where("period", "==", period))
   );
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return dedupeMetricDocs(docs);
 }
 
 // Fetch all available periods (distinct months that have data)
@@ -141,7 +205,8 @@ export async function getMetricPeriods() {
 // Fetch all metrics across all periods (for chart history)
 export async function getAllMetrics() {
   const snap = await getDocs(collection(db, METRICS));
-  const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const data = dedupeMetricDocs(docs);
   data.sort((a,b) => (a.period||'').localeCompare(b.period||''));
   return data;
 }
