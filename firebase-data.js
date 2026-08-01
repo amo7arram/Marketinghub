@@ -315,8 +315,35 @@ export function promoStatus(startDate, endDate) {
 }
 
 
-// ── BD TARGETS ───────────────────────────────────────────────────────────
+// ── BRAND VOICE CONFIG ───────────────────────────────────────────────────
+// Stored as config/brand_voice — editable from admin, feeds every AI caption
+// generation call so the voice stays consistent and tunable without code changes.
+const DEFAULT_BRAND_VOICE = {
+  hashtagCloser: "#غايتنا_عافيتكم",
+  formality: "Warm and conversational, still professional",
+  emojiUsage: "Light use — 1-2 relevant emojis max",
+  toneNotes: "Respectful, family-oriented, non-alarmist. Confident without being clinical or cold. Preventive care and long-term patient relationships are core themes. Aware of Islamic occasions (Ramadan, Eid) and Saudi National Day as natural moments to speak to — never forced.",
+  avoidWords: "guaranteed, cure, miracle, best in Jeddah, #1",
+  ctaStyleEN: "For booking & inquiries call 920027778 or download the MY IMC app",
+  ctaStyleAR: "للحجز والاستفسار 920027778 أو حمل تطبيق MY IMC",
+};
+export async function getBrandVoice() {
+  const snap = await getDoc(doc(db, CONFIG, "brand_voice"));
+  return snap.exists() ? { ...DEFAULT_BRAND_VOICE, ...snap.data() } : DEFAULT_BRAND_VOICE;
+}
+export function setBrandVoice(data) {
+  return setDoc(doc(db, CONFIG, "brand_voice"), data, { merge: true });
+}
+export function watchBrandVoice(callback) {
+  return onSnapshot(doc(db, CONFIG, "brand_voice"),
+    snap => callback(snap.exists() ? { ...DEFAULT_BRAND_VOICE, ...snap.data() } : DEFAULT_BRAND_VOICE),
+    err => { console.error('watchBrandVoice:', err.code); callback(DEFAULT_BRAND_VOICE); }
+  );
+}
+
+
 // Stored as config/bd_targets — single doc with all 2026 KPI targets
+// ── BD TARGETS ───────────────────────────────────────────────────────────
 export function watchBdTargets(callback) {
   return onSnapshot(doc(db, CONFIG, "bd_targets"),
     snap => { callback(snap.exists() ? snap.data() : {}); },

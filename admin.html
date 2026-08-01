@@ -171,6 +171,7 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="tab" onclick="switchTab('requests',this)">Requests</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
+    <div class="tab" onclick="switchTab('contentgen',this)">✨ Content Generator</div>
   </div>
 
   <div class="content">
@@ -493,6 +494,83 @@ tr.row-done:hover td{background:#DCF2E5}
         <div id="metrics-grid-wrap" style="padding:4px 0"></div>
       </div>
     </div>
+
+    <!-- CONTENT GENERATOR PAGE -->
+    <div class="page" id="page-contentgen">
+      <div style="max-width:760px">
+        <div style="background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px">
+          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">✨ AI Content Generator</div>
+          <div style="font-size:12px;color:var(--text-3)">Generate bilingual captions from an existing initiative, or start from a blank brief. Review and edit before saving.</div>
+        </div>
+
+        <!-- Brand Voice Settings — collapsible -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:20px;overflow:hidden">
+          <div onclick="toggleBrandVoicePanel()" style="cursor:pointer;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--bg)">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">🎙 Brand Voice Settings <span style="font-weight:400;color:var(--text-3);font-size:11px">— applies to every caption generated across the whole portal</span></div>
+            <span id="bv-toggle-icon" style="font-size:12px;color:var(--text-3)">▼ Edit</span>
+          </div>
+          <div id="bv-panel" style="display:none;padding:20px">
+            <div class="field-group"><label class="field-label">Closing Hashtag <span style="color:var(--text-3);font-weight:400;font-size:11px">(added at the end of every post, both languages)</span></label><input class="field-input" id="bv-hashtag" placeholder="e.g. #غايتنا_عافيتكم" dir="rtl" style="font-family:'IBM Plex Sans Arabic',sans-serif"></div>
+            <div class="field-row">
+              <div class="field-group"><label class="field-label">Formality Level</label>
+                <select class="field-select" id="bv-formality">
+                  <option>Formal/professional throughout</option>
+                  <option>Warm and conversational, still professional</option>
+                  <option>Mix depending on department (formal for Oncology, casual for lifestyle/derma)</option>
+                </select>
+              </div>
+              <div class="field-group"><label class="field-label">Emoji Usage</label>
+                <select class="field-select" id="bv-emoji">
+                  <option>No emojis — clean and professional</option>
+                  <option>Light use — 1-2 relevant emojis max</option>
+                  <option>Liberal use, feels more social-native</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-group"><label class="field-label">Tone Notes <span style="color:var(--text-3);font-weight:400;font-size:11px">— cultural context, values, positioning cues</span></label><textarea class="field-textarea" id="bv-tone-notes" style="min-height:80px"></textarea></div>
+            <div class="field-group"><label class="field-label">Words/Phrases to Avoid <span style="color:var(--text-3);font-weight:400;font-size:11px">comma-separated</span></label><input class="field-input" id="bv-avoid-words" placeholder="e.g. guaranteed, cure, miracle"></div>
+            <div class="field-section-title">Call-to-Action <span style="color:var(--text-3);font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">— included when relevant to the post, not forced into every caption</span></div>
+            <div class="field-group"><label class="field-label">CTA — English</label><input class="field-input" id="bv-cta-en" placeholder="e.g. For booking & inquiries call 920027778 or download the MY IMC app"></div>
+            <div class="field-group"><label class="field-label">CTA — Arabic</label><input class="field-input" id="bv-cta-ar" dir="rtl" style="font-family:'IBM Plex Sans Arabic',sans-serif" placeholder="مثال: للحجز والاستفسار 920027778 أو حمل تطبيق MY IMC"></div>
+            <button class="btn btn-primary" onclick="saveBrandVoice()">Save Brand Voice</button>
+            <span id="bv-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved — will apply to future generations</span>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Start from an existing initiative <span style="color:var(--text-3);font-weight:400;font-size:11px">(optional — auto-fills the brief below)</span></label>
+          <select class="field-select" id="cg-initiative-select" onchange="loadInitiativeIntoGenerator()">
+            <option value="">— Start from a blank brief —</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="cg-title" placeholder="e.g. World Diabetes Day Awareness Post"></div>
+          <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="cg-department"></select></div>
+        </div>
+        <div class="field-row">
+          <div class="field-group"><label class="field-label">Channels</label><input class="field-input" id="cg-channels" placeholder="e.g. Instagram, TikTok"></div>
+          <div class="field-group"><label class="field-label">Entity</label><input class="field-input" id="cg-entity" placeholder="e.g. IMC, Makkah"></div>
+        </div>
+        <div class="field-group"><label class="field-label">Brief / Key Message</label><textarea class="field-textarea" id="cg-objective" placeholder="What's the angle? Any specific message, offer, or CTA to include?"></textarea></div>
+
+        <button class="btn btn-primary" id="cg-generate-btn" onclick="generateStandaloneCaptions()" style="width:100%;padding:11px;font-size:13px">Generate Content</button>
+        <div id="cg-status" style="font-size:12px;color:var(--text-3);display:none;margin-top:10px;text-align:center"></div>
+
+        <div id="cg-result" style="display:none;margin-top:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow)">
+          <div class="field-group">
+            <label class="field-label">Caption — English <button class="btn btn-sm" type="button" onclick="regenerateStandalone('en')" style="float:right;padding:2px 8px;font-size:10px">↻ Regenerate</button></label>
+            <textarea class="field-textarea" id="cg-caption-en" style="min-height:100px"></textarea>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Caption — Arabic <button class="btn btn-sm" type="button" onclick="regenerateStandalone('ar')" style="float:right;padding:2px 8px;font-size:10px">↻ Regenerate</button></label>
+            <textarea class="field-textarea" id="cg-caption-ar" dir="rtl" style="min-height:100px;font-family:'IBM Plex Sans Arabic',sans-serif"></textarea>
+          </div>
+          <div class="field-group"><label class="field-label">On-Image Headline Suggestion</label><input class="field-input" id="cg-caption-headline"></div>
+          <button class="btn btn-primary" onclick="saveGeneratedToInitiative()" id="cg-save-btn" style="width:100%;margin-top:6px" disabled>Select an initiative above to save this content</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -530,6 +608,29 @@ tr.row-done:hover td{background:#DCF2E5}
 
       <div class="field-section-title" id="section-detail">Details</div>
       <div class="field-group" id="fld-objective-wrap"><label class="field-label" id="fld-objective-label">Objective / Description</label><textarea class="field-textarea" id="fld-objective"></textarea></div>
+
+      <div class="field-group" id="fld-caption-gen-wrap" style="background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius);padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:var(--navy)">✨ AI Caption Generator</div>
+          <button class="btn btn-sm btn-primary" type="button" id="gen-caption-btn" onclick="generateInitiativeCaptions()">Generate Content</button>
+        </div>
+        <div id="gen-caption-status" style="font-size:11px;color:var(--text-3);display:none;margin-bottom:8px"></div>
+        <div id="gen-caption-result" style="display:none">
+          <div class="field-group" style="margin-bottom:8px">
+            <label class="field-label" style="font-size:10px">Caption — English <button class="btn btn-sm" type="button" onclick="regenerateCaption('en')" style="float:right;padding:2px 8px;font-size:10px">↻ Regenerate</button></label>
+            <textarea class="field-textarea" id="gen-caption-en" style="min-height:80px;font-size:12px"></textarea>
+          </div>
+          <div class="field-group" style="margin-bottom:8px">
+            <label class="field-label" style="font-size:10px">Caption — Arabic <button class="btn btn-sm" type="button" onclick="regenerateCaption('ar')" style="float:right;padding:2px 8px;font-size:10px">↻ Regenerate</button></label>
+            <textarea class="field-textarea" id="gen-caption-ar" dir="rtl" style="min-height:80px;font-size:12px;font-family:'IBM Plex Sans Arabic',sans-serif"></textarea>
+          </div>
+          <div class="field-group" style="margin-bottom:0">
+            <label class="field-label" style="font-size:10px">On-Image Headline Suggestion</label>
+            <input class="field-input" id="gen-caption-headline" style="font-size:12px">
+          </div>
+        </div>
+      </div>
+
       <div class="field-group" id="fld-channels-wrap"><label class="field-label">Channels</label><div class="chip-select" id="fld-channels"></div></div>
       <div class="field-group" id="fld-contenttype-wrap"><label class="field-label">Content Type</label><select class="field-select" id="fld-contentType"></select></div>
       <div class="field-group" id="fld-hdcategory-wrap"><label class="field-label">Health Day Category</label><select class="field-select" id="fld-hdCategory"></select></div>
@@ -861,6 +962,7 @@ import {
   watchPromotions, addPromotion, updatePromotion, deletePromotion, promoStatus,
   watchBdCards, addBdCard, updateBdCard, deleteBdCard,
   watchBdTargets, setBdTargets,
+  getBrandVoice, setBrandVoice, watchBrandVoice,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, LEAD_STATUSES, LEAD_STATUS_COLORS,
@@ -880,6 +982,7 @@ let ALL_LOYALTY = [];
 let ALL_LEADS = [];
 let ALL_METRIC_PERIODS = [];
 let BD_TARGETS = {};
+let BRAND_VOICE = {};
 let ANNUAL_BUDGET = 0;
 let currentType = 'Campaign';
 let editingId = null;
@@ -900,6 +1003,7 @@ let unsubBdCards = null;
 let unsubWellspan = null;
 let unsubLoyalty = null;
 let unsubBdTargets = null;
+let unsubBrandVoice = null;
 let unsubLeads = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
@@ -966,6 +1070,7 @@ watchAuth(async user => {
     if(unsubWellspan) unsubWellspan();
     if(unsubLoyalty) unsubLoyalty();
     if(unsubBdTargets) unsubBdTargets();
+    if(unsubBrandVoice) unsubBrandVoice();
     if(unsubLeads) unsubLeads();
   }
 });
@@ -981,6 +1086,7 @@ function initData() {
   unsubWellspan     = watchWellspanPackages(data => { ALL_WELLSPAN = data; renderWellspanTable(); });
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
   unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
+  unsubBrandVoice   = watchBrandVoice(data   => { BRAND_VOICE     = data; loadBrandVoiceForm(); });
   unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); });
   initMetricsTab();
   initBudgetTab();
@@ -992,6 +1098,7 @@ window.switchTab = function(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('page-'+id).classList.add('active');
+  if(id==='contentgen') initContentGenTab();
 }
 
 // ── STATIC SELECT POPULATION ──────────────────────────────────────────
@@ -1129,6 +1236,19 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-printType').value = initiative?.printType || PRINT_TYPES[0];
   document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
+  // Load previously generated/saved captions, if any
+  if(initiative?.captionEN || initiative?.captionAR) {
+    document.getElementById('gen-caption-en').value = initiative?.captionEN || '';
+    document.getElementById('gen-caption-ar').value = initiative?.captionAR || '';
+    document.getElementById('gen-caption-headline').value = initiative?.captionHeadline || '';
+    document.getElementById('gen-caption-result').style.display = 'block';
+  } else {
+    document.getElementById('gen-caption-result').style.display = 'none';
+    document.getElementById('gen-caption-en').value = '';
+    document.getElementById('gen-caption-ar').value = '';
+    document.getElementById('gen-caption-headline').value = '';
+  }
+  document.getElementById('gen-caption-status').style.display = 'none';
   document.getElementById('fld-cost').value = initiative?.cost ?? '';
   document.getElementById('fld-leads').value    = initiative?.leadsGenerated ?? '';
   document.getElementById('fld-bookings').value = initiative?.estimatedBookings ?? '';
@@ -1176,6 +1296,9 @@ window.saveInitiative = async function() {
     printType: document.getElementById('fld-printType').value,
     hdCategory: document.getElementById('fld-hdCategory').value,
     postLink: document.getElementById('fld-postLink').value.trim(),
+    captionEN:       document.getElementById('gen-caption-en').value.trim() || null,
+    captionAR:       document.getElementById('gen-caption-ar').value.trim() || null,
+    captionHeadline: document.getElementById('gen-caption-headline').value.trim() || null,
     cost: parseFloat(document.getElementById('fld-cost').value) || null,
     leadsGenerated:    parseInt(document.getElementById('fld-leads').value)    || null,
     estimatedBookings: parseInt(document.getElementById('fld-bookings').value) || null,
@@ -1935,6 +2058,276 @@ window.renderRequestsTable = function() {
         </tr>`;
       }).join('')
     : '<tr><td colspan="10" class="empty">No requests found</td></tr>';
+}
+
+// ── AI CAPTION GENERATOR — shared logic used by both the initiative form ──
+// and the standalone Content Generator tab. One prompt builder, one API
+// caller, so behavior stays consistent everywhere it's used.
+
+async function callClaudeForCaptions(brief) {
+  const bv = BRAND_VOICE || {};
+  const systemPrompt = `You are a senior social media copywriter for IMC (International Medical Center), a private healthcare group in Saudi Arabia with entities in Jeddah, Makkah, and beyond. You write healthcare marketing copy for Instagram and TikTok following this exact brand voice:
+
+FORMALITY: ${bv.formality || 'Warm and conversational, still professional'}
+EMOJI USAGE: ${bv.emojiUsage || 'Light use — 1-2 relevant emojis max'}
+TONE & CULTURAL CONTEXT: ${bv.toneNotes || 'Respectful, family-oriented, non-alarmist. Confident without being clinical or cold.'}
+WORDS/PHRASES TO NEVER USE: ${bv.avoidWords || 'guaranteed, cure, miracle, best in Jeddah, #1'}
+
+CLOSING HASHTAG — mandatory, always end BOTH captions with this exact hashtag on its own line: ${bv.hashtagCloser || '#غايتنا_عافيتكم'}
+
+CALL TO ACTION — include ONLY when it genuinely fits the post (e.g. a promotion, a new service, an appointment-driving post). Skip it for purely awareness/educational posts where a hard CTA would feel forced. When you do include it, use exactly this wording:
+  English CTA: "${bv.ctaStyleEN || 'For booking & inquiries call 920027778 or download the MY IMC app'}"
+  Arabic CTA: "${bv.ctaStyleAR || 'للحجز والاستفسار 920027778 أو حمل تطبيق MY IMC'}"
+
+Structure each caption as: hook/body copy → (CTA if relevant) → closing hashtag on its own line.
+
+Always follow Saudi healthcare marketing norms — no exaggerated medical claims, no fear-based messaging. Respond ONLY with valid JSON, no markdown formatting, no code fences, no preamble.`;
+
+  const userPrompt = `Write social media content for this initiative:
+
+Title: ${brief.title || 'Untitled'}
+Type: ${brief.type || 'Campaign'}
+Department: ${brief.department || 'General'}
+Channels: ${brief.channels || 'Instagram'}
+Objective / Brief: ${brief.objective || 'No additional brief provided — infer a reasonable angle from the title and department.'}
+Entity: ${brief.entity || 'IMC'}
+
+Return JSON in exactly this shape:
+{
+  "captionEN": "the full English caption including relevant hashtags, ready to post",
+  "captionAR": "the full Arabic caption (Modern Standard Arabic, natural and warm, not a literal translation — written as a native Arabic copywriter would), including relevant Arabic hashtags",
+  "headline": "a short punchy 3-7 word on-image headline suggestion in English, suitable for overlay text on a graphic"
+}`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+  });
+
+  if (!response.ok) throw new Error(`API error ${response.status}`);
+  const data = await response.json();
+  const textBlock = data.content?.find(b => b.type === 'text');
+  if (!textBlock) throw new Error('No text response from Claude');
+
+  const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
+  let parsed;
+  try { parsed = JSON.parse(cleaned); }
+  catch(e) { throw new Error('Could not parse AI response — try regenerating'); }
+  return parsed;
+}
+
+// ── Initiative-form generator ─────────────────────────────────────────────
+window.generateInitiativeCaptions = async function() {
+  const brief = {
+    title:      document.getElementById('fld-title')?.value || '',
+    type:       currentType,
+    department: document.getElementById('fld-department')?.value || '',
+    objective:  document.getElementById('fld-objective')?.value || '',
+    channels:   [...document.querySelectorAll('#fld-channels .chip.active')].map(c=>c.dataset.val).join(', '),
+    entity:     [...document.querySelectorAll('#fld-entity .chip.active')].map(c=>c.dataset.val).join(', '),
+  };
+  if(!brief.title) { showToast('Add a title first so the AI has something to work with', true); return; }
+
+  const btn = document.getElementById('gen-caption-btn');
+  const statusEl = document.getElementById('gen-caption-status');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Writing captions based on this brief...';
+  statusEl.style.color = 'var(--text-3)';
+
+  try {
+    const result = await callClaudeForCaptions(brief);
+    document.getElementById('gen-caption-en').value = result.captionEN || '';
+    document.getElementById('gen-caption-ar').value = result.captionAR || '';
+    document.getElementById('gen-caption-headline').value = result.headline || '';
+    document.getElementById('gen-caption-result').style.display = 'block';
+    statusEl.textContent = '✓ Generated — review and edit before saving';
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    statusEl.textContent = 'Generation failed: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate Content';
+  }
+}
+
+window.regenerateCaption = async function(lang) {
+  const brief = {
+    title:      document.getElementById('fld-title')?.value || '',
+    type:       currentType,
+    department: document.getElementById('fld-department')?.value || '',
+    objective:  document.getElementById('fld-objective')?.value || '',
+    channels:   [...document.querySelectorAll('#fld-channels .chip.active')].map(c=>c.dataset.val).join(', '),
+    entity:     [...document.querySelectorAll('#fld-entity .chip.active')].map(c=>c.dataset.val).join(', '),
+  };
+  if(!brief.title) { showToast('Add a title first', true); return; }
+  const statusEl = document.getElementById('gen-caption-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = `Regenerating ${lang==='en'?'English':'Arabic'} caption...`;
+  statusEl.style.color = 'var(--text-3)';
+  try {
+    const result = await callClaudeForCaptions(brief);
+    if(lang==='en') document.getElementById('gen-caption-en').value = result.captionEN || '';
+    else document.getElementById('gen-caption-ar').value = result.captionAR || '';
+    statusEl.textContent = '✓ Regenerated';
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    statusEl.textContent = 'Failed: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// ── BRAND VOICE SETTINGS ─────────────────────────────────────────────────
+window.toggleBrandVoicePanel = function() {
+  const panel = document.getElementById('bv-panel');
+  const icon  = document.getElementById('bv-toggle-icon');
+  const isOpen = panel.style.display === 'block';
+  panel.style.display = isOpen ? 'none' : 'block';
+  icon.textContent = isOpen ? '▼ Edit' : '▲ Collapse';
+}
+
+function loadBrandVoiceForm() {
+  document.getElementById('bv-hashtag').value      = BRAND_VOICE.hashtagCloser || '';
+  document.getElementById('bv-formality').value    = BRAND_VOICE.formality || 'Warm and conversational, still professional';
+  document.getElementById('bv-emoji').value        = BRAND_VOICE.emojiUsage || 'Light use — 1-2 relevant emojis max';
+  document.getElementById('bv-tone-notes').value   = BRAND_VOICE.toneNotes || '';
+  document.getElementById('bv-avoid-words').value  = BRAND_VOICE.avoidWords || '';
+  document.getElementById('bv-cta-en').value       = BRAND_VOICE.ctaStyleEN || '';
+  document.getElementById('bv-cta-ar').value       = BRAND_VOICE.ctaStyleAR || '';
+}
+
+window.saveBrandVoice = async function() {
+  const data = {
+    hashtagCloser: document.getElementById('bv-hashtag').value.trim(),
+    formality:     document.getElementById('bv-formality').value,
+    emojiUsage:    document.getElementById('bv-emoji').value,
+    toneNotes:     document.getElementById('bv-tone-notes').value.trim(),
+    avoidWords:    document.getElementById('bv-avoid-words').value.trim(),
+    ctaStyleEN:    document.getElementById('bv-cta-en').value.trim(),
+    ctaStyleAR:    document.getElementById('bv-cta-ar').value.trim(),
+  };
+  try {
+    await setBrandVoice(data);
+    BRAND_VOICE = data;
+    const s = document.getElementById('bv-save-status');
+    s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── Standalone Content Generator tab ───────────────────────────────────────
+let cgSelectedInitiativeId = null;
+
+function initContentGenTab() {
+  const sel = document.getElementById('cg-initiative-select');
+  const deptSel = document.getElementById('cg-department');
+  if(deptSel && !deptSel.innerHTML) {
+    deptSel.innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  }
+  if(sel) {
+    sel.innerHTML = '<option value="">— Start from a blank brief —</option>' +
+      ALL_INITIATIVES.slice(0,200).map(i=>`<option value="${i.id}">${i.title||'Untitled'} (${i.type||''})</option>`).join('');
+  }
+}
+
+window.loadInitiativeIntoGenerator = function() {
+  const id = document.getElementById('cg-initiative-select').value;
+  cgSelectedInitiativeId = id || null;
+  const saveBtn = document.getElementById('cg-save-btn');
+  if(!id) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Select an initiative above to save this content';
+    return;
+  }
+  const init = ALL_INITIATIVES.find(i=>i.id===id);
+  if(!init) return;
+  document.getElementById('cg-title').value = init.title || '';
+  document.getElementById('cg-department').value = init.department || DEPARTMENTS[0];
+  document.getElementById('cg-channels').value = (init.channels||[]).join(', ');
+  document.getElementById('cg-entity').value = (init.entity||[]).join(', ');
+  document.getElementById('cg-objective').value = init.objective || '';
+  saveBtn.disabled = false;
+  saveBtn.textContent = `Save to "${init.title}"`;
+  // Pre-fill existing captions if already generated for this initiative
+  if(init.captionEN || init.captionAR) {
+    document.getElementById('cg-caption-en').value = init.captionEN || '';
+    document.getElementById('cg-caption-ar').value = init.captionAR || '';
+    document.getElementById('cg-caption-headline').value = init.captionHeadline || '';
+    document.getElementById('cg-result').style.display = 'block';
+  }
+}
+
+function getCgBrief() {
+  return {
+    title:      document.getElementById('cg-title').value,
+    department: document.getElementById('cg-department').value,
+    channels:   document.getElementById('cg-channels').value,
+    entity:     document.getElementById('cg-entity').value,
+    objective:  document.getElementById('cg-objective').value,
+    type:       'Campaign',
+  };
+}
+
+window.generateStandaloneCaptions = async function() {
+  const brief = getCgBrief();
+  if(!brief.title.trim()) { showToast('Enter a title first', true); return; }
+  const btn = document.getElementById('cg-generate-btn');
+  const statusEl = document.getElementById('cg-status');
+  btn.disabled = true; btn.textContent = 'Generating...';
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Writing bilingual captions...';
+  statusEl.style.color = 'var(--text-3)';
+  try {
+    const result = await callClaudeForCaptions(brief);
+    document.getElementById('cg-caption-en').value = result.captionEN || '';
+    document.getElementById('cg-caption-ar').value = result.captionAR || '';
+    document.getElementById('cg-caption-headline').value = result.headline || '';
+    document.getElementById('cg-result').style.display = 'block';
+    statusEl.textContent = '✓ Generated — review and edit before saving';
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    statusEl.textContent = 'Generation failed: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate Content';
+  }
+}
+
+window.regenerateStandalone = async function(lang) {
+  const brief = getCgBrief();
+  if(!brief.title.trim()) { showToast('Enter a title first', true); return; }
+  const statusEl = document.getElementById('cg-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = `Regenerating ${lang==='en'?'English':'Arabic'} caption...`;
+  statusEl.style.color = 'var(--text-3)';
+  try {
+    const result = await callClaudeForCaptions(brief);
+    if(lang==='en') document.getElementById('cg-caption-en').value = result.captionEN || '';
+    else document.getElementById('cg-caption-ar').value = result.captionAR || '';
+    statusEl.textContent = '✓ Regenerated';
+    statusEl.style.color = 'var(--green)';
+  } catch(e) {
+    statusEl.textContent = 'Failed: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+window.saveGeneratedToInitiative = async function() {
+  if(!cgSelectedInitiativeId) { showToast('Select an initiative first', true); return; }
+  const data = {
+    captionEN:       document.getElementById('cg-caption-en').value.trim() || null,
+    captionAR:       document.getElementById('cg-caption-ar').value.trim() || null,
+    captionHeadline: document.getElementById('cg-caption-headline').value.trim() || null,
+  };
+  try {
+    await updateInitiative(cgSelectedInitiativeId, data);
+    showToast('✓ Content saved to initiative');
+  } catch(e) { showToast('Save failed: '+e.message, true); }
 }
 
 // ── BUSINESS DEVELOPMENT TARGETS ─────────────────────────────────────────
