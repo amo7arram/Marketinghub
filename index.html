@@ -445,7 +445,10 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:24px">
           <div class="card">
             <div class="card-header"><div class="card-title">Leads by Department — <span id="leads-dept-month-label"></span></div></div>
-            <div class="chart-container"><canvas id="leadsDeptChart"></canvas></div>
+            <div class="chart-container">
+              <canvas id="leadsDeptChart"></canvas>
+              <div id="leadsDeptChart-empty" style="display:none;align-items:center;justify-content:center;height:200px;font-size:12px;color:var(--text-3)">No department-level lead data for this month</div>
+            </div>
           </div>
           <div class="card">
             <div class="card-header"><div class="card-title">Department Activity — <span id="dept-activity-month-label">This Month</span></div><span style="font-size:11px;color:var(--text-3)">Share of marketing activity per department</span></div>
@@ -1065,15 +1068,19 @@ function renderLeadsCharts() {
     });
 
     const dc = document.getElementById('leadsDeptChart');
+    const emptyEl = document.getElementById('leadsDeptChart-empty');
     if(dc) {
       const deptLabels = Object.keys(byDept);
       const deptData   = Object.values(byDept);
       const colors     = deptLabels.map(d=>getDeptColor(d).t);
-      if(leadsDeptChart) leadsDeptChart.destroy();
+      if(leadsDeptChart) { leadsDeptChart.destroy(); leadsDeptChart = null; }
       if(!deptLabels.length) {
-        if(dc.parentElement) dc.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:200px;font-size:12px;color:var(--text-3)">No department-level lead data yet</div>';
+        dc.style.display = 'none';
+        if(emptyEl) emptyEl.style.display = 'flex';
         return;
       }
+      dc.style.display = 'block';
+      if(emptyEl) emptyEl.style.display = 'none';
       leadsDeptChart = new Chart(dc,{
         type:'doughnut',
         data:{labels:deptLabels,datasets:[{data:deptData,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
