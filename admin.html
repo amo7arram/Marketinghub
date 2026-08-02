@@ -192,6 +192,7 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
     <div class="tab" onclick="switchTab('contentgen',this)">✨ Content Generator</div>
+    <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
   </div>
 
   <div class="content">
@@ -610,6 +611,47 @@ tr.row-done:hover td{background:#DCF2E5}
         </div>
       </div>
     </div>
+
+    <!-- SETTINGS PAGE — extensible shell for portal-wide controls -->
+    <div class="page" id="page-settings">
+      <div style="max-width:640px">
+        <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:18px">⚙️ Settings</div>
+
+        <!-- Public Access Gate -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text)">🔒 Public Access Gate</div>
+              <div style="font-size:11px;color:var(--text-3);margin-top:2px">Require a password before anyone can view the public portal (index page)</div>
+            </div>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+              <input type="checkbox" id="ag-enabled" onchange="toggleAccessGateEnabled()" style="opacity:0;width:0;height:0">
+              <span id="ag-toggle-track" style="position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:24px;transition:0.2s"></span>
+              <span id="ag-toggle-knob" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
+            </label>
+          </div>
+
+          <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.6">
+            ⚠️ <strong>Note:</strong> since the public portal is a static page with no backend server, this is a deterrent gate, not real security — it stops casual browsing, search engine indexing, and accidental link-sharing, but a determined technical visitor could bypass it. Don't rely on this to protect sensitive data; the underlying Firestore data is only as protected as your database security rules.
+          </div>
+
+          <div id="ag-status" style="font-size:12px;font-weight:600;margin-bottom:14px"></div>
+
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <input class="field-input" type="password" id="ag-password" placeholder="Enter a new password to set or change it">
+            <div class="form-hint" style="font-size:10px;color:var(--text-3);margin-top:3px">Leave blank if you're only toggling the switch above without changing the password. The password is hashed before saving — nobody, including Anthropic or Google/Firebase, can see the plain text.</div>
+          </div>
+          <button class="btn btn-primary" onclick="saveAccessGate()">Save</button>
+          <span id="ag-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+        </div>
+
+        <!-- Placeholder for future settings sections -->
+        <div style="text-align:center;padding:24px;color:var(--text-3);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius-lg)">
+          More portal-wide settings will appear here as they're added.
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1003,6 +1045,7 @@ import {
   watchBdTargets, setBdTargets,
   getBrandVoice, setBrandVoice, watchBrandVoice,
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
+  getAccessGate, setAccessGate, hashPassword,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, LEAD_STATUSES, LEAD_STATUS_COLORS,
@@ -1149,6 +1192,7 @@ window.switchTab = function(id, el, groupId) {
   }
   document.getElementById('page-'+id).classList.add('active');
   if(id==='contentgen') initContentGenTab();
+  if(id==='settings') initSettingsTab();
 }
 
 window.toggleTabGroup = function(groupId) {
@@ -2257,6 +2301,73 @@ window.regenerateCaption = async function(lang) {
     statusEl.textContent = 'Failed: ' + e.message;
     statusEl.style.color = 'var(--red)';
   }
+}
+
+// ── SETTINGS TAB — Public Access Gate ────────────────────────────────────
+let currentAccessGate = { enabled: false, passwordHash: '' };
+
+async function initSettingsTab() {
+  try {
+    currentAccessGate = await getAccessGate();
+  } catch(e) {
+    console.error('getAccessGate failed:', e);
+    currentAccessGate = { enabled: false, passwordHash: '' };
+  }
+  document.getElementById('ag-enabled').checked = !!currentAccessGate.enabled;
+  updateAccessGateToggleVisual();
+  updateAccessGateStatus();
+  document.getElementById('ag-password').value = '';
+}
+
+function updateAccessGateToggleVisual() {
+  const checked = document.getElementById('ag-enabled').checked;
+  document.getElementById('ag-toggle-track').style.background = checked ? 'var(--navy)' : 'var(--border)';
+  document.getElementById('ag-toggle-knob').style.transform = checked ? 'translateX(20px)' : 'translateX(0)';
+}
+
+function updateAccessGateStatus() {
+  const statusEl = document.getElementById('ag-status');
+  const checked = document.getElementById('ag-enabled').checked;
+  if(checked && currentAccessGate.passwordHash) {
+    statusEl.textContent = '✓ Gate is ON — visitors must enter a password to view the public portal';
+    statusEl.style.color = 'var(--green)';
+  } else if(checked && !currentAccessGate.passwordHash) {
+    statusEl.textContent = '⚠ Gate is ON but no password is set yet — set one below before saving';
+    statusEl.style.color = 'var(--orange)';
+  } else {
+    statusEl.textContent = '— Gate is OFF — the public portal is fully open, no password required';
+    statusEl.style.color = 'var(--text-3)';
+  }
+}
+
+window.toggleAccessGateEnabled = function() {
+  updateAccessGateToggleVisual();
+  updateAccessGateStatus();
+}
+
+window.saveAccessGate = async function() {
+  const enabled = document.getElementById('ag-enabled').checked;
+  const newPassword = document.getElementById('ag-password').value;
+
+  if(enabled && !newPassword && !currentAccessGate.passwordHash) {
+    showToast('Enter a password before enabling the gate', true);
+    return;
+  }
+
+  const data = { enabled };
+  if(newPassword) {
+    data.passwordHash = await hashPassword(newPassword);
+  }
+
+  try {
+    await setAccessGate(data);
+    currentAccessGate = { ...currentAccessGate, ...data };
+    document.getElementById('ag-password').value = '';
+    updateAccessGateStatus();
+    const s = document.getElementById('ag-save-status');
+    s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
+    showToast(newPassword ? '✓ Settings saved — password updated, everyone will need to re-enter it' : '✓ Settings saved');
+  } catch(e) { showToast('Save failed: '+e.message, true); }
 }
 
 // ── AI SETUP (API KEY) ───────────────────────────────────────────────────

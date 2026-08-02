@@ -679,7 +679,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
   watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets,
-  promoStatus,
+  promoStatus, getAccessGate, hashPassword,
   DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
 
@@ -802,27 +802,29 @@ function populateFilters() {
 }
 
 // ── DATA LOAD ─────────────────────────────────────────────────────────
-watchInitiatives(data => {
-  ALL = data;
-  document.getElementById('sync-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
-  renderAll();
-});
-watchMetrics(data => {
-  METRICS = data;
-  renderAll();
-});
-watchBdCards(data    => { BD_CARDS  = data; renderAll(); });
-watchWellspanPackages(data => { WELLSPAN = data; renderAll(); });
-watchLoyaltyCards(data => { LOYALTY  = data; renderAll(); });
-watchBdTargets(data => { BD_TARGETS = data; renderAll(); });
-watchPromotions(data => {
-  PROMOTIONS = data;
-  renderAll();
-});
-watchResources(data => {
-  RESOURCES = data;
-  renderAll();
-});
+function initPortalData() {
+  watchInitiatives(data => {
+    ALL = data;
+    document.getElementById('sync-time').textContent = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+    renderAll();
+  });
+  watchMetrics(data => {
+    METRICS = data;
+    renderAll();
+  });
+  watchBdCards(data    => { BD_CARDS  = data; renderAll(); });
+  watchWellspanPackages(data => { WELLSPAN = data; renderAll(); });
+  watchLoyaltyCards(data => { LOYALTY  = data; renderAll(); });
+  watchBdTargets(data => { BD_TARGETS = data; renderAll(); });
+  watchPromotions(data => {
+    PROMOTIONS = data;
+    renderAll();
+  });
+  watchResources(data => {
+    RESOURCES = data;
+    renderAll();
+  });
+}
 
 function renderAll() {
   const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
@@ -1995,7 +1997,74 @@ function loadScriptOnce(id, src, onReady) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────
-populateFilters();
+async function initPortal() {
+  populateFilters();
+  initPortalData();
+}
+
+// ── PUBLIC ACCESS GATE ───────────────────────────────────────────────────
+// A client-side deterrent gate (see admin Settings tab for the full note on
+// its limits). Blocks the page visually and functionally until the correct
+// password is entered — the unlock is tied to the current password hash,
+// so changing the password in admin re-locks every visitor automatically.
+const GATE_STORAGE_KEY = 'imc_portal_unlock_hash';
+
+async function checkAccessGate() {
+  let gate;
+  try { gate = await getAccessGate(); }
+  catch(e) { console.error('Access gate check failed, allowing access:', e); initPortal(); return; }
+
+  if(!gate.enabled || !gate.passwordHash) { initPortal(); return; }
+
+  const savedHash = localStorage.getItem(GATE_STORAGE_KEY);
+  if(savedHash === gate.passwordHash) { initPortal(); return; }
+
+  showAccessGateOverlay(gate.passwordHash);
+}
+
+function showAccessGateOverlay(correctHash) {
+  const overlay = document.createElement('div');
+  overlay.id = 'access-gate-overlay';
+  overlay.style.cssText = `
+    position:fixed; inset:0; z-index:99999; background:linear-gradient(135deg,#00539B,#003f7a);
+    display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Sans',sans-serif;`;
+  overlay.innerHTML = `
+    <div style="background:#fff; border-radius:16px; padding:36px 32px; width:340px; box-shadow:0 20px 60px rgba(0,0,0,0.3); text-align:center">
+      <div style="font-family:'Syne',sans-serif; font-size:20px; font-weight:800; color:#00539B; margin-bottom:4px">IMC</div>
+      <div style="font-size:12px; color:#8890A8; margin-bottom:22px">Marketing & Business Development Hub</div>
+      <div style="font-size:28px; margin-bottom:14px">🔒</div>
+      <div style="font-size:13px; color:#4A5066; margin-bottom:18px">This portal is password protected</div>
+      <input type="password" id="gate-password-input" placeholder="Enter password"
+        style="width:100%; padding:11px 14px; border:1px solid #C8CDD8; border-radius:8px; font-size:14px; font-family:inherit; text-align:center; margin-bottom:10px; box-sizing:border-box">
+      <div id="gate-error" style="color:#E24B4A; font-size:11px; margin-bottom:10px; display:none">Incorrect password — try again</div>
+      <button id="gate-submit-btn" style="width:100%; padding:11px; background:#00539B; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit">Unlock</button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('gate-password-input');
+  const btn   = document.getElementById('gate-submit-btn');
+  const errEl = document.getElementById('gate-error');
+  input.focus();
+
+  async function attemptUnlock() {
+    const entered = input.value;
+    if(!entered) return;
+    const enteredHash = await hashPassword(entered);
+    if(enteredHash === correctHash) {
+      localStorage.setItem(GATE_STORAGE_KEY, correctHash);
+      overlay.remove();
+      initPortal();
+    } else {
+      errEl.style.display = 'block';
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', attemptUnlock);
+  input.addEventListener('keydown', e => { if(e.key === 'Enter') attemptUnlock(); });
+}
+
+checkAccessGate();
 </script>
 </body>
 </html>

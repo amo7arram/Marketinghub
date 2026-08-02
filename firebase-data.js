@@ -362,6 +362,29 @@ export function watchAnthropicKey(callback) {
 }
 
 
+// ── SHARED PASSWORD HASHING (Web Crypto — no library needed) ────────────
+// Used by the public access gate below. Passwords are never stored or
+// compared in plain text.
+export async function hashPassword(pw) {
+  const enc = new TextEncoder().encode(pw);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── PUBLIC ACCESS GATE ───────────────────────────────────────────────────
+// Stored as config/access_gate → { enabled: bool, passwordHash: string }
+// This is a client-side "soft gate" — it deters casual/unauthenticated
+// browsing and search indexing, but is not real security since index.html
+// is a static public file with no backend to enforce anything server-side.
+export async function getAccessGate() {
+  const snap = await getDoc(doc(db, CONFIG, "access_gate"));
+  return snap.exists() ? snap.data() : { enabled: false, passwordHash: '' };
+}
+export function setAccessGate(data) {
+  return setDoc(doc(db, CONFIG, "access_gate"), data, { merge: true });
+}
+
+
 // ── BD TARGETS ───────────────────────────────────────────────────────────
 export function watchBdTargets(callback) {
   return onSnapshot(doc(db, CONFIG, "bd_targets"),
