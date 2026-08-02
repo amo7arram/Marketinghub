@@ -422,6 +422,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="period-nav-label" id="period-nav-label">Loading...</div>
           <button class="period-nav-btn" id="period-next" onclick="shiftPeriod(1)">→</button>
         </div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:-14px;margin-bottom:20px">Applies to Social Media Performance, Department Activity, and Leads by Department below</div>
 
         <!-- Social Media Performance -->
         <div class="dash-section-title">Social Media Performance</div>
@@ -443,7 +444,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         <!-- Leads by Department + Department Activity -->
         <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:24px">
           <div class="card">
-            <div class="card-header"><div class="card-title">Leads by Department</div></div>
+            <div class="card-header"><div class="card-title">Leads by Department — <span id="leads-dept-month-label"></span></div></div>
             <div class="chart-container"><canvas id="leadsDeptChart"></canvas></div>
           </div>
           <div class="card">
@@ -882,8 +883,18 @@ let chartWeb = null;
 
 // ── DASHBOARD HELPERS ────────────────────────────────────────────────────
 function getAvailablePeriods() {
-  const periods = [...new Set(METRICS.map(m=>m.period).filter(Boolean))].sort().reverse();
-  return periods.slice(0,3); // last 3 months with data
+  // Always the last 3 calendar months (index 0 = current month), regardless
+  // of whether metrics/initiatives/leads data exists for them. This lets
+  // every section below (Social Media Performance, Department Activity,
+  // Leads by Department) navigate consistently — a month with no metrics
+  // entered yet just shows zeros/empty states rather than being unreachable.
+  const now = new Date();
+  const periods = [];
+  for(let i=0;i<3;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    periods.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+  }
+  return periods;
 }
 function getPeriodMetrics(period) {
   return METRICS.filter(m=>m.period===period);
@@ -905,6 +916,8 @@ window.shiftPeriod = function(dir) {
   // periods[0] = most recent. ← (dir=-1) goes older = increase index. → (dir=+1) goes newer = decrease index
   dashPeriodIdx = Math.max(0, Math.min(periods.length-1, dashPeriodIdx - dir));
   renderDashboardKPIs();
+  renderDeptActivityBar();
+  renderLeadsCharts();
 }
 
 // ── CAMPAIGN MONTH NAVIGATION ────────────────────────────────────────────
@@ -1035,15 +1048,19 @@ let leadsDeptChart = null;
 
 function renderLeadsCharts() {
   try {
-    const year   = new Date().getFullYear();
+    const periods = getAvailablePeriods();
+    const selectedPeriod = periods[dashPeriodIdx] || periods[0];
+    const [ly, lm] = selectedPeriod.split('-').map(Number);
+    const labelEl = document.getElementById('leads-dept-month-label');
+    if(labelEl) labelEl.textContent = new Date(ly, lm-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
     const byDept = {};
 
-    // Initiatives — any type, with a department and leadsGenerated
-    ALL.filter(i=>i.leadsGenerated && i.department && i.startDate?.startsWith(String(year))).forEach(i=>{
+    // Initiatives — any type, with a department and leadsGenerated, in the selected month
+    ALL.filter(i=>i.leadsGenerated && i.department && i.startDate?.startsWith(selectedPeriod)).forEach(i=>{
       byDept[i.department] = (byDept[i.department]||0) + i.leadsGenerated;
     });
-    // Promotions also carry a department — include their leads too
-    PROMOTIONS.filter(p=>p.leadsGenerated && p.department && p.startDate?.startsWith(String(year))).forEach(p=>{
+    // Promotions also carry a department — include their leads too, same month scope
+    PROMOTIONS.filter(p=>p.leadsGenerated && p.department && p.startDate?.startsWith(selectedPeriod)).forEach(p=>{
       byDept[p.department] = (byDept[p.department]||0) + p.leadsGenerated;
     });
 
@@ -1072,14 +1089,14 @@ function renderLeadsCharts() {
 // horizontal bar segmented by % share of total activity (initiatives count).
 function renderDeptActivityBar() {
   try {
-    const now = new Date();
-    const y = now.getFullYear(), m = now.getMonth();
-    const monthStr = `${y}-${String(m+1).padStart(2,'0')}`;
+    const periods = getAvailablePeriods();
+    const selectedPeriod = periods[dashPeriodIdx] || periods[0];
+    const [y, m] = selectedPeriod.split('-').map(Number);
     document.getElementById('dept-activity-month-label').textContent =
-      now.toLocaleString('en',{month:'long',year:'numeric'});
+      new Date(y, m-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
 
     const counts = {};
-    ALL.filter(i=>i.department && i.startDate?.startsWith(monthStr)).forEach(i=>{
+    ALL.filter(i=>i.department && i.startDate?.startsWith(selectedPeriod)).forEach(i=>{
       counts[i.department] = (counts[i.department]||0) + 1;
     });
 
