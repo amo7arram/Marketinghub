@@ -37,6 +37,7 @@ const BD_CARDS          = "bd_cards";
 const WELLSPAN_PACKAGES = "wellspan_packages";
 const LOYALTY_CARDS     = "loyalty_cards";
 const ENTITIES_COLLECTION = "entities";
+const HEALTH_DAYS = "health_days";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -442,6 +443,47 @@ export async function deleteEntity(id, name) {
 }
 
 
+// ── HEALTH DAYS — standalone collection (independent of initiatives) ─────
+export function watchHealthDays(callback) {
+  return onSnapshot(collection(db, HEALTH_DAYS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    callback(data);
+  }, err => { console.error('watchHealthDays:', err.code); callback([]); });
+}
+export function addHealthDay(data) {
+  return addDoc(collection(db, HEALTH_DAYS), { ...data, createdAt: Timestamp.now() });
+}
+export function updateHealthDay(id, data) {
+  return updateDoc(doc(db, HEALTH_DAYS, id), data);
+}
+export function deleteHealthDay(id) {
+  return deleteDoc(doc(db, HEALTH_DAYS, id));
+}
+
+// One-time migration: moves any legacy type="Health Day" initiatives into the
+// new standalone health_days collection, then removes them from initiatives.
+// Safe to run more than once — it only ever acts on remaining Health Day
+// initiatives, so a second run simply finds nothing left to migrate.
+export async function migrateHealthDaysFromInitiatives() {
+  const snap = await getDocs(query(collection(db, INITIATIVES), where("type", "==", "Health Day")));
+  const legacy = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (!legacy.length) return { migrated: 0 };
+
+  await Promise.all(legacy.map(item =>
+    addDoc(collection(db, HEALTH_DAYS), {
+      name: item.title || '',
+      nameAr: item.nameAr || '',
+      date: item.startDate || '',
+      category: item.hdCategory || 'MOH Health Day',
+      department: item.department || '',
+      createdAt: Timestamp.now(),
+    })
+  ));
+  await Promise.all(legacy.map(item => deleteDoc(doc(db, INITIATIVES, item.id))));
+  return { migrated: legacy.length };
+}
+
 // ── BD TARGETS ───────────────────────────────────────────────────────────
 export function watchBdTargets(callback) {
   return onSnapshot(doc(db, CONFIG, "bd_targets"),
@@ -526,7 +568,8 @@ export const DEPARTMENTS = [
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
 export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
-export const TYPES = ["Campaign","Event","SM Content","Print","Health Day"];
+export const TYPES = ["Campaign","Event","SM Content","Print","Website Update"];
+export const WEBSITE_UPDATE_TYPES = ["News Article","Department Page Update","Doctor Profile Added","Doctor Profile Removed","Other"];
 export const CONTENT_TYPES = ["Post","Reel","Video","Story","Carousel"];
 export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop","Backdrop/Rollup"];
 export const HEALTH_DAY_CATEGORIES = ["MOH Health Day","Saudi Occasion","Islamic Occasion","IMC Campaign"];

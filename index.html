@@ -682,12 +682,13 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 <script type="module">
 import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
-  watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets, watchEntities,
+  watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets, watchEntities, watchHealthDays,
   promoStatus, getAccessGate, hashPassword,
   DEPARTMENTS, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
 
 let ALL_ENTITIES = [];
+let HEALTH_DAYS = [];
 
 let RESOURCES   = [];
 let METRICS     = [];
@@ -737,7 +738,7 @@ const TYPE_PAGE_MAP = {
   'Event':      {page:'events',        navIndex:4, icon:'◆'},
   'SM Content': {page:'library',       navIndex:7, icon:'▨'},
   'Print':      {page:'print',         navIndex:8, icon:'🖨️'},
-  'Health Day': {page:'healthdays',    navIndex:6, icon:'♡'},
+  'Website Update': {page:'dashboard', navIndex:0, icon:'🌐'},
 };
 
 window.onSearchInput = function(q) {
@@ -961,11 +962,15 @@ function renderCampMonthList() {
   const labelEl = document.getElementById('camp-month-label');
   if(labelEl) labelEl.textContent = target.toLocaleString('en',{month:'long',year:'numeric'});
 
-  const items = ALL.filter(i=>{
-    if(!['Campaign','Event','Health Day'].includes(i.type)) return false;
+  const initiativeItems = ALL.filter(i=>{
+    if(!['Campaign','Event'].includes(i.type)) return false;
     const d = i.startDate||'';
     return d.startsWith(targetStr);
   });
+  const healthDayItems = HEALTH_DAYS.filter(h=>(h.date||'').startsWith(targetStr)).map(h=>({
+    type: 'Health Day', title: h.name, department: h.department, startDate: h.date, entity: [], status: null,
+  }));
+  const items = [...initiativeItems, ...healthDayItems];
 
   const listEl = document.getElementById('camp-month-list');
   if(!items.length) {
@@ -981,7 +986,7 @@ function renderCampMonthList() {
       <span style="flex:1;font-weight:600;color:var(--text)">${i.title||''}</span>
       <span style="font-size:10px;color:var(--text-3);margin-right:8px">${i.department||''}</span>
       ${entityBadge(i.entity)}
-      ${statusBadge(i.status)}
+      ${i.status?statusBadge(i.status):''}
     </div>`;
   }).join('');
 }
@@ -1319,7 +1324,12 @@ function getFilteredCalItems() {
   const deptF = document.getElementById('cal-dept').value;
   const entityF = document.getElementById('cal-entity').value;
   const chanF = document.getElementById('cal-channel').value;
-  const items = ALL.filter(i=> i.type==='SM Content' || i.type==='Health Day');
+  const smItems = ALL.filter(i=> i.type==='SM Content');
+  const hdItems = HEALTH_DAYS.map(h=>({
+    type: 'Health Day', title: h.name, department: h.department, entity: [], channels: [],
+    startDate: h.date, status: null,
+  }));
+  const items = [...smItems, ...hdItems];
   return { m, y, items: items.filter(i=>{
     if(deptF && i.department!==deptF) return false;
     if(entityF && !(i.entity||[]).includes(entityF)) return false;
@@ -1556,16 +1566,15 @@ window.renderHealthDays = function(filter='') {
   const typeF = document.getElementById('hd-type-filter').value;
   const deptF = document.getElementById('hd-dept-filter').value;
   const q = filter.toLowerCase();
-  const data = ALL.filter(i=>{
-    if(i.type!=='Health Day') return false;
-    if(typeF && i.hdCategory!==typeF) return false;
-    if(deptF && i.department!==deptF) return false;
-    if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
+  const data = HEALTH_DAYS.filter(h=>{
+    if(typeF && h.category!==typeF) return false;
+    if(deptF && h.department!==deptF) return false;
+    if(q && !`${h.name} ${h.nameAr}`.toLowerCase().includes(q)) return false;
     return true;
   });
   const byMonth = {};
   data.forEach(h=>{
-    const d = h.startDate ? new Date(h.startDate) : null;
+    const d = h.date ? new Date(h.date) : null;
     const m = d ? MONTH_NAMES[d.getMonth()] : 'Unknown';
     if(!byMonth[m]) byMonth[m]=[];
     byMonth[m].push(h);
@@ -1575,12 +1584,12 @@ window.renderHealthDays = function(filter='') {
       <div class="hd-month">
         <div class="hd-month-header">${month} <span class="hd-month-count">${days.length} day${days.length!==1?'s':''}</span></div>
         ${days.map(h=>{
-          const t = h.hdCategory||'MOH Health Day';
+          const t = h.category||'MOH Health Day';
           const tc = t==='Saudi Occasion'||t==='Islamic Occasion' ? 'b-occasion' : t==='IMC Campaign' ? 'b-imc' : 'b-moh';
           const ds = deptStyle(h.department);
           return `<div class="hd-row">
-            <span class="hd-date">${(h.startDate||'').substring(5)||''}</span>
-            <div class="hd-name"><div class="hd-name-en">${h.title||''}</div><div class="hd-name-ar">${h.nameAr||''}</div></div>
+            <span class="hd-date">${(h.date||'').substring(5)||''}</span>
+            <div class="hd-name"><div class="hd-name-en">${h.name||''}</div><div class="hd-name-ar">${h.nameAr||''}</div></div>
             <span class="badge ${tc}" style="margin-left:8px">${t}</span>
             <span class="badge" style="background:${ds.bg};color:${ds.t};margin-left:6px">${h.department||''}</span>
           </div>`;
@@ -2042,6 +2051,7 @@ function loadScriptOnce(id, src, onReady) {
 async function initPortal() {
   populateFilters();
   watchEntities(data => { ALL_ENTITIES = data; populateEntityFilters(); });
+  watchHealthDays(data => { HEALTH_DAYS = data; renderAll(); });
   initPortalData();
 }
 

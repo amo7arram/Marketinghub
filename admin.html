@@ -133,6 +133,11 @@ tr.row-done:hover td{background:#DCF2E5}
 
 /* CAMPAIGN GENERATOR REVIEW CARDS */
 .cgen-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+
+/* CAMPAIGN DRILLDOWN */
+.cdd-child-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px}
+.cdd-child-title{flex:1;font-weight:600;color:var(--text)}
+.cdd-child-empty{text-align:center;padding:24px;color:var(--text-3);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)}
 .cgen-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .cgen-card-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--bg);color:var(--navy)}
 .cgen-card-remove{font-size:11px;color:var(--red);cursor:pointer;background:none;border:none;font-family:inherit;font-weight:600}
@@ -179,9 +184,10 @@ tr.row-done:hover td{background:#DCF2E5}
   </div>
   <div class="tabs" id="admin-tabs">
     <div class="tab-group" id="group-initiatives">
-      <div class="tab-group-label" onclick="toggleTabGroup('group-initiatives')">Initiatives <span class="tab-group-arrow">▾</span></div>
+      <div class="tab-group-label" onclick="toggleTabGroup('group-initiatives')">Activities <span class="tab-group-arrow">▾</span></div>
       <div class="tab-dropdown">
-        <div class="tab-dropdown-item active" onclick="switchTab('initiatives',this,'group-initiatives')">Initiatives</div>
+        <div class="tab-dropdown-item active" onclick="switchTab('initiatives',this,'group-initiatives')">Activities</div>
+        <div class="tab-dropdown-item" onclick="switchTab('healthdays',this,'group-initiatives')">Health Days</div>
         <div class="tab-dropdown-item" onclick="switchTab('requests',this,'group-initiatives')">Requests</div>
       </div>
     </div>
@@ -209,15 +215,16 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="toolbar">
         <div class="filters">
           <select class="filter-select" id="f-type" onchange="renderTable()">
-            <option value="">All Types</option><option>Campaign</option><option>Event</option><option>Content</option><option>Health Day</option>
+            <option value="">All Types</option>
           </select>
           <select class="filter-select" id="f-dept" onchange="renderTable()"><option value="">All Departments</option></select>
+          <select class="filter-select" id="f-entity" onchange="renderTable()"><option value="">All Entities</option></select>
           <select class="filter-select" id="f-status" onchange="renderTable()">
             <option value="">All Status</option><option>Planned</option><option>In Production</option><option>Ready</option><option>Published</option><option>Cancelled</option>
           </select>
           <input class="filter-input" type="text" placeholder="Search..." id="f-search" oninput="renderTable()">
         </div>
-        <button class="btn btn-primary" onclick="openForm()">+ New Initiative</button>
+        <button class="btn btn-primary" onclick="openForm()">+ New Activity</button>
       </div>
       <table>
         <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Actions</th></tr></thead>
@@ -245,6 +252,27 @@ tr.row-done:hover td{background:#DCF2E5}
           <th>Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="promotions-table-body"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- HEALTH DAYS PAGE -->
+    <div class="page" id="page-healthdays">
+      <div class="toolbar">
+        <div class="filters">
+          <input class="filter-input" type="text" id="hd-search" placeholder="Search health days..." oninput="renderHealthDaysTable()">
+          <select class="filter-select" id="hd-category-filter" onchange="renderHealthDaysTable()">
+            <option value="">All Categories</option>
+          </select>
+          <select class="filter-select" id="hd-dept-filter" onchange="renderHealthDaysTable()"><option value="">All Departments</option></select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="runHealthDayMigration()" title="One-time: moves any legacy Health Day activities into this dedicated list">↻ Migrate Legacy Health Days</button>
+          <button class="btn btn-primary" onclick="openHealthDayForm()">+ Add Health Day</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Name (EN)</th><th>Name (AR)</th><th>Date</th><th>Category</th><th>Department</th><th>Actions</th></tr></thead>
+        <tbody id="healthdays-table-body"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -735,12 +763,19 @@ tr.row-done:hover td{background:#DCF2E5}
 <div class="modal-overlay" id="form-overlay">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title" id="form-title">New Initiative</div>
+      <div class="modal-title" id="form-title">New Activity</div>
       <button class="modal-close" onclick="closeForm()">✕</button>
     </div>
     <div class="modal-body">
       <div class="field-group">
-        <label class="field-label">Type</label>
+        <label class="field-label">Kind</label>
+        <div class="type-switcher" id="kind-switcher">
+          <div class="type-btn" data-kind="single" onclick="selectKind('single')">Single Activity</div>
+          <div class="type-btn" data-kind="campaign" onclick="selectKind('campaign')">📦 Campaign</div>
+        </div>
+      </div>
+      <div class="field-group" id="subtype-switcher-wrap">
+        <label class="field-label">Activity Type</label>
         <div class="type-switcher" id="type-switcher"></div>
       </div>
 
@@ -755,7 +790,11 @@ tr.row-done:hover td{background:#DCF2E5}
         <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-status"></select></div>
       </div>
       <div class="field-group"><label class="field-label">Entity (select all that apply)</label><div class="chip-select" id="fld-entity"></div></div>
-      <div class="field-group" id="fld-arabic-wrap"><label class="field-label">Name (Arabic)</label><input class="field-input" id="fld-nameAr"></div>
+
+      <div class="field-group" id="fld-parentcampaign-wrap">
+        <label class="field-label">Part of Campaign? <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, links this activity under a campaign</span></label>
+        <select class="field-select" id="fld-parentCampaign"><option value="">— None (standalone) —</option></select>
+      </div>
 
       <div class="field-section-title">Dates</div>
       <div class="field-row">
@@ -765,6 +804,12 @@ tr.row-done:hover td{background:#DCF2E5}
 
       <div class="field-section-title" id="section-detail">Details</div>
       <div class="field-group" id="fld-objective-wrap"><label class="field-label" id="fld-objective-label">Objective / Description</label><textarea class="field-textarea" id="fld-objective"></textarea></div>
+
+      <div class="field-group" id="fld-eventscope-wrap"><label class="field-label">Event Scope</label>
+        <select class="field-select" id="fld-eventScope"><option>Internal</option><option>External</option></select>
+      </div>
+      <div class="field-group" id="fld-websiteupdatetype-wrap"><label class="field-label">Update Type</label><select class="field-select" id="fld-websiteUpdateType"></select></div>
+      <div class="field-group" id="fld-websiteupdatelink-wrap"><label class="field-label">URL Link</label><input class="field-input" id="fld-websiteUpdateLink" placeholder="https://..."></div>
 
       <div class="field-group" id="fld-caption-gen-wrap" style="background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius);padding:14px 16px;margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -790,7 +835,6 @@ tr.row-done:hover td{background:#DCF2E5}
 
       <div class="field-group" id="fld-channels-wrap"><label class="field-label">Channels</label><div class="chip-select" id="fld-channels"></div></div>
       <div class="field-group" id="fld-contenttype-wrap"><label class="field-label">Content Type</label><select class="field-select" id="fld-contentType"></select></div>
-      <div class="field-group" id="fld-hdcategory-wrap"><label class="field-label">Health Day Category</label><select class="field-select" id="fld-hdCategory"></select></div>
       <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
       <div class="field-group" id="fld-postlink-wrap"><label class="field-label" id="fld-postlink-label">Post / Content Link</label><input class="field-input" id="fld-postLink" placeholder="https://..."></div>
       <div class="field-group" id="fld-cost-wrap"><label class="field-label">Cost (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, appears in Budget tab</span></label><input class="field-input" type="number" id="fld-cost" placeholder="0.00" min="0" step="0.01"></div>
@@ -816,7 +860,7 @@ tr.row-done:hover td{background:#DCF2E5}
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeForm()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveInitiative()">Save Initiative</button>
+      <button class="btn btn-primary" onclick="saveInitiative()">Save Activity</button>
     </div>
   </div>
 </div>
@@ -869,6 +913,54 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="modal-footer">
       <button class="btn" onclick="closePromoForm()">Cancel</button>
       <button class="btn btn-primary" onclick="savePromotion()">Save Promotion</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── HEALTH DAY FORM MODAL ── -->
+<div class="modal-overlay" id="healthday-overlay">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="hd-form-title">New Health Day</div>
+      <button class="modal-close" onclick="closeHealthDayForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Name (English)<span style="color:var(--red)">*</span></label><input class="field-input" id="hd-name" placeholder="e.g. World Diabetes Day"></div>
+      <div class="field-group"><label class="field-label">Name (Arabic)</label><input class="field-input" id="hd-nameAr" dir="rtl" style="font-family:'IBM Plex Sans Arabic',sans-serif"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Date<span style="color:var(--red)">*</span></label><input class="field-input" type="date" id="hd-date"></div>
+        <div class="field-group"><label class="field-label">Category</label><select class="field-select" id="hd-category"></select></div>
+      </div>
+      <div class="field-group"><label class="field-label">Department <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, relevant department if any</span></label><select class="field-select" id="hd-department"><option value="">— None / General —</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeHealthDayForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveHealthDay()">Save Health Day</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CAMPAIGN DRILLDOWN MODAL ── -->
+<div class="modal-overlay" id="campaign-drilldown-overlay">
+  <div class="modal" style="width:640px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="cdd-title">Campaign</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px" id="cdd-subtitle"></div>
+      </div>
+      <button class="modal-close" onclick="closeCampaignDrilldown()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="cdd-objective" style="font-size:12px;color:var(--text-2);background:var(--bg);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;line-height:1.6"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em">Activities in this Campaign</div>
+        <button class="btn btn-sm btn-primary" onclick="addActivityToCampaign()">+ Add Activity</button>
+      </div>
+      <div id="cdd-children-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCampaignDrilldown()">Close</button>
+      <button class="btn btn-primary" onclick="editCampaignFromDrilldown()">Edit Campaign Details</button>
     </div>
   </div>
 </div>
@@ -1123,15 +1215,17 @@ import {
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
   getAccessGate, setAccessGate, hashPassword,
   watchEntities, addEntity, deleteEntity, checkEntityUsage,
+  watchHealthDays, addHealthDay, updateHealthDay, deleteHealthDay, migrateHealthDaysFromInitiatives,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, LEAD_STATUSES, LEAD_STATUS_COLORS,
-  DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
+  DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
+let ALL_HEALTH_DAYS = [];
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let ALL_EXPENSES = [];
@@ -1157,6 +1251,7 @@ let selectedPromoEntities = [];
 let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
+let unsubHealthDays = null;
 let unsubResources = null;
 let unsubRequests = null;
 let unsubExpenses = null;
@@ -1226,6 +1321,7 @@ watchAuth(async user => {
     document.getElementById('login-wrap').style.display = 'flex';
     document.getElementById('app').classList.remove('active');
     if(unsubInitiatives) unsubInitiatives();
+    if(unsubHealthDays) unsubHealthDays();
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
     if(unsubExpenses) unsubExpenses();
@@ -1243,7 +1339,8 @@ watchAuth(async user => {
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); });
+  unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
@@ -1302,6 +1399,9 @@ function populateEntitySelects() {
   const chipsHtml = names.map(e=>`<div class="chip" data-val="${e}" onclick="toggleChip(this,'entity')">${e}</div>`).join('');
   const promoChipsHtml = names.map(e=>`<div class="chip" data-val="${e}" onclick="togglePromoChip(this)">${e}</div>`).join('');
 
+  const fEntity = document.getElementById('f-entity');
+  if(fEntity) fEntity.innerHTML = filterOptionsHtml;
+
   const bdEntity = document.getElementById('bd-entity');
   if(bdEntity) bdEntity.innerHTML = optionsHtml;
 
@@ -1349,9 +1449,6 @@ function populateStaticSelects() {
   const fldContentType = document.getElementById('fld-contentType');
   fldContentType.innerHTML = CONTENT_TYPES.map(c=>`<option>${c}</option>`).join('');
 
-  const fldHd = document.getElementById('fld-hdCategory');
-  fldHd.innerHTML = HEALTH_DAY_CATEGORIES.map(h=>`<option>${h}</option>`).join('');
-
   const fldPrint = document.getElementById('fld-printType');
   fldPrint.innerHTML = PRINT_TYPES.map(t=>`<option>${t}</option>`).join('');
 
@@ -1386,9 +1483,19 @@ function populateStaticSelects() {
   }).join('');
   document.getElementById('exp-month-filter').innerHTML += months;
 
-  document.getElementById('type-switcher').innerHTML = TYPES.map(t=>
+  document.getElementById('type-switcher').innerHTML = TYPES.filter(t=>t!=='Campaign').map(t=>
     `<div class="type-btn" data-type="${t}" onclick="selectType('${t}')">${t}</div>`
   ).join('');
+
+  document.getElementById('fld-websiteUpdateType').innerHTML = WEBSITE_UPDATE_TYPES.map(t=>`<option>${t}</option>`).join('');
+
+  const hdCatHtml = HEALTH_DAY_CATEGORIES.map(h=>`<option>${h}</option>`).join('');
+  document.getElementById('hd-category').innerHTML = hdCatHtml;
+  document.getElementById('hd-category-filter').innerHTML += hdCatHtml;
+  document.getElementById('hd-department').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('hd-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+
+  document.getElementById('f-type').innerHTML = '<option value="">All Types</option>' + TYPES.map(t=>`<option>${t}</option>`).join('');
 
   document.getElementById('fld-channels').innerHTML = CHANNELS.map(c=>
     `<div class="chip" data-val="${c}" onclick="toggleChip(this,'channels')">${c}</div>`
@@ -1412,37 +1519,62 @@ window.toggleChip = function(el, group) {
 // ── TYPE SWITCHER → SHOW/HIDE RELEVANT FIELDS ───────────────────────────
 window.selectType = function(type) {
   currentType = type;
-  document.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
+  const isCampaign = type === 'Campaign';
 
-  const show = (id, on) => document.getElementById(id).style.display = on ? '' : 'none';
-  show('fld-arabic-wrap',    type==='Health Day');
-  show('fld-enddate-wrap',   type==='Campaign');
-  show('fld-objective-wrap', type !== 'Print');
-  show('fld-channels-wrap',  type==='Campaign' || type==='Event');
-  show('fld-contenttype-wrap', type==='SM Content');
-  show('fld-printtype-wrap', type==='Print');
-  show('fld-hdcategory-wrap',type==='Health Day');
-  show('fld-postlink-wrap',  type==='Campaign' || type==='SM Content' || type==='Event' || type==='Print');
-  show('fld-perf-wrap',      type==='Campaign' || type==='SM Content');
-  show('fld-eng-wrap',       type==='Campaign' || type==='SM Content');
-  show('section-perf',       type==='Campaign' || type==='SM Content');
+  document.querySelectorAll('#kind-switcher .type-btn').forEach(b=>b.classList.toggle('active', b.dataset.kind === (isCampaign?'campaign':'single')));
+  document.getElementById('subtype-switcher-wrap').style.display = isCampaign ? 'none' : '';
+  document.querySelectorAll('#type-switcher .type-btn').forEach(b=>b.classList.toggle('active', b.dataset.type===type));
 
-  // Update contextual labels
+  const show = (id, on) => { const el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  show('fld-enddate-wrap',           isCampaign);
+  show('fld-objective-wrap',         true);
+  show('fld-channels-wrap',          type==='Event' || type==='SM Content');
+  show('fld-contenttype-wrap',       type==='SM Content');
+  show('fld-printtype-wrap',         type==='Print');
+  show('fld-websiteupdatetype-wrap', type==='Website Update');
+  show('fld-websiteupdatelink-wrap', type==='Website Update');
+  show('fld-eventscope-wrap',        type==='Event');
+  show('fld-parentcampaign-wrap',    !isCampaign);
+  show('fld-postlink-wrap',          type==='SM Content' || type==='Event' || type==='Print');
+  show('fld-caption-gen-wrap',       type==='Event' || type==='SM Content' || type==='Print');
+  show('fld-perf-wrap',              isCampaign || type==='SM Content');
+  show('fld-eng-wrap',               isCampaign || type==='SM Content');
+  show('section-perf',               isCampaign || type==='SM Content');
+
   document.getElementById('fld-objective-label').textContent =
-    type==='Health Day' ? 'Notes' :
-    type==='Event' ? 'Description' : 'Objective / Description';
+    (type==='Event' || type==='Website Update') ? 'Description' : 'Objective / Description';
   document.getElementById('fld-postlink-label').textContent =
     type==='Print' ? 'Link to Content / File' : 'Post Link';
+}
+
+window.selectKind = function(kind) {
+  document.querySelectorAll('#kind-switcher .type-btn').forEach(b=>b.classList.toggle('active', b.dataset.kind===kind));
+  if(kind === 'campaign') {
+    selectType('Campaign');
+  } else {
+    selectType(currentType==='Campaign' ? 'Event' : currentType);
+  }
+}
+
+// Populates the "Part of Campaign?" dropdown from currently loaded campaigns,
+// excluding the record being edited (a campaign can't be its own parent).
+function populateParentCampaignSelect(excludeId) {
+  const sel = document.getElementById('fld-parentCampaign');
+  if(!sel) return;
+  const campaigns = ALL_INITIATIVES.filter(i=>i.type==='Campaign' && i.id!==excludeId);
+  sel.innerHTML = '<option value="">— None (standalone) —</option>' +
+    campaigns.map(c=>`<option value="${c.id}">${c.title||'Untitled Campaign'}</option>`).join('');
 }
 
 // ── FORM OPEN / CLOSE ────────────────────────────────────────────────────
 window.openForm = function(initiative=null) {
   editingId = initiative ? initiative.id : null;
-  document.getElementById('form-title').textContent = initiative ? 'Edit Initiative' : 'New Initiative';
+  document.getElementById('form-title').textContent = initiative ? 'Edit Activity' : 'New Activity';
   selectedEntities = initiative ? [...(initiative.entity||[])] : [];
   selectedChannels = initiative ? [...(initiative.channels||[])] : [];
 
-  selectType(initiative ? initiative.type : 'Campaign');
+  populateParentCampaignSelect(editingId);
+  selectType(initiative ? initiative.type : 'Event');
 
   document.getElementById('fld-title').value = initiative?.title || '';
   const knownDept = initiative?.department || DEPARTMENTS[0];
@@ -1451,13 +1583,15 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-department-other').value = isCustomDept ? initiative.department : '';
   toggleOtherDept();
   document.getElementById('fld-status').value = initiative?.status || 'Planned';
-  document.getElementById('fld-nameAr').value = initiative?.nameAr || '';
   document.getElementById('fld-startDate').value = initiative?.startDate || '';
   document.getElementById('fld-endDate').value = initiative?.endDate || '';
   document.getElementById('fld-objective').value = initiative?.objective || '';
   document.getElementById('fld-contentType').value = initiative?.contentType || CONTENT_TYPES[0];
   document.getElementById('fld-printType').value = initiative?.printType || PRINT_TYPES[0];
-  document.getElementById('fld-hdCategory').value = initiative?.hdCategory || HEALTH_DAY_CATEGORIES[0];
+  document.getElementById('fld-eventScope').value = initiative?.eventScope || 'Internal';
+  document.getElementById('fld-websiteUpdateType').value = initiative?.websiteUpdateType || WEBSITE_UPDATE_TYPES[0];
+  document.getElementById('fld-websiteUpdateLink').value = initiative?.websiteUpdateLink || '';
+  document.getElementById('fld-parentCampaign').value = initiative?.parentCampaignId || '';
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
   // Load previously generated/saved captions, if any
   if(initiative?.captionEN || initiative?.captionAR) {
@@ -1510,14 +1644,16 @@ window.saveInitiative = async function() {
     department: deptFinal,
     status: document.getElementById('fld-status').value,
     entity: selectedEntities,
-    nameAr: document.getElementById('fld-nameAr').value.trim(),
     startDate: document.getElementById('fld-startDate').value,
     endDate: document.getElementById('fld-endDate').value,
     objective: document.getElementById('fld-objective').value.trim(),
     channels: selectedChannels,
     contentType: document.getElementById('fld-contentType').value,
     printType: document.getElementById('fld-printType').value,
-    hdCategory: document.getElementById('fld-hdCategory').value,
+    eventScope: document.getElementById('fld-eventScope').value,
+    websiteUpdateType: document.getElementById('fld-websiteUpdateType').value,
+    websiteUpdateLink: document.getElementById('fld-websiteUpdateLink').value.trim(),
+    parentCampaignId: document.getElementById('fld-parentCampaign').value || null,
     postLink: document.getElementById('fld-postLink').value.trim(),
     captionEN:       document.getElementById('gen-caption-en').value.trim() || null,
     captionAR:       document.getElementById('gen-caption-ar').value.trim() || null,
@@ -1553,14 +1689,161 @@ window.editInitiative = function(id) {
 }
 
 window.removeInitiative = async function(id, title) {
+  const item = ALL_INITIATIVES.find(i=>i.id===id);
+  if(item?.type === 'Campaign') {
+    const childCount = ALL_INITIATIVES.filter(i=>i.parentCampaignId===id).length;
+    if(childCount > 0) {
+      alert(`Cannot delete "${title}" — it still has ${childCount} linked activit${childCount===1?'y':'ies'}. Remove or reassign them first (open the campaign to view them).`);
+      return;
+    }
+  }
   if(!confirm(`Delete "${title}"? This cannot be undone.`)) return;
   try {
     await deleteInitiative(id);
-    showToast('Initiative deleted');
+    showToast('Activity deleted');
   } catch(e) {
     showToast('Delete failed: ' + e.message, true);
   }
 }
+
+// ── HEALTH DAYS (standalone, independent of Activities) ──────────────────
+let editingHealthDayId = null;
+
+window.renderHealthDaysTable = function() {
+  const q = (document.getElementById('hd-search')?.value||'').toLowerCase();
+  const catF = document.getElementById('hd-category-filter')?.value||'';
+  const deptF = document.getElementById('hd-dept-filter')?.value||'';
+
+  const data = ALL_HEALTH_DAYS.filter(h=>{
+    if(catF && h.category!==catF) return false;
+    if(deptF && h.department!==deptF) return false;
+    if(q && !`${h.name} ${h.nameAr}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  document.getElementById('healthdays-table-body').innerHTML = data.length
+    ? data.map(h=>`<tr>
+        <td style="font-weight:600">${h.name||''}</td>
+        <td style="font-family:'IBM Plex Sans Arabic',sans-serif">${h.nameAr||'—'}</td>
+        <td style="font-size:11px;color:var(--text-3)">${h.date||'—'}</td>
+        <td><span class="type-pill">${h.category||''}</span></td>
+        <td style="font-size:11px;color:var(--text-3)">${h.department||'—'}</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editHealthDay('${h.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeHealthDay('${h.id}','${(h.name||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : `<tr><td colspan="6" class="empty">${ALL_HEALTH_DAYS.length?'No health days match filters':'No health days yet — add one, or migrate legacy entries above'}</td></tr>`;
+}
+
+window.openHealthDayForm = function(hd=null) {
+  editingHealthDayId = hd?.id || null;
+  document.getElementById('hd-form-title').textContent = hd ? 'Edit Health Day' : 'New Health Day';
+  document.getElementById('hd-name').value = hd?.name || '';
+  document.getElementById('hd-nameAr').value = hd?.nameAr || '';
+  document.getElementById('hd-date').value = hd?.date || '';
+  document.getElementById('hd-category').value = hd?.category || HEALTH_DAY_CATEGORIES[0];
+  document.getElementById('hd-department').value = hd?.department || '';
+  document.getElementById('healthday-overlay').classList.add('open');
+}
+window.closeHealthDayForm = function() {
+  document.getElementById('healthday-overlay').classList.remove('open');
+}
+window.saveHealthDay = async function() {
+  const name = document.getElementById('hd-name').value.trim();
+  const date = document.getElementById('hd-date').value;
+  if(!name || !date) { showToast('Name and date are required', true); return; }
+  const data = {
+    name, date,
+    nameAr: document.getElementById('hd-nameAr').value.trim(),
+    category: document.getElementById('hd-category').value,
+    department: document.getElementById('hd-department').value,
+  };
+  try {
+    if(editingHealthDayId) { await updateHealthDay(editingHealthDayId, data); showToast('Health day updated'); }
+    else { await addHealthDay(data); showToast('Health day added'); }
+    closeHealthDayForm();
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+window.editHealthDay = function(id) {
+  const hd = ALL_HEALTH_DAYS.find(h=>h.id===id);
+  if(hd) openHealthDayForm(hd);
+}
+window.removeHealthDay = async function(id, name) {
+  if(!confirm(`Delete health day "${name}"?`)) return;
+  try { await deleteHealthDay(id); showToast('Health day deleted'); }
+  catch(e) { showToast('Delete failed: '+e.message, true); }
+}
+window.runHealthDayMigration = async function() {
+  if(!confirm('This scans Activities for any legacy Health Day entries, moves them into this dedicated list, and removes them from Activities. Safe to run more than once. Proceed?')) return;
+  try {
+    const result = await migrateHealthDaysFromInitiatives();
+    if(result.migrated === 0) showToast('No legacy Health Day entries found — nothing to migrate ✓');
+    else showToast(`✓ Migrated ${result.migrated} health day(s) into this list`);
+  } catch(e) { showToast('Migration failed: '+e.message, true); }
+}
+
+// ── CAMPAIGN DRILLDOWN ───────────────────────────────────────────────────
+let currentDrilldownCampaignId = null;
+let pendingParentCampaignForNewActivity = null;
+
+window.openCampaignDrilldown = function(campaignId) {
+  currentDrilldownCampaignId = campaignId;
+  renderCampaignDrilldown();
+  document.getElementById('campaign-drilldown-overlay').classList.add('open');
+}
+window.closeCampaignDrilldown = function() {
+  currentDrilldownCampaignId = null;
+  document.getElementById('campaign-drilldown-overlay').classList.remove('open');
+}
+function refreshCampaignDrilldownIfOpen() {
+  if(currentDrilldownCampaignId) renderCampaignDrilldown();
+}
+function renderCampaignDrilldown() {
+  const campaign = ALL_INITIATIVES.find(i=>i.id===currentDrilldownCampaignId);
+  if(!campaign) { closeCampaignDrilldown(); return; }
+
+  document.getElementById('cdd-title').textContent = campaign.title || 'Untitled Campaign';
+  document.getElementById('cdd-subtitle').textContent =
+    `${campaign.department||''} · ${campaign.startDate||''}${campaign.endDate?' → '+campaign.endDate:''}`;
+  document.getElementById('cdd-objective').textContent = campaign.objective || 'No objective set.';
+
+  const children = ALL_INITIATIVES.filter(i=>i.parentCampaignId===currentDrilldownCampaignId);
+  const listEl = document.getElementById('cdd-children-list');
+  listEl.innerHTML = children.length
+    ? children.map(c=>`
+      <div class="cdd-child-row">
+        <span class="type-pill">${c.type||''}</span>
+        <span class="cdd-child-title">${c.title||''}</span>
+        <span style="font-size:10px;color:var(--text-3)">${c.startDate||'—'}</span>
+        <span class="badge ${STATUS_CLASS[c.status]||'b-planned'}">${c.status||''}</span>
+        <button class="btn btn-sm" onclick="editChildFromDrilldown('${c.id}')">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="removeInitiative('${c.id}','${(c.title||'').replace(/'/g,"\\'")}')">Delete</button>
+      </div>`).join('')
+    : '<div class="cdd-child-empty">No activities linked to this campaign yet — click "+ Add Activity" to create one</div>';
+}
+
+window.addActivityToCampaign = function() {
+  pendingParentCampaignForNewActivity = currentDrilldownCampaignId;
+  closeCampaignDrilldown();
+  openForm();
+  selectKind('single');
+  document.getElementById('fld-parentCampaign').value = pendingParentCampaignForNewActivity;
+  pendingParentCampaignForNewActivity = null;
+}
+
+window.editChildFromDrilldown = function(id) {
+  const item = ALL_INITIATIVES.find(i=>i.id===id);
+  closeCampaignDrilldown();
+  if(item) openForm(item);
+}
+
+window.editCampaignFromDrilldown = function() {
+  const campaign = ALL_INITIATIVES.find(i=>i.id===currentDrilldownCampaignId);
+  closeCampaignDrilldown();
+  if(campaign) openForm(campaign);
+}
+
 
 // ── DEPT STYLE HELPER (used by promotions + initiatives table) ────────────
 function deptStyle(d) {
@@ -1580,12 +1863,18 @@ window.toggleSort = function() {
 window.renderTable = function() {
   const typeF = document.getElementById('f-type').value;
   const deptF = document.getElementById('f-dept').value;
+  const entityF = document.getElementById('f-entity').value;
   const statusF = document.getElementById('f-status').value;
   const q = document.getElementById('f-search').value.toLowerCase();
 
+  // Option B: every visible row is a peer. Campaign children (anything with
+  // a parentCampaignId) are hidden from this flat list — they only appear
+  // inside their parent campaign's drill-down panel.
   let filtered = ALL_INITIATIVES.filter(i=>{
+    if(i.parentCampaignId) return false;
     if(typeF && i.type!==typeF) return false;
     if(deptF && i.department!==deptF) return false;
+    if(entityF && !(i.entity||[]).includes(entityF)) return false;
     if(statusF && i.status!==statusF) return false;
     if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
     return true;
@@ -1599,21 +1888,32 @@ window.renderTable = function() {
     });
   }
 
+  function childCount(campaignId) {
+    return ALL_INITIATIVES.filter(i=>i.parentCampaignId===campaignId).length;
+  }
+
   document.getElementById('table-body').innerHTML = filtered.length
-    ? filtered.map(i=>`
+    ? filtered.map(i=>{
+        const isCampaign = i.type === 'Campaign';
+        const count = isCampaign ? childCount(i.id) : 0;
+        const typeCell = isCampaign
+          ? `<span class="badge b-planned" style="cursor:pointer" onclick="openCampaignDrilldown('${i.id}')" title="View activities in this campaign">📦 Campaign${count?` · ${count}`:''}</span>`
+          : `<span class="type-pill">${i.type||''}</span>`;
+        return `
       <tr>
-        <td><span class="type-pill">${i.type||''}</span></td>
-        <td style="font-weight:600">${i.title||''}${i.parentCampaignId?' <span title="Generated as part of a campaign" style="font-size:10px;color:var(--navy)">🔗</span>':''}</td>
+        <td>${typeCell}</td>
+        <td style="font-weight:600">${i.title||''}</td>
         <td>${i.department||''}</td>
         <td>${(i.entity||[]).join(', ')}</td>
         <td style="font-size:11px;color:var(--text-3)">${i.startDate||'—'}${i.endDate?' → '+i.endDate:''}</td>
         <td><span class="badge ${STATUS_CLASS[i.status]||'b-planned'}">${i.status||''}</span></td>
         <td class="row-actions">
+          ${isCampaign?`<button class="btn btn-sm" onclick="openCampaignDrilldown('${i.id}')">View</button>`:''}
           <button class="btn btn-sm" onclick="editInitiative('${i.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="removeInitiative('${i.id}','${(i.title||'').replace(/'/g,"\\'")}')">Delete</button>
         </td>
-      </tr>`).join('')
-    : '<tr><td colspan="7" class="empty">No initiatives found</td></tr>';
+      </tr>`;}).join('')
+    : '<tr><td colspan="7" class="empty">No activities found</td></tr>';
 }
 
 // ── PROMOTIONS ────────────────────────────────────────────────────────────
