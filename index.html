@@ -497,7 +497,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <select class="cal-select" id="cal-month" onchange="renderCalendar()"></select>
           <select class="cal-select" id="cal-dept" onchange="renderCalendar()"><option value="">All Departments</option></select>
           <select class="cal-select" id="cal-entity" onchange="renderCalendar()">
-            <option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option>
+            <option value="">All Entities</option>
           </select>
           <select class="cal-select" id="cal-channel" onchange="renderCalendar()">
             <option value="">All Channels</option><option>Instagram</option><option>TikTok</option><option>Facebook</option><option>X</option><option>LinkedIn</option><option>Print</option>
@@ -538,7 +538,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <!-- PROMOTIONS CALENDAR -->
       <div class="page" id="page-promotions">
         <div class="cal-controls" style="margin-bottom:20px">
-          <select class="cal-select" id="promo-entity-f" onchange="renderPromotions()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="promo-entity-f" onchange="renderPromotions()"><option value="">All Entities</option></select>
           <select class="cal-select" id="promo-dept-f" onchange="renderPromotions()"><option value="">All Departments</option></select>
           <select class="cal-select" id="promo-status-f" onchange="renderPromotions()"><option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option></select>
         </div>
@@ -549,7 +549,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <div class="page" id="page-campaigns">
         <div class="cal-controls" style="margin-bottom:16px">
           <input class="lib-search" style="flex:1;min-width:160px;max-width:280px" type="text" placeholder="Search campaigns..." oninput="renderCampaigns(this.value)">
-          <select class="cal-select" id="camp-entity-filter" onchange="renderCampaigns()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="camp-entity-filter" onchange="renderCampaigns()"><option value="">All Entities</option></select>
           <select class="cal-select" id="camp-status-filter" onchange="renderCampaigns()"><option value="">All Status</option><option>Planned</option><option>In Production</option><option>Ready</option><option>Published</option><option>Cancelled</option></select>
         </div>
         <div class="scrollable-x">
@@ -563,7 +563,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <!-- EVENTS -->
       <div class="page" id="page-events">
         <div class="cal-controls" style="margin-bottom:16px">
-          <select class="cal-select" id="evt-entity-filter" onchange="renderEvents()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="evt-entity-filter" onchange="renderEvents()"><option value="">All Entities</option></select>
           <select class="cal-select" id="evt-status-filter" onchange="renderEvents()"><option value="">All Status</option><option>Upcoming</option><option>Live</option><option>Past</option></select>
         </div>
         <div class="events-grid" id="events-grid"><div class="loading">Loading events...</div></div>
@@ -620,7 +620,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <!-- WELL-SPAN PROGRAM -->
       <div class="page" id="page-wellspan">
         <div class="cal-controls" style="margin-bottom:20px">
-          <select class="cal-select" id="ws-entity-f" onchange="renderWellspan()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="ws-entity-f" onchange="renderWellspan()"><option value="">All Entities</option></select>
         </div>
         <div class="dash-section-title">Wellness Packages</div>
         <div class="promotions-grid" id="wellspan-packages-grid" style="margin-bottom:28px"><div class="loading">Loading...</div></div>
@@ -641,7 +641,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div id="bd-kpi-progress"><div style="font-size:12px;color:var(--text-3);padding:8px 0">Set targets in the admin Business Development tab to see progress here</div></div>
         </div>
         <div class="cal-controls" style="margin-bottom:20px">
-          <select class="cal-select" id="bd-entity-f" onchange="renderBD()"><option value="">All Entities</option><option>IMC</option><option>Makkah</option><option>TFC</option><option>JP</option><option>RSM</option></select>
+          <select class="cal-select" id="bd-entity-f" onchange="renderBD()"><option value="">All Entities</option></select>
         </div>
         <div class="dash-section-title">BD Activities & Initiatives</div>
         <div class="dept-camp-grid" id="bd-grid"><div class="loading">Loading...</div></div>
@@ -682,10 +682,12 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 <script type="module">
 import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
-  watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets,
+  watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets, watchEntities,
   promoStatus, getAccessGate, hashPassword,
-  DEPARTMENTS, ENTITIES, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
+  DEPARTMENTS, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
+
+let ALL_ENTITIES = [];
 
 let RESOURCES   = [];
 let METRICS     = [];
@@ -779,6 +781,22 @@ document.addEventListener('click', (e) => {
     document.getElementById('search-results').classList.remove('open');
   }
 });
+
+// Repopulates every entity filter dropdown from the live ALL_ENTITIES list.
+// Safe to call repeatedly (entities can change any time an admin edits them)
+// — always rebuilds fully rather than appending, so nothing duplicates.
+function populateEntityFilters() {
+  const names = ALL_ENTITIES.map(e=>e.name);
+  const optionsHtml = '<option value="">All Entities</option>' + names.map(e=>`<option>${e}</option>`).join('');
+  ['cal-entity','promo-entity-f','camp-entity-filter','evt-entity-filter','ws-entity-f','bd-entity-f'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) {
+      const prevVal = el.value;
+      el.innerHTML = optionsHtml;
+      if(names.includes(prevVal)) el.value = prevVal; // preserve current filter selection if still valid
+    }
+  });
+}
 
 function populateFilters() {
   const deptOptionsHtml = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
@@ -2023,6 +2041,7 @@ function loadScriptOnce(id, src, onReady) {
 // ── INIT ─────────────────────────────────────────────────────────────
 async function initPortal() {
   populateFilters();
+  watchEntities(data => { ALL_ENTITIES = data; populateEntityFilters(); });
   initPortalData();
 }
 

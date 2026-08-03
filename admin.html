@@ -646,6 +646,19 @@ tr.row-done:hover td{background:#DCF2E5}
           <span id="ag-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
         </div>
 
+        <!-- Entities Management -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">🏢 Entities</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:16px">Manage the list of entities used across initiatives, promotions, and business development. An entity can only be deleted if nothing currently references it.</div>
+
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <input class="field-input" type="text" id="new-entity-input" placeholder="e.g. New Clinic Name" style="flex:1" onkeydown="if(event.key==='Enter')addNewEntity()">
+            <button class="btn btn-primary" onclick="addNewEntity()">+ Add Entity</button>
+          </div>
+
+          <div id="entities-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+
         <!-- Placeholder for future settings sections -->
         <div style="text-align:center;padding:24px;color:var(--text-3);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius-lg)">
           More portal-wide settings will appear here as they're added.
@@ -1046,10 +1059,11 @@ import {
   getBrandVoice, setBrandVoice, watchBrandVoice,
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
   getAccessGate, setAccessGate, hashPassword,
+  watchEntities, addEntity, deleteEntity, checkEntityUsage,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, LEAD_STATUSES, LEAD_STATUS_COLORS,
-  DEPARTMENTS, ENTITIES, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
+  DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
 
@@ -1066,6 +1080,7 @@ let ALL_LEADS = [];
 let ALL_METRIC_PERIODS = [];
 let BD_TARGETS = {};
 let BRAND_VOICE = {};
+let ALL_ENTITIES = [];
 let ANTHROPIC_API_KEY = '';
 let ANNUAL_BUDGET = 0;
 let currentType = 'Campaign';
@@ -1088,6 +1103,7 @@ let unsubWellspan = null;
 let unsubLoyalty = null;
 let unsubBdTargets = null;
 let unsubBrandVoice = null;
+let unsubEntities = null;
 let unsubAnthropicKey = null;
 let unsubLeads = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
@@ -1156,6 +1172,7 @@ watchAuth(async user => {
     if(unsubLoyalty) unsubLoyalty();
     if(unsubBdTargets) unsubBdTargets();
     if(unsubBrandVoice) unsubBrandVoice();
+    if(unsubEntities) unsubEntities();
     if(unsubAnthropicKey) unsubAnthropicKey();
     if(unsubLeads) unsubLeads();
   }
@@ -1173,6 +1190,7 @@ function initData() {
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
   unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
   unsubBrandVoice   = watchBrandVoice(data   => { BRAND_VOICE     = data; loadBrandVoiceForm(); });
+  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); });
   initMetricsTab();
@@ -1208,6 +1226,51 @@ document.addEventListener('click', e => {
   if(!e.target.closest('.tab-group')) closeAllTabGroups();
 });
 
+// ── ENTITIES — dynamic, admin-manageable ─────────────────────────────────
+// Re-populates every entity dropdown/chip-list from the live ALL_ENTITIES
+// state. Safe to call repeatedly (e.g. after adding/deleting an entity) —
+// always fully rebuilds each target rather than appending, so nothing
+// duplicates on repeat calls.
+function populateEntitySelects() {
+  const names = ALL_ENTITIES.map(e=>e.name);
+  const optionsHtml = '<option value="">All / General</option>' + names.map(e=>`<option>${e}</option>`).join('');
+  const filterOptionsHtml = '<option value="">All Entities</option>' + names.map(e=>`<option>${e}</option>`).join('');
+  const chipsHtml = names.map(e=>`<div class="chip" data-val="${e}" onclick="toggleChip(this,'entity')">${e}</div>`).join('');
+  const promoChipsHtml = names.map(e=>`<div class="chip" data-val="${e}" onclick="togglePromoChip(this)">${e}</div>`).join('');
+
+  const bdEntity = document.getElementById('bd-entity');
+  if(bdEntity) bdEntity.innerHTML = optionsHtml;
+
+  const expEntity = document.getElementById('exp-entity');
+  if(expEntity) expEntity.innerHTML = optionsHtml;
+
+  const expEntityFilter = document.getElementById('exp-entity-filter');
+  if(expEntityFilter) expEntityFilter.innerHTML = filterOptionsHtml;
+
+  const promoEntity = document.getElementById('promo-entity');
+  if(promoEntity) {
+    // Preserve any already-selected chips (e.g. mid-edit) where possible
+    const prevSelected = [...promoEntity.querySelectorAll('.chip.active')].map(c=>c.dataset.val);
+    promoEntity.innerHTML = promoChipsHtml;
+    promoEntity.querySelectorAll('.chip').forEach(c=>{
+      if(prevSelected.includes(c.dataset.val)) c.classList.add('active');
+    });
+  }
+
+  const promoEntityFilter = document.getElementById('promo-entity-filter');
+  if(promoEntityFilter) promoEntityFilter.innerHTML = filterOptionsHtml;
+
+  const fldEntity = document.getElementById('fld-entity');
+  if(fldEntity) {
+    const prevSelected = [...fldEntity.querySelectorAll('.chip.active')].map(c=>c.dataset.val);
+    fldEntity.innerHTML = chipsHtml;
+    fldEntity.querySelectorAll('.chip').forEach(c=>{
+      if(prevSelected.includes(c.dataset.val)) c.classList.add('active');
+    });
+  }
+}
+
+
 // ── STATIC SELECT POPULATION ──────────────────────────────────────────
 function populateStaticSelects() {
   const deptFilter = document.getElementById('f-dept');
@@ -1231,7 +1294,6 @@ function populateStaticSelects() {
   const rType = document.getElementById('r-type');
   rType.innerHTML = RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
 
-  document.getElementById('bd-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
   document.getElementById('ws-item-type').innerHTML = WELLSPAN_ITEM_TYPES.map(t=>`<option>${t}</option>`).join('');
   // Leads CRM
   const leadDeptHtml = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
@@ -1246,19 +1308,13 @@ function populateStaticSelects() {
 
   // Expense form
   document.getElementById('exp-type').innerHTML = EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
-  document.getElementById('exp-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
 
   // Promotion form
   document.getElementById('promo-department').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('promo-entity').innerHTML = ENTITIES.map(e=>
-    `<div class="chip" data-val="${e}" onclick="togglePromoChip(this)">${e}</div>`
-  ).join('');
   // Promotion filters
   document.getElementById('promo-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('promo-entity-filter').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
   // Budget table filters
   document.getElementById('exp-type-filter').innerHTML += EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
-  document.getElementById('exp-entity-filter').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
   const now = new Date();
   const months = Array.from({length:12},(_,i)=>{
     const d = new Date(now.getFullYear(),i,1);
@@ -1268,10 +1324,6 @@ function populateStaticSelects() {
 
   document.getElementById('type-switcher').innerHTML = TYPES.map(t=>
     `<div class="type-btn" data-type="${t}" onclick="selectType('${t}')">${t}</div>`
-  ).join('');
-
-  document.getElementById('fld-entity').innerHTML = ENTITIES.map(e=>
-    `<div class="chip" data-val="${e}" onclick="toggleChip(this,'entity')">${e}</div>`
   ).join('');
 
   document.getElementById('fld-channels').innerHTML = CHANNELS.map(c=>
@@ -2303,6 +2355,42 @@ window.regenerateCaption = async function(lang) {
   }
 }
 
+// ── SETTINGS TAB — Entities Management ───────────────────────────────────
+window.renderEntitiesSettingsList = function() {
+  const el = document.getElementById('entities-list');
+  if(!el) return; // Settings tab not open yet — list refreshes when it is
+  el.innerHTML = ALL_ENTITIES.length
+    ? ALL_ENTITIES.map(e => `
+      <div style="display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:6px 8px 6px 14px;font-size:12px;font-weight:600;color:var(--text)">
+        <span>${e.name}</span>
+        <button onclick="attemptDeleteEntity('${e.id}','${(e.name||'').replace(/'/g,"\\'")}')"
+          title="Delete entity" style="width:18px;height:18px;border-radius:50%;border:none;background:var(--border);color:var(--text-3);cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0">×</button>
+      </div>`).join('')
+    : '<div style="font-size:12px;color:var(--text-3)">No entities yet — add one above</div>';
+}
+
+window.addNewEntity = async function() {
+  const input = document.getElementById('new-entity-input');
+  const name = input.value.trim();
+  if(!name) { showToast('Enter an entity name', true); return; }
+  try {
+    await addEntity(name);
+    input.value = '';
+    showToast(`✓ "${name}" added`);
+  } catch(e) { showToast(e.message, true); }
+}
+
+window.attemptDeleteEntity = async function(id, name) {
+  if(!confirm(`Delete entity "${name}"? This will check for anything currently using it first.`)) return;
+  try {
+    await deleteEntity(id, name);
+    showToast(`✓ "${name}" deleted`);
+  } catch(e) {
+    // deleteEntity throws a clear, specific message when the entity is still in use
+    alert(e.message);
+  }
+}
+
 // ── SETTINGS TAB — Public Access Gate ────────────────────────────────────
 let currentAccessGate = { enabled: false, passwordHash: '' };
 
@@ -2317,6 +2405,7 @@ async function initSettingsTab() {
   updateAccessGateToggleVisual();
   updateAccessGateStatus();
   document.getElementById('ag-password').value = '';
+  renderEntitiesSettingsList();
 }
 
 function updateAccessGateToggleVisual() {

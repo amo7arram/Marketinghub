@@ -36,6 +36,7 @@ const PROMOTIONS  = "promotions";
 const BD_CARDS          = "bd_cards";
 const WELLSPAN_PACKAGES = "wellspan_packages";
 const LOYALTY_CARDS     = "loyalty_cards";
+const ENTITIES_COLLECTION = "entities";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -382,6 +383,62 @@ export async function getAccessGate() {
 }
 export function setAccessGate(data) {
   return setDoc(doc(db, CONFIG, "access_gate"), data, { merge: true });
+}
+
+
+// ── ENTITIES (admin-manageable, replaces the old hardcoded list) ─────────
+// Auto-seeds the original 5 entities on first load if the collection is
+// empty, so nothing breaks for existing deployments.
+export function watchEntities(callback) {
+  return onSnapshot(collection(db, ENTITIES_COLLECTION), async snap => {
+    if (snap.empty) {
+      const seedNames = ["IMC","Makkah","TFC","JP","RSM"];
+      await Promise.all(seedNames.map(name =>
+        addDoc(collection(db, ENTITIES_COLLECTION), { name, createdAt: Timestamp.now() })
+      ));
+      return; // onSnapshot fires again automatically once the seed writes land
+    }
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    callback(data);
+  }, err => { console.error('watchEntities:', err.code); callback([]); });
+}
+
+export async function addEntity(name) {
+  const clean = (name||'').trim();
+  if (!clean) throw new Error('Entity name cannot be empty');
+  const snap = await getDocs(collection(db, ENTITIES_COLLECTION));
+  const exists = snap.docs.some(d => (d.data().name||'').toLowerCase() === clean.toLowerCase());
+  if (exists) throw new Error(`"${clean}" already exists`);
+  return addDoc(collection(db, ENTITIES_COLLECTION), { name: clean, createdAt: Timestamp.now() });
+}
+
+// Counts how many initiatives, BD cards, and promotions reference this
+// entity — used to block deletion when the entity is still in use anywhere.
+export async function checkEntityUsage(entityName) {
+  const [initSnap, bdSnap, promoSnap] = await Promise.all([
+    getDocs(query(collection(db, INITIATIVES), where("entity", "array-contains", entityName))),
+    getDocs(query(collection(db, BD_CARDS), where("entity", "==", entityName))),
+    getDocs(query(collection(db, PROMOTIONS), where("entity", "array-contains", entityName))),
+  ]);
+  return {
+    initiatives: initSnap.size,
+    bdCards: bdSnap.size,
+    promotions: promoSnap.size,
+    total: initSnap.size + bdSnap.size + promoSnap.size,
+  };
+}
+
+export async function deleteEntity(id, name) {
+  const usage = await checkEntityUsage(name);
+  if (usage.total > 0) {
+    const parts = [];
+    if (usage.initiatives) parts.push(`${usage.initiatives} initiative(s)`);
+    if (usage.bdCards) parts.push(`${usage.bdCards} BD card(s)`);
+    if (usage.promotions) parts.push(`${usage.promotions} promotion(s)`);
+    throw new Error(`Cannot delete "${name}" — still used by ${parts.join(', ')}. Remove or reassign these first.`);
+  }
+  return deleteDoc(doc(db, ENTITIES_COLLECTION, id));
 }
 
 
