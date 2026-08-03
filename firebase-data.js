@@ -528,7 +528,7 @@ export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print",
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
 export const TYPES = ["Campaign","Event","SM Content","Print","Health Day"];
 export const CONTENT_TYPES = ["Post","Reel","Video","Story","Carousel"];
-export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop"];
+export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop","Backdrop/Rollup"];
 export const HEALTH_DAY_CATEGORIES = ["MOH Health Day","Saudi Occasion","Islamic Occasion","IMC Campaign"];
 
 // Explicit colors for the original 9 departments — preserved exactly as before
