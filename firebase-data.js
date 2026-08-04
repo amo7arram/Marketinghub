@@ -373,6 +373,25 @@ export async function hashPassword(pw) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ── ADMIN LOGIN PASSCODE ("Magic Word") ───────────────────────────────────
+// A temporary, parallel login path alongside real email/password auth —
+// not a replacement for it. Entering the correct passcode triggers a real,
+// silent Firebase Auth login behind the scenes (see admin.html), so nothing
+// about Firestore security rules changes; this is purely a faster front door
+// for trusted staff during a transitional period.
+// Stored as config/admin_passcode → { passwordHash: string }
+// Auto-seeds the default passcode "openIMC@123admin" on first use.
+export async function getAdminPasscode() {
+  const snap = await getDoc(doc(db, CONFIG, "admin_passcode"));
+  if (snap.exists()) return snap.data().passwordHash;
+  const defaultHash = await hashPassword("openIMC@123admin");
+  await setDoc(doc(db, CONFIG, "admin_passcode"), { passwordHash: defaultHash });
+  return defaultHash;
+}
+export function setAdminPasscode(passwordHash) {
+  return setDoc(doc(db, CONFIG, "admin_passcode"), { passwordHash }, { merge: true });
+}
+
 // ── PUBLIC ACCESS GATE ───────────────────────────────────────────────────
 // Stored as config/access_gate → { enabled: bool, passwordHash: string }
 // This is a client-side "soft gate" — it deters casual/unauthenticated
