@@ -3,13 +3,13 @@
 // This module centralizes Firebase init + Firestore read/write helpers
 // so both pages always talk to the data the same way.
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, setDoc,
   getDocs, onSnapshot, query, orderBy, where, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
@@ -38,6 +38,7 @@ const WELLSPAN_PACKAGES = "wellspan_packages";
 const LOYALTY_CARDS     = "loyalty_cards";
 const ENTITIES_COLLECTION = "entities";
 const HEALTH_DAYS = "health_days";
+const TEAM_MEMBERS = "team_members";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -373,6 +374,72 @@ export async function hashPassword(pw) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ── TEAM MEMBERS ──────────────────────────────────────────────────────────
+// A lightweight team directory used to populate "Assigned To" dropdowns.
+// Optionally, a team member can also get a real Firebase Auth login account
+// (admin or coordinator role) — created via a SECONDARY app instance so it
+// never disturbs the currently logged-in admin's own session.
+export function watchTeamMembers(callback) {
+  return onSnapshot(collection(db, TEAM_MEMBERS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    callback(data);
+  }, err => { console.error('watchTeamMembers:', err.code); callback([]); });
+}
+
+// Directory-only entry — no login access, just shows up in "Assigned To".
+export function addTeamMember(data) {
+  return addDoc(collection(db, TEAM_MEMBERS), {
+    ...data, hasLoginAccount: false, authUid: null, active: true, createdAt: Timestamp.now(),
+  });
+}
+
+export function updateTeamMember(id, data) {
+  return updateDoc(doc(db, TEAM_MEMBERS, id), data);
+}
+
+// Deletes the directory entry. If this person has a login account, also
+// deletes their roles/{uid} document — which immediately revokes their
+// admin panel access (the existing login flow blocks anyone with no role
+// doc). Note: this does NOT delete the underlying Firebase Auth account
+// itself — client-side code can only delete the currently signed-in user's
+// own account, not someone else's. The orphaned account is harmless (no
+// role = no access) but for full removal, delete it manually in Firebase
+// Console → Authentication → Users.
+export async function deleteTeamMember(id, authUid) {
+  if (authUid) {
+    await deleteDoc(doc(db, "roles", authUid)).catch(() => {});
+  }
+  return deleteDoc(doc(db, TEAM_MEMBERS, id));
+}
+
+// Creates a REAL Firebase Auth login account for a team member, using a
+// secondary app instance so the admin's own current session is untouched.
+// Then writes their role and saves the team member record together.
+export async function createTeamMemberWithLogin({ name, email, department, password, role }) {
+  const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
+  const secondaryAuth = getAuth(secondaryApp);
+  let newUid;
+  try {
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    newUid = cred.user.uid;
+    await signOut(secondaryAuth);
+  } finally {
+    await deleteApp(secondaryApp);
+  }
+
+  // Write the role doc (requires the current signed-in admin's Firestore
+  // rules to permit this — see the updated `roles` rule).
+  await setDoc(doc(db, "roles", newUid), { role });
+
+  // Save the team member directory entry, linked to their new auth account.
+  const docRef = await addDoc(collection(db, TEAM_MEMBERS), {
+    name, email, department: department || '', role,
+    hasLoginAccount: true, authUid: newUid, active: true, createdAt: Timestamp.now(),
+  });
+  return { id: docRef.id, authUid: newUid };
+}
+
 // ── ADMIN LOGIN PASSCODE ("Magic Word") ───────────────────────────────────
 // A temporary, parallel login path alongside real email/password auth —
 // not a replacement for it. Entering the correct passcode triggers a real,
@@ -587,7 +654,7 @@ export const DEPARTMENTS = [
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
 export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
-export const TYPES = ["Campaign","Event","SM Content","Print","Website Update"];
+export const TYPES = ["Campaign","Event","SM Content","Print","Website Update","Physician Video"];
 export const WEBSITE_UPDATE_TYPES = ["News Article","Department Page Update","Doctor Profile Added","Doctor Profile Removed","Other"];
 export const CONTENT_TYPES = ["Post","Reel","Video","Story","Carousel"];
 export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop","Backdrop/Rollup"];

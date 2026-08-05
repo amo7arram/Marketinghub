@@ -220,7 +220,7 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="tab" onclick="switchTab('budget',this)">Budget</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
-    <div class="tab" onclick="switchTab('contentgen',this)">✨ Content Generator</div>
+    <div class="tab" onclick="switchTab('contentgen',this)" style="display:none">✨ Content Generator</div>
     <div class="tab" onclick="switchTab('campaigngen',this)">🎬 Campaign Generator</div>
     <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
   </div>
@@ -783,6 +783,23 @@ tr.row-done:hover td{background:#DCF2E5}
           <div id="entities-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
 
+        <!-- Team Members -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">👥 Team Members</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:16px">Manage the team directory used for "Assigned To" on activities. Optionally give someone real login access to this admin panel.</div>
+
+          <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:16px;line-height:1.6">
+            ℹ️ Removing someone with login access immediately revokes it. It does not delete their raw account record — for full removal, also delete them in Firebase Console → Authentication → Users.
+          </div>
+
+          <button class="btn btn-primary" onclick="openTeamMemberForm()" style="margin-bottom:16px">+ Add Team Member</button>
+
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Login Access</th><th>Actions</th></tr></thead>
+            <tbody id="team-members-table-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
+
         <!-- Placeholder for future settings sections -->
         <div style="text-align:center;padding:24px;color:var(--text-3);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius-lg)">
           More portal-wide settings will appear here as they're added.
@@ -843,6 +860,7 @@ tr.row-done:hover td{background:#DCF2E5}
       </div>
       <div class="field-group" id="fld-websiteupdatetype-wrap"><label class="field-label">Update Type</label><select class="field-select" id="fld-websiteUpdateType"></select></div>
       <div class="field-group" id="fld-websiteupdatelink-wrap"><label class="field-label">URL Link</label><input class="field-input" id="fld-websiteUpdateLink" placeholder="https://..."></div>
+      <div class="field-group" id="fld-physicianname-wrap"><label class="field-label">Physician Name <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, which doctor this video promotes</span></label><input class="field-input" id="fld-physicianName" placeholder="e.g. Dr. Ahmed Al-Zahrani"></div>
 
       <div class="field-group" id="fld-caption-gen-wrap" style="background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius);padding:14px 16px;margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -889,7 +907,7 @@ tr.row-done:hover td{background:#DCF2E5}
       </div>
       <div class="field-group" id="fld-eng-wrap"><label class="field-label">Engagements</label><input class="field-input" type="number" id="fld-engagements"></div>
 
-      <div class="field-group"><label class="field-label">Assigned To</label><input class="field-input" id="fld-assignedTo"></div>
+      <div class="field-group"><label class="field-label">Assigned To</label><select class="field-select" id="fld-assignedTo"><option value="">— Unassigned —</option></select></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeForm()">Cancel</button>
@@ -969,6 +987,37 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="modal-footer">
       <button class="btn" onclick="closeHealthDayForm()">Cancel</button>
       <button class="btn btn-primary" onclick="saveHealthDay()">Save Health Day</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TEAM MEMBER FORM MODAL ── -->
+<div class="modal-overlay" id="team-member-overlay">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <div class="modal-title">New Team Member</div>
+      <button class="modal-close" onclick="closeTeamMemberForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Name<span style="color:var(--red)">*</span></label><input class="field-input" id="tm-name"></div>
+      <div class="field-group"><label class="field-label">Email<span style="color:var(--red)">*</span></label><input class="field-input" type="email" id="tm-email"></div>
+      <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="tm-department"><option value="">— None —</option></select></div>
+
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);margin-top:6px">
+        <input type="checkbox" id="tm-give-login" style="width:16px;height:16px;cursor:pointer" onchange="toggleTeamMemberLoginFields()">
+        <label for="tm-give-login" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">Give this person login access to the admin panel</label>
+      </div>
+
+      <div id="tm-login-fields" style="display:none;margin-top:10px">
+        <div class="field-group"><label class="field-label">Password<span style="color:var(--red)">*</span></label><input class="field-input" type="text" id="tm-password" placeholder="Set an initial password"></div>
+        <div class="field-group"><label class="field-label">Role</label>
+          <select class="field-select" id="tm-role"><option value="admin">Admin — full access</option><option value="coordinator">Coordinator — request form only</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeTeamMemberForm()">Cancel</button>
+      <button class="btn btn-primary" id="tm-save-btn" onclick="saveTeamMember()">Save Team Member</button>
     </div>
   </div>
 </div>
@@ -1248,6 +1297,7 @@ import {
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
   getAccessGate, setAccessGate, hashPassword,
   getAdminPasscode, setAdminPasscode,
+  watchTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember, createTeamMemberWithLogin,
   watchEntities, addEntity, deleteEntity, checkEntityUsage,
   watchHealthDays, addHealthDay, updateHealthDay, deleteHealthDay, migrateHealthDaysFromInitiatives,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
@@ -1260,6 +1310,7 @@ import {
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
 let ALL_HEALTH_DAYS = [];
+let ALL_TEAM_MEMBERS = [];
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let ALL_EXPENSES = [];
@@ -1286,6 +1337,7 @@ let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
 let unsubHealthDays = null;
+let unsubTeamMembers = null;
 let unsubResources = null;
 let unsubRequests = null;
 let unsubExpenses = null;
@@ -1411,6 +1463,7 @@ watchAuth(async user => {
     document.getElementById('app').classList.remove('active');
     if(unsubInitiatives) unsubInitiatives();
     if(unsubHealthDays) unsubHealthDays();
+    if(unsubTeamMembers) unsubTeamMembers();
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
     if(unsubExpenses) unsubExpenses();
@@ -1430,6 +1483,7 @@ function initData() {
   populateStaticSelects();
   unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
+  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
@@ -1582,6 +1636,7 @@ function populateStaticSelects() {
   document.getElementById('hd-category').innerHTML = hdCatHtml;
   document.getElementById('hd-category-filter').innerHTML += hdCatHtml;
   document.getElementById('hd-department').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('tm-department').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('hd-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
 
   document.getElementById('f-type').innerHTML = '<option value="">All Types</option>' + TYPES.map(t=>`<option>${t}</option>`).join('');
@@ -1617,18 +1672,19 @@ window.selectType = function(type) {
   const show = (id, on) => { const el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
   show('fld-enddate-wrap',           isCampaign);
   show('fld-objective-wrap',         true);
-  show('fld-channels-wrap',          type==='Event' || type==='SM Content');
-  show('fld-contenttype-wrap',       type==='SM Content');
+  show('fld-channels-wrap',          type==='Event' || type==='SM Content' || type==='Physician Video');
+  show('fld-contenttype-wrap',       type==='SM Content' || type==='Physician Video');
   show('fld-printtype-wrap',         type==='Print');
   show('fld-websiteupdatetype-wrap', type==='Website Update');
   show('fld-websiteupdatelink-wrap', type==='Website Update');
   show('fld-eventscope-wrap',        type==='Event');
+  show('fld-physicianname-wrap',     type==='Physician Video');
   show('fld-parentcampaign-wrap',    !isCampaign);
-  show('fld-postlink-wrap',          type==='SM Content' || type==='Event' || type==='Print');
-  show('fld-caption-gen-wrap',       type==='Event' || type==='SM Content' || type==='Print');
-  show('fld-perf-wrap',              isCampaign || type==='SM Content');
-  show('fld-eng-wrap',               isCampaign || type==='SM Content');
-  show('section-perf',               isCampaign || type==='SM Content');
+  show('fld-postlink-wrap',          type==='SM Content' || type==='Event' || type==='Print' || type==='Physician Video');
+  show('fld-caption-gen-wrap',       type==='Event' || type==='SM Content' || type==='Print' || type==='Physician Video');
+  show('fld-perf-wrap',              isCampaign || type==='SM Content' || type==='Physician Video');
+  show('fld-eng-wrap',               isCampaign || type==='SM Content' || type==='Physician Video');
+  show('section-perf',               isCampaign || type==='SM Content' || type==='Physician Video');
 
   document.getElementById('fld-objective-label').textContent =
     (type==='Event' || type==='Website Update') ? 'Description' : 'Objective / Description';
@@ -1680,6 +1736,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-eventScope').value = initiative?.eventScope || 'Internal';
   document.getElementById('fld-websiteUpdateType').value = initiative?.websiteUpdateType || WEBSITE_UPDATE_TYPES[0];
   document.getElementById('fld-websiteUpdateLink').value = initiative?.websiteUpdateLink || '';
+  document.getElementById('fld-physicianName').value = initiative?.physicianName || '';
   document.getElementById('fld-parentCampaign').value = initiative?.parentCampaignId || '';
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
   // Load previously generated/saved captions, if any
@@ -1727,6 +1784,16 @@ window.saveInitiative = async function() {
 
   if(deptSelectVal === 'Other' && !deptFinal) { showToast('Please enter the department name', true); return; }
 
+  // Published activities must have a post/content link — no dangling
+  // "Published" status with nothing to actually show for it.
+  const statusVal = document.getElementById('fld-status').value;
+  const postLinkVal = document.getElementById('fld-postLink')?.value.trim() || '';
+  const postLinkFieldVisible = document.getElementById('fld-postlink-wrap')?.style.display !== 'none';
+  if(statusVal === 'Published' && postLinkFieldVisible && !postLinkVal) {
+    showToast('This activity is marked Published — add the Post / Content Link before saving', true);
+    return;
+  }
+
   const data = {
     type: currentType,
     title,
@@ -1742,6 +1809,7 @@ window.saveInitiative = async function() {
     eventScope: document.getElementById('fld-eventScope').value,
     websiteUpdateType: document.getElementById('fld-websiteUpdateType').value,
     websiteUpdateLink: document.getElementById('fld-websiteUpdateLink').value.trim(),
+    physicianName: document.getElementById('fld-physicianName').value.trim(),
     parentCampaignId: document.getElementById('fld-parentCampaign').value || null,
     postLink: document.getElementById('fld-postLink').value.trim(),
     captionEN:       document.getElementById('gen-caption-en').value.trim() || null,
@@ -1755,7 +1823,7 @@ window.saveInitiative = async function() {
     reach: Number(document.getElementById('fld-reach').value) || null,
     impressions: Number(document.getElementById('fld-impressions').value) || null,
     engagements: Number(document.getElementById('fld-engagements').value) || null,
-    assignedTo: document.getElementById('fld-assignedTo').value.trim(),
+    assignedTo: document.getElementById('fld-assignedTo').value,
   };
 
   try {
@@ -3128,6 +3196,127 @@ window.saveCampaignContent = async function() {
   } finally {
     btn.disabled = false; btn.textContent = '✓ Create Campaign & Save All Content';
   }
+}
+
+// ── SETTINGS TAB — Team Members ──────────────────────────────────────────
+let editingTeamMemberId = null;
+
+// Populates the "Assigned To" dropdown on the activity form from active
+// team members. Safe to call repeatedly — always fully rebuilds.
+function populateAssignedToSelect() {
+  const sel = document.getElementById('fld-assignedTo');
+  if(!sel) return;
+  const prevVal = sel.value;
+  const active = ALL_TEAM_MEMBERS.filter(m=>m.active!==false);
+  sel.innerHTML = '<option value="">— Unassigned —</option>' +
+    active.map(m=>`<option value="${m.name}">${m.name}</option>`).join('');
+  if(active.some(m=>m.name===prevVal)) sel.value = prevVal;
+}
+
+window.renderTeamMembersTable = function() {
+  const el = document.getElementById('team-members-table-body');
+  if(!el) return;
+  el.innerHTML = ALL_TEAM_MEMBERS.length
+    ? ALL_TEAM_MEMBERS.map(m=>`<tr>
+        <td style="font-weight:600">${m.name||''}</td>
+        <td style="font-size:11px;color:var(--text-3)">${m.email||''}</td>
+        <td style="font-size:11px;color:var(--text-3)">${m.department||'—'}</td>
+        <td>${m.hasLoginAccount?`<span class="badge b-published">✓ ${m.role||'admin'}</span>`:`<span class="badge b-planned">Directory only</span>`}</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editTeamMember('${m.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeTeamMember('${m.id}','${m.authUid||''}','${(m.name||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No team members yet</td></tr>';
+}
+
+window.openTeamMemberForm = function(member=null) {
+  editingTeamMemberId = member?.id || null;
+  document.querySelector('#team-member-overlay .modal-title').textContent = member ? 'Edit Team Member' : 'New Team Member';
+  document.getElementById('tm-name').value = member?.name || '';
+  document.getElementById('tm-email').value = member?.email || '';
+  document.getElementById('tm-department').value = member?.department || '';
+  document.getElementById('tm-give-login').checked = false;
+  document.getElementById('tm-password').value = '';
+  document.getElementById('tm-role').value = 'admin';
+  toggleTeamMemberLoginFields();
+
+  // Login access, once granted, isn't changeable from this form in this
+  // build — keep the checkbox hidden entirely when editing someone who
+  // already has an account, to avoid implying it can be toggled here.
+  const loginCheckboxRow = document.getElementById('tm-give-login').closest('div');
+  if(member?.hasLoginAccount) {
+    loginCheckboxRow.style.display = 'none';
+    document.getElementById('tm-email').disabled = true;
+  } else {
+    loginCheckboxRow.style.display = 'flex';
+    document.getElementById('tm-email').disabled = false;
+  }
+
+  document.getElementById('team-member-overlay').classList.add('open');
+}
+window.closeTeamMemberForm = function() {
+  document.getElementById('team-member-overlay').classList.remove('open');
+}
+window.toggleTeamMemberLoginFields = function() {
+  document.getElementById('tm-login-fields').style.display =
+    document.getElementById('tm-give-login').checked ? 'block' : 'none';
+}
+
+window.saveTeamMember = async function() {
+  const name = document.getElementById('tm-name').value.trim();
+  const email = document.getElementById('tm-email').value.trim();
+  const department = document.getElementById('tm-department').value;
+  if(!name || !email) { showToast('Name and email are required', true); return; }
+
+  const btn = document.getElementById('tm-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    if(editingTeamMemberId) {
+      // Editing an existing entry — name/department/email only (login
+      // access, if any, was already granted at creation and isn't changed here).
+      await updateTeamMember(editingTeamMemberId, { name, email, department });
+      showToast('✓ Team member updated');
+    } else {
+      const giveLogin = document.getElementById('tm-give-login').checked;
+      if(giveLogin) {
+        const password = document.getElementById('tm-password').value;
+        const role = document.getElementById('tm-role').value;
+        if(!password || password.length < 6) {
+          showToast('Password must be at least 6 characters', true);
+          btn.disabled = false; btn.textContent = 'Save Team Member';
+          return;
+        }
+        await createTeamMemberWithLogin({ name, email, department, password, role });
+        showToast(`✓ ${name} added with ${role} login access`);
+      } else {
+        await addTeamMember({ name, email, department });
+        showToast(`✓ ${name} added to team directory`);
+      }
+    }
+    closeTeamMemberForm();
+  } catch(e) {
+    showToast('Save failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Team Member';
+  }
+}
+
+window.editTeamMember = function(id) {
+  const m = ALL_TEAM_MEMBERS.find(x=>x.id===id);
+  if(m) openTeamMemberForm(m);
+}
+
+window.removeTeamMember = async function(id, authUid, name) {
+  const warning = authUid
+    ? `Delete "${name}"? This revokes their admin panel access immediately. (Their raw account record stays in Firebase Auth — remove it there too if you want it fully gone.)`
+    : `Delete "${name}" from the team directory?`;
+  if(!confirm(warning)) return;
+  try {
+    await deleteTeamMember(id, authUid || null);
+    showToast(`✓ ${name} removed`);
+  } catch(e) { showToast('Delete failed: ' + e.message, true); }
 }
 
 // ── SETTINGS TAB — Entities Management ───────────────────────────────────
