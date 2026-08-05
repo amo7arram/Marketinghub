@@ -1324,7 +1324,7 @@ function getFilteredCalItems() {
   const deptF = document.getElementById('cal-dept').value;
   const entityF = document.getElementById('cal-entity').value;
   const chanF = document.getElementById('cal-channel').value;
-  const smItems = ALL.filter(i=> i.type==='SM Content');
+  const smItems = ALL.filter(i=> i.type==='SM Content' || i.type==='Physician Video');
   const hdItems = HEALTH_DAYS.map(h=>({
     type: 'Health Day', title: h.name, department: h.department, entity: [], channels: [],
     startDate: h.date, status: null,
