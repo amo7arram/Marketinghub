@@ -136,6 +136,7 @@ tr.row-done:hover td{background:#DCF2E5}
 
 /* CAMPAIGN DRILLDOWN */
 .cdd-child-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12px}
+.lead-history-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:5px;font-size:11px}
 .cdd-child-title{flex:1;font-weight:600;color:var(--text)}
 .cdd-child-empty{text-align:center;padding:24px;color:var(--text-3);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius)}
 .cgen-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -811,6 +812,15 @@ tr.row-done:hover td{background:#DCF2E5}
           </table>
         </div>
 
+        <!-- Department Revenue Estimates (ROI fallback) -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">💰 Department Revenue Estimates</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:14px">Used as a fallback for campaign ROI when a booked lead has no actual revenue entered yet. Leave blank for departments where you'd rather see "no data" than a guess.</div>
+          <div id="dept-revenue-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"></div>
+          <button class="btn btn-primary" onclick="saveDeptRevenueEstimates()">Save Estimates</button>
+          <span id="dept-revenue-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+        </div>
+
         <!-- Placeholder for future settings sections -->
         <div style="text-align:center;padding:24px;color:var(--text-3);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius-lg)">
           More portal-wide settings will appear here as they're added.
@@ -1026,7 +1036,7 @@ tr.row-done:hover td{background:#DCF2E5}
       <div id="tm-login-fields" style="display:none;margin-top:10px">
         <div class="field-group"><label class="field-label">Password<span style="color:var(--red)">*</span></label><input class="field-input" type="text" id="tm-password" placeholder="Set an initial password"></div>
         <div class="field-group"><label class="field-label">Role</label>
-          <select class="field-select" id="tm-role"><option value="admin">Admin — full access</option><option value="coordinator">Coordinator — request form only</option></select>
+          <select class="field-select" id="tm-role"><option value="admin">Admin — full access</option><option value="coordinator">Coordinator — request form only</option><option value="call_center">Call Center — leads list only, no delete</option></select>
         </div>
       </div>
     </div>
@@ -1174,6 +1184,10 @@ tr.row-done:hover td{background:#DCF2E5}
         <select class="field-select" id="bulk-department"><option value="">— No change —</option></select>
       </div>
       <div class="field-group">
+        <label class="field-label">Entity</label>
+        <select class="field-select" id="bulk-entity"><option value="">— No change —</option></select>
+      </div>
+      <div class="field-group">
         <label class="field-label">Contact Status</label>
         <select class="field-select" id="bulk-contact-status"><option value="">— No change —</option></select>
       </div>
@@ -1250,8 +1264,13 @@ tr.row-done:hover td{background:#DCF2E5}
       </div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Date Created</label><input class="field-input" type="date" id="lead-date"></div>
+        <div class="field-group" id="lead-revenue-wrap"><label class="field-label">Revenue Value (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— if known, once booked</span></label><input class="field-input" type="number" id="lead-revenue" placeholder="0.00" min="0" step="0.01"></div>
       </div>
       <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" style="min-height:60px" id="lead-notes" placeholder="Follow-up notes, preferences, etc."></textarea></div>
+      <div id="lead-history-section" style="display:none">
+        <div class="field-section-title">Contact History <span style="color:var(--text-3);font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">— other interactions from this phone number</span></div>
+        <div id="lead-history-list"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeLeadForm()">Cancel</button>
@@ -1269,7 +1288,7 @@ tr.row-done:hover td{background:#DCF2E5}
     </div>
     <div class="modal-body">
       <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.6">
-        The sheet needs link-sharing set to "Anyone with the link can view." This fetches a fresh snapshot each time you click Sync — not a live connection — and skips any phone numbers already in your leads list.
+        The sheet needs link-sharing set to "Anyone with the link can view." This fetches a fresh snapshot each time you click Sync — not a live connection — and skips any phone number already imported for this same campaign (the same person appearing under a different campaign is imported as a new, separate interaction).
       </div>
       <div class="field-group">
         <label class="field-label">Attribute to Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">— auto-fills the sheet link below if one is saved on that campaign</span></label>
@@ -1372,6 +1391,7 @@ import {
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
+  getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
   DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
@@ -1380,6 +1400,7 @@ import {
 let ALL_INITIATIVES = [];
 let ALL_HEALTH_DAYS = [];
 let ALL_TEAM_MEMBERS = [];
+let DEPT_REVENUE_ESTIMATES = {};
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let ALL_EXPENSES = [];
@@ -1407,6 +1428,7 @@ let selectedChannels = [];
 let unsubInitiatives = null;
 let unsubHealthDays = null;
 let unsubTeamMembers = null;
+let unsubDeptRevenue = null;
 let unsubResources = null;
 let unsubRequests = null;
 let unsubExpenses = null;
@@ -1533,6 +1555,7 @@ watchAuth(async user => {
     if(unsubInitiatives) unsubInitiatives();
     if(unsubHealthDays) unsubHealthDays();
     if(unsubTeamMembers) unsubTeamMembers();
+    if(unsubDeptRevenue) unsubDeptRevenue();
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
     if(unsubExpenses) unsubExpenses();
@@ -1553,6 +1576,7 @@ function initData() {
   unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); });
+  unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
@@ -1649,6 +1673,8 @@ function populateEntitySelects() {
   if(leadEntity) leadEntity.innerHTML = optionsHtml;
   const leadEntityFilter = document.getElementById('lead-filter-entity');
   if(leadEntityFilter) leadEntityFilter.innerHTML = filterOptionsHtml;
+  const bulkEntity = document.getElementById('bulk-entity');
+  if(bulkEntity) bulkEntity.innerHTML = '<option value="">— No change —</option>' + names.map(e=>`<option>${e}</option>`).join('');
 }
 
 // Re-populates every "pick a campaign" dropdown in the Leads CRM from
@@ -3301,6 +3327,32 @@ window.saveCampaignContent = async function() {
   }
 }
 
+// ── SETTINGS TAB — Department Revenue Estimates ──────────────────────────
+function loadDeptRevenueForm() {
+  const grid = document.getElementById('dept-revenue-grid');
+  if(!grid) return;
+  grid.innerHTML = DEPARTMENTS.map(d=>`
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:11px;color:var(--text-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d}">${d}</label>
+      <input class="field-input" type="number" min="0" placeholder="SAR" style="width:110px;font-size:12px"
+        id="dept-rev-${d.replace(/[^a-zA-Z0-9]/g,'_')}" value="${DEPT_REVENUE_ESTIMATES[d] ?? ''}">
+    </div>`).join('');
+}
+
+window.saveDeptRevenueEstimates = async function() {
+  const estimates = {};
+  DEPARTMENTS.forEach(d=>{
+    const el = document.getElementById(`dept-rev-${d.replace(/[^a-zA-Z0-9]/g,'_')}`);
+    if(el && el.value !== '') estimates[d] = parseFloat(el.value) || 0;
+  });
+  try {
+    await setDepartmentRevenueEstimates(estimates);
+    const s = document.getElementById('dept-revenue-save-status');
+    s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
+    showToast('✓ Revenue estimates saved');
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
 // ── SETTINGS TAB — Team Members ──────────────────────────────────────────
 let editingTeamMemberId = null;
 
@@ -3485,6 +3537,7 @@ async function initSettingsTab() {
   updateAccessGateStatus();
   document.getElementById('ag-password').value = '';
   renderEntitiesSettingsList();
+  loadDeptRevenueForm();
 }
 
 function updateAccessGateToggleVisual() {
@@ -4161,6 +4214,7 @@ window.openBulkEditModal = function() {
   document.getElementById('bulk-edit-count').textContent = `(${count} lead${count===1?'':'s'})`;
   document.getElementById('bulk-date').value = '';
   document.getElementById('bulk-department').value = '';
+  document.getElementById('bulk-entity').value = '';
   document.getElementById('bulk-contact-status').value = '';
   document.getElementById('bulk-outcome').value = '';
   document.getElementById('bulk-edit-overlay').classList.add('open');
@@ -4171,12 +4225,14 @@ window.closeBulkEditModal = function() {
 window.confirmBulkEdit = async function() {
   const dateVal    = document.getElementById('bulk-date').value;
   const deptVal    = document.getElementById('bulk-department').value;
+  const entityVal  = document.getElementById('bulk-entity').value;
   const contactVal = document.getElementById('bulk-contact-status').value;
   const outcomeVal = document.getElementById('bulk-outcome').value;
 
   const updateObj = {};
   if(dateVal)    updateObj.dateCreated   = dateVal;
   if(deptVal)    updateObj.department    = deptVal;
+  if(entityVal)  updateObj.entity        = entityVal;
   if(contactVal) updateObj.contactStatus = contactVal;
   if(outcomeVal) updateObj.outcome       = outcomeVal;
 
@@ -4221,9 +4277,34 @@ window.openLeadForm = function(lead=null) {
   document.getElementById('lead-source').value         = lead?.source||'';
   document.getElementById('lead-campaign').value       = lead?.campaignId||'';
   document.getElementById('lead-date').value           = lead?.dateCreated||new Date().toISOString().split('T')[0];
+  document.getElementById('lead-revenue').value        = lead?.revenueValue ?? '';
   document.getElementById('lead-notes').value          = lead?.notes||'';
+  renderLeadContactHistory(lead);
   document.getElementById('lead-overlay').classList.add('open');
 }
+
+// Shows other lead records sharing the same phone number — lets you see
+// every campaign/service this person has engaged with, not just this one.
+function renderLeadContactHistory(lead) {
+  const section = document.getElementById('lead-history-section');
+  const list = document.getElementById('lead-history-list');
+  if(!lead?.phone) { section.style.display = 'none'; return; }
+  const others = ALL_LEADS.filter(l => l.id !== lead.id && l.phone === lead.phone);
+  if(!others.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = others.map(o=>{
+    const campaignLabel = o.campaign || campaignTitleFor(o.campaignId) || 'No campaign';
+    const cs = o.contactStatus || 'Untouched';
+    const oc = o.outcome || 'Pending';
+    return `<div class="lead-history-row">
+      <span style="color:var(--text-3);white-space:nowrap">${o.dateCreated||'—'}</span>
+      <span style="font-weight:600;flex:1">${campaignLabel}</span>
+      <span class="type-pill">${cs}</span>
+      ${cs==='Reached'?`<span class="type-pill">${oc}</span>`:''}
+    </div>`;
+  }).join('');
+}
+
 window.closeLeadForm = function() { document.getElementById('lead-overlay').classList.remove('open'); }
 window.saveLead = async function() {
   const name  = document.getElementById('lead-name').value.trim();
@@ -4242,6 +4323,7 @@ window.saveLead = async function() {
     campaign:      campaignId ? campaignTitleFor(campaignId) : '',
     dateCreated:   document.getElementById('lead-date').value,
     notes:         document.getElementById('lead-notes').value.trim(),
+    revenueValue:  parseFloat(document.getElementById('lead-revenue').value) || null,
   };
   try {
     if(editingLeadId){await updateLead(editingLeadId,data);showToast('Lead updated');}
@@ -4511,7 +4593,14 @@ window.fetchAndPreviewSheet = async function() {
 
     if(!nameCol||!phoneCol) { statusEl.textContent = 'Could not find Name or Phone columns in that sheet'; statusEl.style.color = 'var(--red)'; return; }
 
-    const existingPhones = new Set(ALL_LEADS.map(l=>String(l.phone||'').replace(/\D/g,'')));
+    // Dedupe by phone+campaign together — not phone alone. The same person
+    // can legitimately show up in multiple campaigns (different services,
+    // different times), and each is a real, separate interaction worth
+    // tracking. This only blocks re-importing the exact same person from
+    // the exact same campaign twice (e.g. re-syncing the same sheet).
+    const existingPhoneCampaignPairs = new Set(
+      ALL_LEADS.map(l => `${String(l.phone||'').replace(/\D/g,'')}__${l.campaignId||''}`)
+    );
     const campaignId = document.getElementById('sheet-import-campaign').value;
     const campaignName = campaignId ? campaignTitleFor(campaignId) : '';
 
@@ -4519,6 +4608,7 @@ window.fetchAndPreviewSheet = async function() {
       const rawDept = deptCol ? r[deptCol] : '';
       const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
       const phone = String(r[phoneCol]||'');
+      const pairKey = `${phone.replace(/\D/g,'')}__${campaignId||''}`;
       return {
         name: r[nameCol]||'', phone,
         source: sourceCol ? r[sourceCol]||'' : '',
@@ -4530,7 +4620,7 @@ window.fetchAndPreviewSheet = async function() {
         department: matchDepartment(rawDept),
         campaignId: campaignId || null,
         campaign: campaignId ? campaignName : '',
-        _isDuplicate: existingPhones.has(phone.replace(/\D/g,'')),
+        _isDuplicate: existingPhoneCampaignPairs.has(pairKey),
       };
     }).filter(r=>r.name && r.phone);
 
@@ -4549,7 +4639,7 @@ window.fetchAndPreviewSheet = async function() {
         <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
       </tr>`).join('')}</tbody>`;
 
-    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already in your leads list`:''}`;
+    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}`;
     statusEl.style.color = 'var(--green)';
     document.getElementById('sheet-import-preview-wrap').style.display = 'block';
     document.getElementById('confirm-sheet-import-btn').disabled = pendingSheetImportRows.length === 0;
@@ -4627,19 +4717,31 @@ function computeAndPublishLeadStats() {
         }
 
         if(l.campaignId) {
-          if(!byCampaign[l.campaignId]) byCampaign[l.campaignId] = { total:0, reached:0, booked:0, openFile:0 };
+          if(!byCampaign[l.campaignId]) byCampaign[l.campaignId] = { total:0, reached:0, booked:0, openFile:0, actualRevenue:0, estimatedRevenue:0 };
           byCampaign[l.campaignId].total++;
           if(cs==='Reached') byCampaign[l.campaignId].reached++;
           if(oc==='Booked') byCampaign[l.campaignId].booked++;
           if(oc==='Open File') byCampaign[l.campaignId].openFile++;
+          // Revenue tracking — actual entered value if known, otherwise fall
+          // back to the department's average estimate (only for booked leads).
+          if(oc==='Booked') {
+            if(l.revenueValue) {
+              byCampaign[l.campaignId].actualRevenue += l.revenueValue;
+            } else {
+              const estimate = DEPT_REVENUE_ESTIMATES[l.department];
+              if(estimate) byCampaign[l.campaignId].estimatedRevenue += estimate;
+            }
+          }
         }
       });
 
-      // Attach campaign name + cost + CPL/CPA for each campaign with leads
+      // Attach campaign name + cost + CPL/CPA/ROI for each campaign with leads
       const campaignStats = Object.entries(byCampaign).map(([id, stats]) => {
         const campaign = ALL_INITIATIVES.find(i=>i.id===id);
         const cost = campaign?.cost || 0;
         const acquisitions = stats.booked + stats.openFile;
+        const totalRevenue = stats.actualRevenue + stats.estimatedRevenue;
+        const hasRevenueData = totalRevenue > 0;
         return {
           campaignId: id,
           title: campaign?.title || 'Unknown Campaign',
@@ -4650,6 +4752,10 @@ function computeAndPublishLeadStats() {
           openFile: stats.openFile,
           cpl: stats.total > 0 ? Math.round((cost / stats.total) * 100) / 100 : null,
           cpa: acquisitions > 0 ? Math.round((cost / acquisitions) * 100) / 100 : null,
+          actualRevenue: stats.actualRevenue,
+          estimatedRevenue: stats.estimatedRevenue,
+          roi: (hasRevenueData && cost > 0) ? Math.round(((totalRevenue - cost) / cost) * 1000) / 10 : null,
+          roiIsEstimated: stats.estimatedRevenue > 0, // true if any portion of ROI relies on department averages, not actuals
         };
       }).sort((a,b) => b.leads - a.leads);
 

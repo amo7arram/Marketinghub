@@ -892,6 +892,24 @@ export async function fetchGoogleSheetCSV(sheetUrlOrId) {
   return res.text();
 }
 
+// ── DEPARTMENT REVENUE ESTIMATES (ROI fallback) ───────────────────────────
+// Stored as config/department_revenue_estimates → { "Cardiology": 1200, ... }
+// Used as a fallback when a booked lead has no actual revenueValue entered,
+// so campaign ROI always has a number rather than showing "no data."
+export async function getDepartmentRevenueEstimates() {
+  const snap = await getDoc(doc(db, CONFIG, "department_revenue_estimates"));
+  return snap.exists() ? snap.data() : {};
+}
+export function setDepartmentRevenueEstimates(estimates) {
+  return setDoc(doc(db, CONFIG, "department_revenue_estimates"), estimates);
+}
+export function watchDepartmentRevenueEstimates(callback) {
+  return onSnapshot(doc(db, CONFIG, "department_revenue_estimates"),
+    snap => callback(snap.exists() ? snap.data() : {}),
+    err => { console.error('watchDepartmentRevenueEstimates:', err.code); callback({}); }
+  );
+}
+
 // ── PUBLIC LEAD STATS (aggregated, no PII) ────────────────────────────────
 // Written by the admin app whenever leads change (see admin.html). Stored
 // separately from the leads collection itself so the public portal never

@@ -2055,9 +2055,9 @@ window.renderLeadsDashboard = function() {
     </div>
 
     <div class="card">
-      <div class="card-header"><div class="card-title">Campaign Performance</div><span style="font-size:11px;color:var(--text-3)">Cost per Lead & Cost per Acquisition</span></div>
+      <div class="card-header"><div class="card-title">Campaign Performance</div><span style="font-size:11px;color:var(--text-3)">Cost per Lead, Cost per Acquisition & ROI</span></div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
           <thead><tr style="border-bottom:2px solid var(--border)">
             <th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-3)">Campaign</th>
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Leads</th>
@@ -2065,21 +2065,28 @@ window.renderLeadsDashboard = function() {
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">CPL</th>
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Booked</th>
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">CPA</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">ROI</th>
           </tr></thead>
           <tbody>${
             (s.campaigns||[]).length
-              ? s.campaigns.map(c=>`<tr style="border-bottom:1px solid var(--border)">
-                  <td style="padding:8px 10px;font-weight:600">${c.title}</td>
-                  <td style="padding:8px 10px;text-align:right">${fmt(c.leads)}</td>
-                  <td style="padding:8px 10px;text-align:right;color:var(--text-3)">${c.cost?c.cost.toLocaleString():'—'}</td>
-                  <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--navy)">${c.cpl!=null?c.cpl.toLocaleString():'—'}</td>
-                  <td style="padding:8px 10px;text-align:right;color:var(--green);font-weight:600">${fmt(c.booked)}</td>
-                  <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--green)">${c.cpa!=null?c.cpa.toLocaleString():'—'}</td>
-                </tr>`).join('')
-              : `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">No leads linked to a campaign yet</td></tr>`
+              ? s.campaigns.map(c=>{
+                  const roiColor = c.roi==null ? 'var(--text-3)' : c.roi >= 0 ? 'var(--green)' : 'var(--red)';
+                  const roiDisplay = c.roi==null ? '—' : `${c.roi>=0?'+':''}${c.roi}%${c.roiIsEstimated?' <span title="Includes department-average revenue estimates for bookings with no actual revenue entered yet" style="color:var(--text-3);cursor:help">‡</span>':''}`;
+                  return `<tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:8px 10px;font-weight:600">${c.title}</td>
+                    <td style="padding:8px 10px;text-align:right">${fmt(c.leads)}</td>
+                    <td style="padding:8px 10px;text-align:right;color:var(--text-3)">${c.cost?c.cost.toLocaleString():'—'}</td>
+                    <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--navy)">${c.cpl!=null?c.cpl.toLocaleString():'—'}</td>
+                    <td style="padding:8px 10px;text-align:right;color:var(--green);font-weight:600">${fmt(c.booked)}</td>
+                    <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--green)">${c.cpa!=null?c.cpa.toLocaleString():'—'}</td>
+                    <td style="padding:8px 10px;text-align:right;font-weight:700;color:${roiColor}">${roiDisplay}</td>
+                  </tr>`;
+                }).join('')
+              : `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">No leads linked to a campaign yet</td></tr>`
           }</tbody>
         </table>
       </div>
+      ${(s.campaigns||[]).some(c=>c.roiIsEstimated) ? `<div style="font-size:10px;color:var(--text-3);margin-top:10px">‡ ROI includes department-average revenue estimates for bookings without an actual entered value — set in admin Settings → Department Revenue Estimates</div>` : ''}
     </div>
   `;
 

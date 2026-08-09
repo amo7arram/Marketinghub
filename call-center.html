@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC — Call Center Leads</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--gold:#C8A96E;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;--green:#1DB87A;--red:#E0392B;--orange:#9B5800;
+  --radius:6px;--radius-lg:10px;--shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+}
+html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+/* LOGIN */
+.login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy),#003766)}
+.login-card{background:var(--surface);border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center}
+.login-logo-img{width:130px;margin-bottom:10px}
+.login-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.login-field{margin-bottom:14px;text-align:left}
+.login-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.login-input{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.login-input:focus{outline:none;border-color:var(--navy)}
+.login-btn{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:600;font-size:14px;cursor:pointer;margin-top:6px;font-family:inherit}
+.login-btn:hover{background:#003f7a}
+.login-error{background:#FFE8E8;color:#9B2020;padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:14px;display:none;text-align:left}
+
+/* PAGE */
+.page-wrap{display:none;min-height:100vh}
+.page-wrap.active{display:block}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px}
+.topbar-logo{display:flex;align-items:center;gap:10px}
+.topbar-logo-img{height:28px}
+.topbar-logo-text{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text-2)}
+.btn{font-size:12px;padding:7px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;background:var(--surface);color:var(--text-2);font-family:inherit;font-weight:500}
+.btn:hover{background:var(--bg)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn-primary:hover{background:#003f7a}
+.content{padding:20px 24px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow);text-align:center}
+.stat-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--navy);line-height:1}
+.stat-label{font-size:10px;color:var(--text-3);margin-top:4px;text-transform:uppercase;letter-spacing:0.04em}
+
+/* FILTERS */
+.filters-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.filter-input,.filter-select{font-size:12px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;background:var(--surface)}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+th{background:var(--navy);color:#fff;padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+.empty-row td{text-align:center;padding:30px;color:var(--text-3)}
+.status-select{font-size:10px;padding:3px 6px;border-radius:4px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid transparent}
+.pagination{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.5);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:14px;width:420px;max-width:90vw;box-shadow:var(--shadow-lg)}
+.modal-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:800}
+.modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-3)}
+.modal-body{padding:20px 22px}
+.modal-footer{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.field-group{margin-bottom:14px}
+.field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.field-input,.field-textarea{width:100%;padding:8px 11px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.field-textarea{min-height:70px;resize:vertical}
+.field-input:focus,.field-textarea:focus{outline:none;border-color:var(--navy)}
+.readonly-note{font-size:10px;color:var(--text-3);margin-top:3px}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
+.toast.show{display:block}
+.toast.error{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <img class="login-logo-img" src="logo.jpg" alt="IMC">
+    <div class="login-sub">Call Center — Leads Access</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-field"><label class="login-label">Email</label><input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa"></div>
+    <div class="login-field"><label class="login-label">Password</label><input class="login-input" type="password" id="login-password" placeholder="••••••••"></div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<div class="page-wrap" id="page-wrap">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <img class="topbar-logo-img" src="logo.jpg" alt="IMC">
+      <span class="topbar-logo-text">Call Center · Leads</span>
+    </div>
+    <button class="btn" onclick="doLogout()">Sign Out</button>
+  </div>
+
+  <div class="content">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val" id="s-total">—</div><div class="stat-label">Total</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-untouched">—</div><div class="stat-label">Untouched</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-reached">—</div><div class="stat-label">Reached</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-unreached">—</div><div class="stat-label">Unreached</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-missed">—</div><div class="stat-label">Missed</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-booked">—</div><div class="stat-label">Booked</div></div>
+    </div>
+
+    <div class="filters-bar">
+      <input class="filter-input" type="text" id="f-search" placeholder="Search name or phone..." oninput="resetPageAndRender()" style="width:200px">
+      <select class="filter-select" id="f-contact" onchange="resetPageAndRender()"><option value="">All Contact Status</option></select>
+      <select class="filter-select" id="f-outcome" onchange="resetPageAndRender()"><option value="">All Outcomes</option></select>
+      <select class="filter-select" id="f-dept" onchange="resetPageAndRender()"><option value="">All Departments</option></select>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table style="min-width:1000px">
+        <thead><tr>
+          <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
+          <th>Campaign</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Notes</th><th></th>
+        </tr></thead>
+        <tbody id="table-body"><tr class="empty-row"><td colspan="11">Loading leads...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- EDIT MODAL — Name, Phone, Notes, Revenue only. Status/Outcome edited inline. -->
+<div class="modal-overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Lead</div>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Full Name</label><input class="field-input" id="edit-name"></div>
+      <div class="field-group"><label class="field-label">Phone</label><input class="field-input" id="edit-phone" type="tel"></div>
+      <div class="field-group">
+        <label class="field-label">Revenue Value (SAR) <span style="color:var(--text-3);font-weight:400">— if known, once booked</span></label>
+        <input class="field-input" type="number" id="edit-revenue" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" id="edit-notes" placeholder="Call notes, follow-up needed, etc."></textarea></div>
+      <div class="readonly-note">Department, Entity, and Campaign are set by the marketing team and can't be changed here.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import {
+  login, logout, watchAuth, getUserRole,
+  watchLeads, updateLead, watchInitiatives,
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, DEPARTMENTS
+} from './firebase-data.js';
+
+let ALL_LEADS = [];
+let ALL_CAMPAIGNS = [];
+let editingLeadId = null;
+let currentPage = 1;
+const PER_PAGE = 50;
+
+// ── AUTH ──────────────────────────────────────────────────────────────
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+  try { await login(email, password); }
+  catch(e) {
+    errEl.textContent = 'Sign-in failed — check your email and password.';
+    errEl.style.display = 'block';
+    btn.textContent = 'Sign In'; btn.disabled = false;
+  }
+}
+window.doLogout = async function() { await logout(); }
+
+watchAuth(async user => {
+  const btn = document.getElementById('login-btn');
+  if(user) {
+    try {
+      const role = await getUserRole(user.uid);
+      if(role !== 'call_center') {
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = 'This account does not have call center access.';
+        errEl.style.display = 'block';
+        if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
+        await logout();
+        return;
+      }
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('page-wrap').classList.add('active');
+      populateFilters();
+      watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); renderTable(); });
+      watchLeads(data => { ALL_LEADS = data; renderStats(); renderTable(); });
+    } catch(e) {
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = 'Could not verify access: ' + e.message;
+      errEl.style.display = 'block';
+      if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
+      await logout();
+    }
+  } else {
+    if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
+    document.getElementById('login-wrap').style.display = 'flex';
+    document.getElementById('page-wrap').classList.remove('active');
+  }
+});
+
+function populateFilters() {
+  document.getElementById('f-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('f-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('f-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+}
+
+function campaignTitleFor(id) {
+  if(!id) return null;
+  const c = ALL_CAMPAIGNS.find(x=>x.id===id);
+  return c ? c.title : null;
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────
+function renderStats() {
+  const counts = { Untouched:0, Reached:0, Unreached:0, Missed:0 };
+  let booked = 0;
+  ALL_LEADS.forEach(l=>{
+    const cs = l.contactStatus || 'Untouched';
+    if(counts[cs]!==undefined) counts[cs]++;
+    if(l.outcome==='Booked') booked++;
+  });
+  document.getElementById('s-total').textContent = ALL_LEADS.length;
+  document.getElementById('s-untouched').textContent = counts.Untouched;
+  document.getElementById('s-reached').textContent = counts.Reached;
+  document.getElementById('s-unreached').textContent = counts.Unreached;
+  document.getElementById('s-missed').textContent = counts.Missed;
+  document.getElementById('s-booked').textContent = booked;
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────
+window.resetPageAndRender = function() { currentPage = 1; renderTable(); }
+
+function renderTable() {
+  const q = (document.getElementById('f-search')?.value||'').toLowerCase();
+  const contactF = document.getElementById('f-contact')?.value||'';
+  const outcomeF = document.getElementById('f-outcome')?.value||'';
+  const deptF = document.getElementById('f-dept')?.value||'';
+
+  let data = ALL_LEADS.filter(l=>{
+    if(contactF && (l.contactStatus||'Untouched')!==contactF) return false;
+    if(outcomeF && (l.outcome||'Pending')!==outcomeF) return false;
+    if(deptF && l.department!==deptF) return false;
+    if(q && !`${l.name} ${l.phone}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(data.length / PER_PAGE));
+  if(currentPage > totalPages) currentPage = totalPages;
+  if(currentPage < 1) currentPage = 1;
+  const startIdx = (currentPage-1)*PER_PAGE;
+  const pageData = data.slice(startIdx, startIdx+PER_PAGE);
+
+  document.getElementById('table-body').innerHTML = pageData.length
+    ? pageData.map(l=>{
+        const cs = l.contactStatus || 'Untouched';
+        const oc = l.outcome || 'Pending';
+        const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
+        const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
+        const campaignLabel = l.campaign || campaignTitleFor(l.campaignId) || '—';
+        return `<tr>
+          <td style="font-weight:600">${l.name||'—'}</td>
+          <td>${l.phone||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${l.department||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${l.entity||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${l.source||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${campaignLabel}</td>
+          <td style="color:var(--text-3);font-size:11px;white-space:nowrap">${l.dateCreated||'—'}</td>
+          <td><select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
+            ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
+          </select></td>
+          <td>${cs==='Reached'
+            ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
+                ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
+              </select>`
+            : `<span style="color:var(--text-3);font-size:11px">—</span>`}
+          </td>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${l.notes||''}">${l.notes||'—'}</td>
+          <td><button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button></td>
+        </tr>`;
+      }).join('')
+    : `<tr class="empty-row"><td colspan="11">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+
+  renderPagination(data.length, totalPages, startIdx, pageData.length);
+}
+
+function renderPagination(totalCount, totalPages, startIdx, pageCount) {
+  const el = document.getElementById('pagination');
+  if(totalCount===0){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <span>Showing ${startIdx+1}–${startIdx+pageCount} of ${totalCount} leads</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm" ${currentPage<=1?'disabled':''} onclick="goToPage(${currentPage-1})">‹ Prev</button>
+      <span style="padding:4px 8px;font-weight:600">Page ${currentPage} of ${totalPages}</span>
+      <button class="btn btn-sm" ${currentPage>=totalPages?'disabled':''} onclick="goToPage(${currentPage+1})">Next ›</button>
+    </div>`;
+}
+window.goToPage = function(p) { currentPage = p; renderTable(); }
+
+window.changeContactStatus = async function(id, contactStatus) {
+  try {
+    const updates = { contactStatus };
+    if(contactStatus !== 'Reached') updates.outcome = 'Pending';
+    await updateLead(id, updates);
+  } catch(e) { showToast('Update failed: '+e.message, true); }
+}
+window.changeOutcome = async function(id, outcome) {
+  try { await updateLead(id, { outcome }); }
+  catch(e) { showToast('Update failed: '+e.message, true); }
+}
+
+// ── EDIT MODAL (Name, Phone, Notes, Revenue only) ──────────────────────
+window.openEditModal = function(id) {
+  const l = ALL_LEADS.find(x=>x.id===id);
+  if(!l) return;
+  editingLeadId = id;
+  document.getElementById('edit-name').value = l.name||'';
+  document.getElementById('edit-phone').value = l.phone||'';
+  document.getElementById('edit-revenue').value = l.revenueValue ?? '';
+  document.getElementById('edit-notes').value = l.notes||'';
+  document.getElementById('edit-overlay').classList.add('open');
+}
+window.closeEditModal = function() { document.getElementById('edit-overlay').classList.remove('open'); }
+window.saveEdit = async function() {
+  const name = document.getElementById('edit-name').value.trim();
+  const phone = document.getElementById('edit-phone').value.trim();
+  if(!name || !phone) { showToast('Name and phone are required', true); return; }
+  try {
+    await updateLead(editingLeadId, {
+      name, phone,
+      revenueValue: parseFloat(document.getElementById('edit-revenue').value) || null,
+      notes: document.getElementById('edit-notes').value.trim(),
+    });
+    showToast('✓ Lead updated');
+    closeEditModal();
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=>{ t.className = 'toast'; }, 3000);
+}
+</script>
+</body>
+</html>
