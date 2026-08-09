@@ -195,7 +195,7 @@ watchAuth(async user => {
   if(user) {
     try {
       const role = await getUserRole(user.uid);
-      if(role !== 'call_center') {
+      if(role !== 'agent' && role !== 'admin') {
         const errEl = document.getElementById('login-error');
         errEl.textContent = 'This account does not have call center access.';
         errEl.style.display = 'block';
