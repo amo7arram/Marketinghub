@@ -804,12 +804,23 @@ export const SAMPLE_LOYALTY_CARDS = [
 // ── LEADS CRM ─────────────────────────────────────────────────────────────
 const LEADS = "leads";
 
-export const LEAD_STATUSES = ["Lead", "Open File", "Booked", "Closed"];
-export const LEAD_STATUS_COLORS = {
-  "Lead":      {bg:"#E4EDFF", t:"#1649A3"},
-  "Open File": {bg:"#FFF0D4", t:"#9B5800"},
-  "Booked":    {bg:"#D4F0E2", t:"#0D6E44"},
-  "Closed":    {bg:"#F0F2F7", t:"#8890A8"},
+// Two-dimension status model:
+// contactStatus — mutually exclusive, always sums to 100% of leads.
+// outcome — only meaningful once contactStatus is "Reached".
+export const CONTACT_STATUSES = ["Untouched", "Reached", "Unreached", "Missed"];
+export const OUTCOMES = ["Pending", "Open File", "Booked", "Closed - Unsuccessful"];
+
+export const CONTACT_STATUS_COLORS = {
+  "Untouched": {bg:"#F0F2F7", t:"#8890A8"},
+  "Reached":   {bg:"#D4F0E2", t:"#0D6E44"},
+  "Unreached": {bg:"#FFF0D4", t:"#9B5800"},
+  "Missed":    {bg:"#FDE4E4", t:"#B0234A"},
+};
+export const OUTCOME_COLORS = {
+  "Pending":                {bg:"#F0F2F7", t:"#8890A8"},
+  "Open File":              {bg:"#FFF0D4", t:"#9B5800"},
+  "Booked":                 {bg:"#D4F0E2", t:"#0D6E44"},
+  "Closed - Unsuccessful":  {bg:"#FDE4E4", t:"#B0234A"},
 };
 
 export function watchLeads(callback) {
@@ -839,4 +850,63 @@ export async function bulkAddLeads(leadsArray, onProgress) {
     if(onProgress) onProgress(done, leadsArray.length);
   }
   return done;
+}
+
+// One-time migration: converts legacy flat `status` (Lead/Open File/Booked/
+// Closed) into the new two-field model. Safe to run more than once — only
+// acts on leads that still have an old-style status and no contactStatus yet.
+const LEGACY_STATUS_MAP = {
+  "Lead":      { contactStatus: "Untouched", outcome: "Pending" },
+  "Open File": { contactStatus: "Reached",   outcome: "Open File" },
+  "Booked":    { contactStatus: "Reached",   outcome: "Booked" },
+  "Closed":    { contactStatus: "Reached",   outcome: "Closed - Unsuccessful" },
+};
+export async function migrateLegacyLeadStatuses() {
+  const snap = await getDocs(collection(db, LEADS));
+  const legacy = snap.docs.filter(d => d.data().status && !d.data().contactStatus);
+  if (!legacy.length) return { migrated: 0 };
+  await Promise.all(legacy.map(d => {
+    const mapped = LEGACY_STATUS_MAP[d.data().status] || { contactStatus: "Untouched", outcome: "Pending" };
+    return updateDoc(doc(db, LEADS, d.id), mapped);
+  }));
+  return { migrated: legacy.length };
+}
+
+// ── LEADS ↔ GOOGLE SHEETS (live-read, on-demand sync) ─────────────────────
+// Extracts the sheet ID from any normal Google Sheets share URL.
+export function parseGoogleSheetId(url) {
+  const m = String(url||'').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+// Fetches a sheet's first tab as raw CSV text via Google's public CSV export
+// endpoint. Works for any sheet with "Anyone with the link can view" sharing
+// — no separate "Publish to web" step needed. This is a one-time fetch, not
+// a live connection — call it again (e.g. via a Sync button) to get fresh data.
+export async function fetchGoogleSheetCSV(sheetUrlOrId) {
+  const sheetId = sheetUrlOrId.includes('/') ? parseGoogleSheetId(sheetUrlOrId) : sheetUrlOrId;
+  if (!sheetId) throw new Error('Could not find a valid Google Sheet ID in that link');
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+  const res = await fetch(exportUrl);
+  if (!res.ok) throw new Error('Could not fetch the sheet — check that link-sharing is set to "Anyone with the link can view"');
+  return res.text();
+}
+
+// ── PUBLIC LEAD STATS (aggregated, no PII) ────────────────────────────────
+// Written by the admin app whenever leads change (see admin.html). Stored
+// separately from the leads collection itself so the public portal never
+// needs read access to individual names/phone numbers — only this
+// pre-computed, aggregate-only snapshot.
+export async function getLeadStats() {
+  const snap = await getDoc(doc(db, CONFIG, "lead_stats"));
+  return snap.exists() ? snap.data() : null;
+}
+export function setLeadStats(stats) {
+  return setDoc(doc(db, CONFIG, "lead_stats"), { ...stats, updatedAt: Timestamp.now() });
+}
+export function watchLeadStats(callback) {
+  return onSnapshot(doc(db, CONFIG, "lead_stats"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchLeadStats:', err.code); callback(null); }
+  );
 }

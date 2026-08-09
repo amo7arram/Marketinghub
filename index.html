@@ -306,6 +306,28 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 
 /* BD KPI PROGRESS */
 .kpi-row{display:grid;grid-template-columns:160px 1fr 80px 60px;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+
+/* LEADS & ATTRIBUTION DASHBOARD */
+.ld-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.ld-kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow);text-align:center}
+.ld-kpi-val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:var(--navy);line-height:1;margin-bottom:6px}
+.ld-kpi-label{font-size:12px;font-weight:600;color:var(--text)}
+.ld-kpi-sub{font-size:10px;color:var(--text-3);margin-top:3px}
+.ld-funnel-wrap{display:flex;flex-direction:column;gap:8px;padding:8px 0}
+.ld-funnel-stage{display:flex;align-items:center;gap:14px}
+.ld-funnel-bar-track{flex:1;height:38px;background:var(--bg);border-radius:8px;overflow:hidden;position:relative}
+.ld-funnel-bar-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:14px;color:#fff;font-weight:700;font-size:13px;transition:width 0.6s ease;white-space:nowrap}
+.ld-funnel-label{width:110px;font-size:12px;font-weight:700;color:var(--text);text-align:right;flex-shrink:0}
+.ld-funnel-pct{width:60px;font-size:13px;font-weight:800;color:var(--navy);flex-shrink:0}
+.ld-side-stat{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:8px;padding:10px 14px}
+.ld-side-stat-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ld-side-stat-val{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--text)}
+.ld-side-stat-label{font-size:11px;color:var(--text-3)}
+.ld-breakdown-row{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12px}
+.ld-breakdown-label{width:140px;flex-shrink:0;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ld-breakdown-track{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.ld-breakdown-fill{height:100%;border-radius:4px;background:var(--navy)}
+.ld-breakdown-count{width:50px;text-align:right;color:var(--text-3);font-size:11px;flex-shrink:0}
 .kpi-row:last-child{border:none}
 .kpi-row-label{font-size:12px;font-weight:600;color:var(--text)}
 .kpi-row-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
@@ -378,6 +400,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <div class="nav-item" onclick="nav('wellspan',this)"><span class="nav-icon">💚</span> Well-span Program</div>
       <div class="nav-item" onclick="nav('loyalty',this)"><span class="nav-icon">🏅</span> Loyalty Program</div>
       <div class="nav-item" onclick="nav('bd',this)"><span class="nav-icon">🤝</span> Business Development</div>
+      <div class="nav-item" onclick="nav('leadsdash',this)"><span class="nav-icon">📈</span> Leads & Attribution</div>
       <div class="nav-section">Campaigns</div>
       <div class="nav-item" onclick="nav('campaigns',this)"><span class="nav-icon">◈</span> All Campaigns</div>
       <div class="nav-item" onclick="nav('events',this)"><span class="nav-icon">◆</span> Events</div>
@@ -647,6 +670,11 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         <div class="dept-camp-grid" id="bd-grid"><div class="loading">Loading...</div></div>
       </div>
 
+      <!-- LEADS & ATTRIBUTION DASHBOARD -->
+      <div class="page" id="page-leadsdash">
+        <div id="leadsdash-content"><div class="loading">Loading leads data...</div></div>
+      </div>
+
       <!-- BRAND RESOURCES -->
       <div class="page" id="page-resources">
         <div class="cal-controls" style="margin-bottom:16px">
@@ -683,12 +711,14 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
   watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets, watchEntities, watchHealthDays,
+  watchLeadStats,
   promoStatus, getAccessGate, hashPassword,
   DEPARTMENTS, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
 
 let ALL_ENTITIES = [];
 let HEALTH_DAYS = [];
+let LEAD_STATS = null;
 
 let RESOURCES   = [];
 let METRICS     = [];
@@ -717,6 +747,7 @@ const PAGE_META = {
   wellspan:  {title:'Well-span Program', sub:'Wellness packages and preventive health programs'},
   loyalty:   {title:'Loyalty Program', sub:'IMC loyalty cards — benefits and pricing'},
   bd:        {title:'Business Development', sub:'Outreach, collaborations, and external activations'},
+  leadsdash: {title:'Leads & Attribution', sub:'Lead generation funnel, campaign performance, and cost per acquisition'},
   resources: {title:'Brand Resources',  sub:'Logos, templates, and brand guidelines to download'},
 };
 
@@ -866,6 +897,7 @@ function renderAll() {
   if(activePage==='wellspan')      window.renderWellspan();
   if(activePage==='loyalty')       window.renderLoyalty();
   if(activePage==='bd')            window.renderBD();
+  if(activePage==='leadsdash')     window.renderLeadsDashboard();
   if(activePage==='resources')     window.renderResources();
 }
 
@@ -1953,6 +1985,146 @@ function renderBdGrid() {
   }).join('');
 }
 
+// ── LEADS & ATTRIBUTION DASHBOARD ────────────────────────────────────────
+let ldTrendChart = null;
+
+window.renderLeadsDashboard = function() {
+  const el = document.getElementById('leadsdash-content');
+  if(!el) return;
+
+  if(!LEAD_STATS || !LEAD_STATS.total) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📈</div>No leads data yet — leads entered in the admin Leads CRM will populate this dashboard automatically</div>`;
+    return;
+  }
+
+  const s = LEAD_STATS;
+  const reachPct = s.total ? Math.round((s.reached/s.total)*100) : 0;
+  const bookRate = s.reached ? Math.round((s.booked/s.reached)*100) : 0;
+  const unreachedPct = s.total ? Math.round((s.unreached/s.total)*100) : 0;
+  const missedPct = s.total ? Math.round((s.missed/s.total)*100) : 0;
+
+  el.innerHTML = `
+    <div class="ld-kpi-grid">
+      <div class="ld-kpi-card"><div class="ld-kpi-val">${fmt(s.total)}</div><div class="ld-kpi-label">Total Leads</div></div>
+      <div class="ld-kpi-card"><div class="ld-kpi-val" style="color:#0D6E44">${reachPct}%</div><div class="ld-kpi-label">Reach Rate</div><div class="ld-kpi-sub">${fmt(s.reached)} reached</div></div>
+      <div class="ld-kpi-card"><div class="ld-kpi-val" style="color:var(--green)">${bookRate}%</div><div class="ld-kpi-label">Book Rate</div><div class="ld-kpi-sub">${fmt(s.booked)} of reached</div></div>
+      <div class="ld-kpi-card"><div class="ld-kpi-val" style="color:var(--text-3)">${fmt(s.untouched)}</div><div class="ld-kpi-label">Untouched</div><div class="ld-kpi-sub">not yet contacted</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><div class="card-title">Lead Funnel</div></div>
+      <div class="ld-funnel-wrap">
+        <div class="ld-funnel-stage">
+          <div class="ld-funnel-label">Total Leads</div>
+          <div class="ld-funnel-bar-track"><div class="ld-funnel-bar-fill" style="width:100%;background:var(--text-3)">${fmt(s.total)}</div></div>
+          <div class="ld-funnel-pct">100%</div>
+        </div>
+        <div class="ld-funnel-stage">
+          <div class="ld-funnel-label">Reached</div>
+          <div class="ld-funnel-bar-track"><div class="ld-funnel-bar-fill" style="width:${reachPct}%;background:#0D6E44">${fmt(s.reached)}</div></div>
+          <div class="ld-funnel-pct">${reachPct}%</div>
+        </div>
+        <div class="ld-funnel-stage">
+          <div class="ld-funnel-label">Booked</div>
+          <div class="ld-funnel-bar-track"><div class="ld-funnel-bar-fill" style="width:${Math.max(reachPct*bookRate/100,3)}%;background:var(--green)">${fmt(s.booked)}</div></div>
+          <div class="ld-funnel-pct">${bookRate}%<span style="font-weight:400;color:var(--text-3)"> of reached</span></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px">
+        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#9B5800"></span><div><div class="ld-side-stat-val">${fmt(s.unreached)}</div><div class="ld-side-stat-label">Unreached (${unreachedPct}%)</div></div></div>
+        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#B0234A"></span><div><div class="ld-side-stat-val">${fmt(s.missed)}</div><div class="ld-side-stat-label">Missed (${missedPct}%)</div></div></div>
+        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#9B5800"></span><div><div class="ld-side-stat-val">${fmt(s.openFile)}</div><div class="ld-side-stat-label">Open File</div></div></div>
+        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#8890A8"></span><div><div class="ld-side-stat-val">${fmt(s.closedUnsuccessful)}</div><div class="ld-side-stat-label">Closed / Unsuccessful</div></div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:24px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Leads Trend</div><span style="font-size:11px;color:var(--text-3)">Monthly — Total / Reached / Booked</span></div>
+        <div class="chart-container"><canvas id="ldTrendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">By Department</div></div>
+        <div id="ld-dept-breakdown"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><div class="card-title">By Entity</div></div>
+      <div id="ld-entity-breakdown"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Campaign Performance</div><span style="font-size:11px;color:var(--text-3)">Cost per Lead & Cost per Acquisition</span></div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+          <thead><tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-3)">Campaign</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Leads</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Cost (SAR)</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">CPL</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Booked</th>
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">CPA</th>
+          </tr></thead>
+          <tbody>${
+            (s.campaigns||[]).length
+              ? s.campaigns.map(c=>`<tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:8px 10px;font-weight:600">${c.title}</td>
+                  <td style="padding:8px 10px;text-align:right">${fmt(c.leads)}</td>
+                  <td style="padding:8px 10px;text-align:right;color:var(--text-3)">${c.cost?c.cost.toLocaleString():'—'}</td>
+                  <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--navy)">${c.cpl!=null?c.cpl.toLocaleString():'—'}</td>
+                  <td style="padding:8px 10px;text-align:right;color:var(--green);font-weight:600">${fmt(c.booked)}</td>
+                  <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--green)">${c.cpa!=null?c.cpa.toLocaleString():'—'}</td>
+                </tr>`).join('')
+              : `<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-3)">No leads linked to a campaign yet</td></tr>`
+          }</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  renderLeadsTrendChart(s.byMonth||{});
+  renderLeadsBreakdown('ld-dept-breakdown', s.byDepartment||{});
+  renderLeadsBreakdown('ld-entity-breakdown', s.byEntity||{});
+}
+
+function renderLeadsTrendChart(byMonth) {
+  const canvas = document.getElementById('ldTrendChart');
+  if(!canvas) return;
+  const months = Object.keys(byMonth).sort();
+  const labels = months.map(m=>{ const [y,mo]=m.split('-'); return new Date(y,mo-1,1).toLocaleString('en',{month:'short',year:'2-digit'}); });
+  const totalData   = months.map(m=>byMonth[m].total);
+  const reachedData = months.map(m=>byMonth[m].reached);
+  const bookedData  = months.map(m=>byMonth[m].booked);
+
+  if(ldTrendChart) ldTrendChart.destroy();
+  ldTrendChart = new Chart(canvas, {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'Total',   data:totalData,   borderColor:'#8890A8', backgroundColor:'transparent', tension:0.35, borderWidth:2, pointRadius:3 },
+      { label:'Reached', data:reachedData, borderColor:'#0D6E44', backgroundColor:'transparent', tension:0.35, borderWidth:2, pointRadius:3 },
+      { label:'Booked',  data:bookedData,  borderColor:'#1DB87A', backgroundColor:'rgba(29,184,122,0.08)', tension:0.35, borderWidth:2, pointRadius:3, fill:true },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{font:{size:10},boxWidth:10,padding:10} } },
+      scales:{ y:{ beginAtZero:true, ticks:{font:{size:9}}, grid:{color:'rgba(0,0,0,0.04)'} } } }
+  });
+}
+
+function renderLeadsBreakdown(containerId, byGroup) {
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const entries = Object.entries(byGroup).sort((a,b)=>b[1].total-a[1].total);
+  if(!entries.length) { el.innerHTML = '<div style="font-size:12px;color:var(--text-3);padding:8px 0">No data yet</div>'; return; }
+  const maxTotal = Math.max(...entries.map(([,v])=>v.total));
+  el.innerHTML = entries.map(([label,v])=>`
+    <div class="ld-breakdown-row">
+      <div class="ld-breakdown-label" title="${label}">${label}</div>
+      <div class="ld-breakdown-track"><div class="ld-breakdown-fill" style="width:${(v.total/maxTotal*100)}%"></div></div>
+      <div class="ld-breakdown-count">${v.total}</div>
+    </div>`).join('');
+}
+
 // ── BRAND RESOURCES ──────────────────────────────────────────────────
 const RES_TYPE_ICONS = {
   'Social Media':'📱','Print':'🖨️','Stationery':'✉️','Logo & Brand Mark':'🎨',
@@ -2052,6 +2224,7 @@ async function initPortal() {
   populateFilters();
   watchEntities(data => { ALL_ENTITIES = data; populateEntityFilters(); });
   watchHealthDays(data => { HEALTH_DAYS = data; renderAll(); });
+  watchLeadStats(data => { LEAD_STATS = data; renderAll(); });
   initPortalData();
 }
 

@@ -372,30 +372,41 @@ tr.row-done:hover td{background:#DCF2E5}
     <!-- LEADS CRM PAGE -->
     <div class="page" id="page-leads">
       <!-- Stats row -->
-      <div class="budget-stats" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px">
+      <div class="budget-stats" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
         <div class="budget-stat"><div class="budget-stat-label">Total Leads</div><div class="budget-stat-val" id="ls-total">—</div></div>
-        <div class="budget-stat" style="border-left:3px solid #1649A3"><div class="budget-stat-label">Lead</div><div class="budget-stat-val" id="ls-lead" style="color:#1649A3">—</div></div>
-        <div class="budget-stat" style="border-left:3px solid #9B5800"><div class="budget-stat-label">Open File</div><div class="budget-stat-val" id="ls-open" style="color:#9B5800">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid #0D6E44"><div class="budget-stat-label">Reached</div><div class="budget-stat-val" id="ls-reached" style="color:#0D6E44">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid #9B5800"><div class="budget-stat-label">Unreached</div><div class="budget-stat-val" id="ls-unreached" style="color:#9B5800">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid #B0234A"><div class="budget-stat-label">Missed</div><div class="budget-stat-val" id="ls-missed" style="color:#B0234A">—</div></div>
         <div class="budget-stat" style="border-left:3px solid var(--green)"><div class="budget-stat-label">Booked</div><div class="budget-stat-val" id="ls-booked" style="color:var(--green)">—</div></div>
-        <div class="budget-stat" style="border-left:3px solid var(--text-3)"><div class="budget-stat-label">Closed</div><div class="budget-stat-val" id="ls-closed" style="color:var(--text-3)">—</div></div>
+        <div class="budget-stat" style="border-left:3px solid var(--text-3)"><div class="budget-stat-label">Untouched</div><div class="budget-stat-val" id="ls-untouched" style="color:var(--text-3)">—</div></div>
       </div>
       <!-- Toolbar -->
       <div class="toolbar">
         <div class="filters">
-          <input class="filter-input" type="text" id="lead-search" placeholder="Search name or phone..." oninput="resetLeadsPageAndRender()" style="width:200px">
-          <select class="filter-select" id="lead-filter-status" onchange="resetLeadsPageAndRender()">
-            <option value="">All Status</option>
-            <option>Lead</option><option>Open File</option><option>Booked</option><option>Closed</option>
+          <input class="filter-input" type="text" id="lead-search" placeholder="Search name or phone..." oninput="resetLeadsPageAndRender()" style="width:180px">
+          <select class="filter-select" id="lead-filter-contact" onchange="resetLeadsPageAndRender()">
+            <option value="">All Contact Status</option>
+          </select>
+          <select class="filter-select" id="lead-filter-outcome" onchange="resetLeadsPageAndRender()">
+            <option value="">All Outcomes</option>
           </select>
           <select class="filter-select" id="lead-filter-dept" onchange="resetLeadsPageAndRender()">
             <option value="">All Departments</option>
           </select>
+          <select class="filter-select" id="lead-filter-entity" onchange="resetLeadsPageAndRender()">
+            <option value="">All Entities</option>
+          </select>
+          <select class="filter-select" id="lead-filter-campaign" onchange="resetLeadsPageAndRender()">
+            <option value="">All Campaigns</option>
+          </select>
         </div>
         <div style="display:flex;gap:8px">
+          <button class="btn" onclick="openMigrateLeadsPrompt()" title="One-time: converts old-style lead statuses to the new model">↻ Migrate Old Statuses</button>
           <label class="btn" style="cursor:pointer">
             📁 Upload Excel
             <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(this)">
           </label>
+          <button class="btn" onclick="openSheetImportModal()">🔗 Import from Google Sheet</button>
           <button class="btn btn-primary" onclick="openLeadForm()">+ Add Lead</button>
         </div>
       </div>
@@ -409,13 +420,13 @@ tr.row-done:hover td{background:#DCF2E5}
       </div>
       <!-- Table -->
       <div style="overflow-x:auto">
-        <table style="min-width:940px">
+        <table style="min-width:1080px">
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
-            <th>Name</th><th>Phone</th><th>Department</th><th>Source</th>
-            <th>Campaign</th><th>Date Created</th><th>Status</th><th>Notes</th><th></th>
+            <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
+            <th>Campaign</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="10" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="12" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
@@ -851,6 +862,10 @@ tr.row-done:hover td{background:#DCF2E5}
         <div class="field-group"><label class="field-label">Start Date</label><input class="field-input" type="date" id="fld-startDate"></div>
         <div class="field-group" id="fld-enddate-wrap"><label class="field-label">End Date</label><input class="field-input" type="date" id="fld-endDate"></div>
       </div>
+      <div class="field-group" id="fld-sheetlink-wrap">
+        <label class="field-label">Leads Google Sheet Link <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, lets you sync leads from this sheet in the Leads CRM tab</span></label>
+        <input class="field-input" id="fld-googleSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
+      </div>
 
       <div class="field-section-title" id="section-detail">Details</div>
       <div class="field-group" id="fld-objective-wrap"><label class="field-label" id="fld-objective-label">Objective / Description</label><textarea class="field-textarea" id="fld-objective"></textarea></div>
@@ -1159,8 +1174,12 @@ tr.row-done:hover td{background:#DCF2E5}
         <select class="field-select" id="bulk-department"><option value="">— No change —</option></select>
       </div>
       <div class="field-group">
-        <label class="field-label">Status</label>
-        <select class="field-select" id="bulk-status"><option value="">— No change —</option></select>
+        <label class="field-label">Contact Status</label>
+        <select class="field-select" id="bulk-contact-status"><option value="">— No change —</option></select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Outcome</label>
+        <select class="field-select" id="bulk-outcome"><option value="">— No change —</option></select>
       </div>
     </div>
     <div class="modal-footer">
@@ -1183,10 +1202,14 @@ tr.row-done:hover td{background:#DCF2E5}
           <label class="field-label">Default department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used only for rows with no department match)</span></label>
           <select class="field-select" id="import-dept"></select>
         </div>
-        <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius);font-size:12px;color:var(--text-3)">
-          <strong id="import-count" style="font-size:18px;color:var(--navy)">0</strong> leads ready to import<br>
-          <span id="import-col-info" style="font-size:11px"></span>
+        <div>
+          <label class="field-label">Attribute to Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">(optional — enables cost-per-lead tracking)</span></label>
+          <select class="field-select" id="import-campaign"><option value="">— No campaign —</option></select>
         </div>
+      </div>
+      <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius);font-size:12px;color:var(--text-3);margin-bottom:14px">
+        <strong id="import-count" style="font-size:18px;color:var(--navy)">0</strong> leads ready to import<br>
+        <span id="import-col-info" style="font-size:11px"></span>
       </div>
       <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">Preview (first 10 rows)</div>
       <div style="overflow-x:auto;max-height:280px;overflow-y:auto">
@@ -1203,7 +1226,7 @@ tr.row-done:hover td{background:#DCF2E5}
 
 <!-- ── SINGLE LEAD FORM MODAL ── -->
 <div class="modal-overlay" id="lead-overlay">
-  <div class="modal" style="width:480px">
+  <div class="modal" style="width:500px">
     <div class="modal-header">
       <div class="modal-title" id="lead-form-title">New Lead</div>
       <button class="modal-close" onclick="closeLeadForm()">✕</button>
@@ -1215,11 +1238,15 @@ tr.row-done:hover td{background:#DCF2E5}
       </div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="lead-dept"></select></div>
-        <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="lead-status"></select></div>
+        <div class="field-group"><label class="field-label">Entity</label><select class="field-select" id="lead-entity"><option value="">— None —</option></select></div>
       </div>
       <div class="field-row">
-        <div class="field-group"><label class="field-label">Source</label><input class="field-input" id="lead-source" placeholder="e.g. Event, Call, Walk-in"></div>
-        <div class="field-group"><label class="field-label">Campaign</label><input class="field-input" id="lead-campaign" placeholder="e.g. Maternity Package 2026"></div>
+        <div class="field-group"><label class="field-label">Contact Status</label><select class="field-select" id="lead-contact-status" onchange="toggleLeadOutcomeField()"></select></div>
+        <div class="field-group" id="lead-outcome-wrap"><label class="field-label">Outcome</label><select class="field-select" id="lead-outcome"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Source</label><input class="field-input" id="lead-source" placeholder="e.g. Meta Ads, Google, Walk-in"></div>
+        <div class="field-group"><label class="field-label">Campaign</label><select class="field-select" id="lead-campaign"><option value="">— Not linked to a campaign —</option></select></div>
       </div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Date Created</label><input class="field-input" type="date" id="lead-date"></div>
@@ -1229,6 +1256,46 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="modal-footer">
       <button class="btn" onclick="closeLeadForm()">Cancel</button>
       <button class="btn btn-primary" onclick="saveLead()">Save Lead</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── GOOGLE SHEET IMPORT MODAL ── -->
+<div class="modal-overlay" id="sheet-import-overlay">
+  <div class="modal" style="width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Import Leads from Google Sheet</div>
+      <button class="modal-close" onclick="closeSheetImportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.6">
+        The sheet needs link-sharing set to "Anyone with the link can view." This fetches a fresh snapshot each time you click Sync — not a live connection — and skips any phone numbers already in your leads list.
+      </div>
+      <div class="field-group">
+        <label class="field-label">Attribute to Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">— auto-fills the sheet link below if one is saved on that campaign</span></label>
+        <select class="field-select" id="sheet-import-campaign" onchange="onSheetImportCampaignChange()"><option value="">— No campaign —</option></select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Google Sheet Link</label>
+        <input class="field-input" id="sheet-import-url" placeholder="https://docs.google.com/spreadsheets/d/...">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Default Department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used for rows with no department match)</span></label>
+        <select class="field-select" id="sheet-import-dept"></select>
+      </div>
+      <button class="btn btn-primary" onclick="fetchAndPreviewSheet()">Fetch & Preview</button>
+      <div id="sheet-import-status" style="font-size:12px;color:var(--text-3);margin-top:10px;display:none"></div>
+      <div id="sheet-import-preview-wrap" style="display:none;margin-top:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">Preview (first 10 rows)</div>
+        <div style="overflow-x:auto;max-height:260px;overflow-y:auto">
+          <table id="sheet-preview-table" style="font-size:11px;width:100%;border-collapse:collapse"></table>
+        </div>
+        <div id="sheet-import-progress" style="display:none;margin-top:12px;font-size:12px;color:var(--navy);font-weight:600"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSheetImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="confirm-sheet-import-btn" onclick="confirmSheetImport()" disabled>Import Leads</button>
     </div>
   </div>
 </div>
@@ -1302,7 +1369,9 @@ import {
   watchHealthDays, addHealthDay, updateHealthDay, deleteHealthDay, migrateHealthDaysFromInitiatives,
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
-  watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, LEAD_STATUSES, LEAD_STATUS_COLORS,
+  watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS,
+  fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
   HEALTH_DAY_CATEGORIES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
@@ -1481,7 +1550,7 @@ watchAuth(async user => {
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
@@ -1575,6 +1644,32 @@ function populateEntitySelects() {
       if(prevSelected.includes(c.dataset.val)) c.classList.add('active');
     });
   }
+
+  const leadEntity = document.getElementById('lead-entity');
+  if(leadEntity) leadEntity.innerHTML = optionsHtml;
+  const leadEntityFilter = document.getElementById('lead-filter-entity');
+  if(leadEntityFilter) leadEntityFilter.innerHTML = filterOptionsHtml;
+}
+
+// Re-populates every "pick a campaign" dropdown in the Leads CRM from
+// current Campaign-type activities. Safe to call repeatedly.
+function populateLeadCampaignSelects() {
+  const campaigns = ALL_INITIATIVES.filter(i=>i.type==='Campaign');
+  const optionsHtml = '<option value="">— Not linked to a campaign —</option>' +
+    campaigns.map(c=>`<option value="${c.id}">${c.title||'Untitled Campaign'}</option>`).join('');
+  const filterOptionsHtml = '<option value="">All Campaigns</option>' +
+    campaigns.map(c=>`<option value="${c.id}">${c.title||'Untitled Campaign'}</option>`).join('');
+  const sheetOptionsHtml = '<option value="">— No campaign —</option>' +
+    campaigns.map(c=>`<option value="${c.id}">${c.title||'Untitled Campaign'}</option>`).join('');
+
+  const leadCampaign = document.getElementById('lead-campaign');
+  if(leadCampaign) leadCampaign.innerHTML = optionsHtml;
+  const leadCampaignFilter = document.getElementById('lead-filter-campaign');
+  if(leadCampaignFilter) leadCampaignFilter.innerHTML = filterOptionsHtml;
+  const sheetImportCampaign = document.getElementById('sheet-import-campaign');
+  if(sheetImportCampaign) sheetImportCampaign.innerHTML = sheetOptionsHtml;
+  const importCampaign = document.getElementById('import-campaign');
+  if(importCampaign) importCampaign.innerHTML = sheetOptionsHtml;
 }
 
 
@@ -1604,9 +1699,14 @@ function populateStaticSelects() {
   document.getElementById('lead-dept').innerHTML = leadDeptHtml;
   document.getElementById('lead-filter-dept').innerHTML += leadDeptHtml;
   document.getElementById('import-dept').innerHTML = leadDeptHtml;
-  document.getElementById('lead-status').innerHTML = LEAD_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('sheet-import-dept').innerHTML = leadDeptHtml;
+  document.getElementById('lead-contact-status').innerHTML = CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('lead-outcome').innerHTML = OUTCOMES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('lead-filter-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('lead-filter-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('bulk-department').innerHTML += leadDeptHtml;
-  document.getElementById('bulk-status').innerHTML += LEAD_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('bulk-contact-status').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('bulk-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
 
@@ -1671,6 +1771,7 @@ window.selectType = function(type) {
 
   const show = (id, on) => { const el = document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
   show('fld-enddate-wrap',           isCampaign);
+  show('fld-sheetlink-wrap',         isCampaign);
   show('fld-objective-wrap',         true);
   show('fld-channels-wrap',          type==='Event' || type==='SM Content' || type==='Physician Video');
   show('fld-contenttype-wrap',       type==='SM Content' || type==='Physician Video');
@@ -1730,6 +1831,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-status').value = initiative?.status || 'Planned';
   document.getElementById('fld-startDate').value = initiative?.startDate || '';
   document.getElementById('fld-endDate').value = initiative?.endDate || '';
+  document.getElementById('fld-googleSheetUrl').value = initiative?.googleSheetUrl || '';
   document.getElementById('fld-objective').value = initiative?.objective || '';
   document.getElementById('fld-contentType').value = initiative?.contentType || CONTENT_TYPES[0];
   document.getElementById('fld-printType').value = initiative?.printType || PRINT_TYPES[0];
@@ -1802,6 +1904,7 @@ window.saveInitiative = async function() {
     entity: selectedEntities,
     startDate: document.getElementById('fld-startDate').value,
     endDate: document.getElementById('fld-endDate').value,
+    googleSheetUrl: document.getElementById('fld-googleSheetUrl').value.trim(),
     objective: document.getElementById('fld-objective').value.trim(),
     channels: selectedChannels,
     contentType: document.getElementById('fld-contentType').value,
@@ -3861,14 +3964,22 @@ let pendingImportRows = [];
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 window.renderLeadsStats = function() {
-  const total   = ALL_LEADS.length;
-  const counts  = {"Lead":0,"Open File":0,"Booked":0,"Closed":0};
-  ALL_LEADS.forEach(l => { if(counts[l.status]!==undefined) counts[l.status]++; });
-  document.getElementById('ls-total').textContent  = total;
-  document.getElementById('ls-lead').textContent   = counts['Lead'];
-  document.getElementById('ls-open').textContent   = counts['Open File'];
-  document.getElementById('ls-booked').textContent = counts['Booked'];
-  document.getElementById('ls-closed').textContent = counts['Closed'];
+  const total = ALL_LEADS.length;
+  const counts = {Untouched:0, Reached:0, Unreached:0, Missed:0};
+  let booked = 0;
+  ALL_LEADS.forEach(l => {
+    const cs = l.contactStatus || 'Untouched';
+    if(counts[cs]!==undefined) counts[cs]++;
+    if(l.outcome === 'Booked') booked++;
+  });
+  document.getElementById('ls-total').textContent     = total;
+  document.getElementById('ls-reached').textContent   = counts.Reached;
+  document.getElementById('ls-unreached').textContent = counts.Unreached;
+  document.getElementById('ls-missed').textContent    = counts.Missed;
+  document.getElementById('ls-booked').textContent    = booked;
+  document.getElementById('ls-untouched').textContent = counts.Untouched;
+  // Keep the public-facing aggregate snapshot in sync any time stats render
+  computeAndPublishLeadStats();
 }
 
 // ── Table ──────────────────────────────────────────────────────────────────
@@ -3881,23 +3992,33 @@ window.resetLeadsPageAndRender = function() {
   renderLeadsTable();
 }
 
+function campaignTitleFor(campaignId) {
+  if(!campaignId) return null;
+  const c = ALL_INITIATIVES.find(i=>i.id===campaignId && i.type==='Campaign');
+  return c ? c.title : null;
+}
+
 window.renderLeadsTable = function() {
-  const q      = (document.getElementById('lead-search')?.value||'').toLowerCase();
-  const statusF= document.getElementById('lead-filter-status')?.value||'';
-  const deptF  = document.getElementById('lead-filter-dept')?.value||'';
+  const q        = (document.getElementById('lead-search')?.value||'').toLowerCase();
+  const contactF = document.getElementById('lead-filter-contact')?.value||'';
+  const outcomeF = document.getElementById('lead-filter-outcome')?.value||'';
+  const deptF    = document.getElementById('lead-filter-dept')?.value||'';
+  const entityF  = document.getElementById('lead-filter-entity')?.value||'';
+  const campaignF= document.getElementById('lead-filter-campaign')?.value||'';
 
   let data = ALL_LEADS.filter(l=>{
-    if(statusF && l.status!==statusF) return false;
+    if(contactF && (l.contactStatus||'Untouched')!==contactF) return false;
+    if(outcomeF && (l.outcome||'Pending')!==outcomeF) return false;
     if(deptF && l.department!==deptF) return false;
+    if(entityF && l.entity!==entityF) return false;
+    if(campaignF && l.campaignId!==campaignF) return false;
     if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source}`.toLowerCase().includes(q)) return false;
     return true;
   });
 
-  // Drop selections for leads no longer in ALL_LEADS (e.g. deleted elsewhere)
   const validIds = new Set(ALL_LEADS.map(l=>l.id));
   selectedLeadIds.forEach(id => { if(!validIds.has(id)) selectedLeadIds.delete(id); });
 
-  // Pagination — 50 per page
   const totalPages = Math.max(1, Math.ceil(data.length / LEADS_PER_PAGE));
   if(currentLeadsPage > totalPages) currentLeadsPage = totalPages;
   if(currentLeadsPage < 1) currentLeadsPage = 1;
@@ -3906,32 +4027,44 @@ window.renderLeadsTable = function() {
 
   document.getElementById('leads-table-body').innerHTML = pageData.length
     ? pageData.map(l=>{
-        const sc = LEAD_STATUS_COLORS[l.status]||{bg:'#F0F2F7',t:'#8890A8'};
+        const cs = l.contactStatus || 'Untouched';
+        const oc = l.outcome || 'Pending';
+        const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
+        const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
         const isChecked = selectedLeadIds.has(l.id);
+        const campaignLabel = l.campaign || campaignTitleFor(l.campaignId) || '—';
         return `<tr style="${isChecked?'background:#F0F7FF':''}">
           <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
           <td style="font-weight:600">${l.name||'—'}</td>
           <td style="font-size:12px">${l.phone||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.entity||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.source||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.campaign||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${campaignLabel}</td>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${l.dateCreated||'—'}</td>
           <td>
-            <select style="font-size:11px;padding:3px 6px;border:1px solid ${sc.bg};border-radius:4px;background:${sc.bg};color:${sc.t};font-weight:600;cursor:pointer;font-family:inherit"
-              onchange="changeLeadStatus('${l.id}',this.value)">
-              ${LEAD_STATUSES.map(s=>`<option${l.status===s?' selected':''}>${s}</option>`).join('')}
+            <select style="font-size:10px;padding:3px 5px;border:1px solid ${csColor.bg};border-radius:4px;background:${csColor.bg};color:${csColor.t};font-weight:600;cursor:pointer;font-family:inherit"
+              onchange="changeLeadContactStatus('${l.id}',this.value)">
+              ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
             </select>
           </td>
-          <td style="font-size:11px;color:var(--text-3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.notes||''}">${l.notes||'—'}</td>
+          <td>
+            ${cs==='Reached'
+              ? `<select style="font-size:10px;padding:3px 5px;border:1px solid ${ocColor.bg};border-radius:4px;background:${ocColor.bg};color:${ocColor.t};font-weight:600;cursor:pointer;font-family:inherit"
+                  onchange="changeLeadOutcome('${l.id}',this.value)">
+                  ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
+                </select>`
+              : `<span style="font-size:10px;color:var(--text-3)">—</span>`}
+          </td>
+          <td style="font-size:11px;color:var(--text-3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.notes||''}">${l.notes||'—'}</td>
           <td class="row-actions">
             <button class="btn btn-sm" onclick="editLeadRow('${l.id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="removeLeadRow('${l.id}','${(l.name||'').replace(/'/g,"\\'")}')">Delete</button>
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="10" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel or add manually'}</td></tr>`;
+    : `<tr><td colspan="12" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
 
-  // Keep "select all" checkbox in sync — scoped to the CURRENT PAGE only
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
     const visibleIds = pageData.map(l=>l.id);
@@ -3940,6 +4073,19 @@ window.renderLeadsTable = function() {
   }
   updateBulkActionBar();
   renderLeadsPagination(data.length, totalPages, startIdx, pageData.length);
+}
+
+window.changeLeadContactStatus = async function(id, contactStatus) {
+  try {
+    const updates = { contactStatus };
+    // Leaving Reached clears any outcome that no longer applies
+    if(contactStatus !== 'Reached') updates.outcome = 'Pending';
+    await updateLead(id, updates);
+  } catch(e) { showToast('Update failed: '+e.message, true); }
+}
+window.changeLeadOutcome = async function(id, outcome) {
+  try { await updateLead(id, { outcome }); }
+  catch(e) { showToast('Update failed: '+e.message, true); }
 }
 
 function renderLeadsPagination(totalCount, totalPages, startIdx, pageCount) {
@@ -4015,21 +4161,24 @@ window.openBulkEditModal = function() {
   document.getElementById('bulk-edit-count').textContent = `(${count} lead${count===1?'':'s'})`;
   document.getElementById('bulk-date').value = '';
   document.getElementById('bulk-department').value = '';
-  document.getElementById('bulk-status').value = '';
+  document.getElementById('bulk-contact-status').value = '';
+  document.getElementById('bulk-outcome').value = '';
   document.getElementById('bulk-edit-overlay').classList.add('open');
 }
 window.closeBulkEditModal = function() {
   document.getElementById('bulk-edit-overlay').classList.remove('open');
 }
 window.confirmBulkEdit = async function() {
-  const dateVal = document.getElementById('bulk-date').value;
-  const deptVal = document.getElementById('bulk-department').value;
-  const statusVal = document.getElementById('bulk-status').value;
+  const dateVal    = document.getElementById('bulk-date').value;
+  const deptVal    = document.getElementById('bulk-department').value;
+  const contactVal = document.getElementById('bulk-contact-status').value;
+  const outcomeVal = document.getElementById('bulk-outcome').value;
 
   const updateObj = {};
-  if(dateVal)   updateObj.dateCreated = dateVal;
-  if(deptVal)   updateObj.department  = deptVal;
-  if(statusVal) updateObj.status      = statusVal;
+  if(dateVal)    updateObj.dateCreated   = dateVal;
+  if(deptVal)    updateObj.department    = deptVal;
+  if(contactVal) updateObj.contactStatus = contactVal;
+  if(outcomeVal) updateObj.outcome       = outcomeVal;
 
   if(!Object.keys(updateObj).length) {
     showToast('Set at least one field to apply', true);
@@ -4053,23 +4202,26 @@ window.confirmBulkEdit = async function() {
   }
 }
 
-window.changeLeadStatus = async function(id, status) {
-  try { await updateLead(id, {status}); }
-  catch(e) { showToast('Update failed: '+e.message, true); }
+// ── Single lead form ──────────────────────────────────────────────────────
+window.toggleLeadOutcomeField = function() {
+  const isReached = document.getElementById('lead-contact-status').value === 'Reached';
+  document.getElementById('lead-outcome-wrap').style.display = isReached ? '' : 'none';
 }
 
-// ── Single lead form ──────────────────────────────────────────────────────
 window.openLeadForm = function(lead=null) {
   editingLeadId = lead?.id||null;
   document.getElementById('lead-form-title').textContent = lead ? 'Edit Lead' : 'New Lead';
-  document.getElementById('lead-name').value     = lead?.name||'';
-  document.getElementById('lead-phone').value    = lead?.phone||'';
-  document.getElementById('lead-dept').value     = lead?.department||DEPARTMENTS[0];
-  document.getElementById('lead-status').value   = lead?.status||'Lead';
-  document.getElementById('lead-source').value   = lead?.source||'';
-  document.getElementById('lead-campaign').value = lead?.campaign||'';
-  document.getElementById('lead-date').value     = lead?.dateCreated||new Date().toISOString().split('T')[0];
-  document.getElementById('lead-notes').value    = lead?.notes||'';
+  document.getElementById('lead-name').value           = lead?.name||'';
+  document.getElementById('lead-phone').value          = lead?.phone||'';
+  document.getElementById('lead-dept').value           = lead?.department||DEPARTMENTS[0];
+  document.getElementById('lead-entity').value         = lead?.entity||'';
+  document.getElementById('lead-contact-status').value = lead?.contactStatus||'Untouched';
+  document.getElementById('lead-outcome').value        = lead?.outcome||'Pending';
+  toggleLeadOutcomeField();
+  document.getElementById('lead-source').value         = lead?.source||'';
+  document.getElementById('lead-campaign').value       = lead?.campaignId||'';
+  document.getElementById('lead-date').value           = lead?.dateCreated||new Date().toISOString().split('T')[0];
+  document.getElementById('lead-notes').value          = lead?.notes||'';
   document.getElementById('lead-overlay').classList.add('open');
 }
 window.closeLeadForm = function() { document.getElementById('lead-overlay').classList.remove('open'); }
@@ -4077,14 +4229,19 @@ window.saveLead = async function() {
   const name  = document.getElementById('lead-name').value.trim();
   const phone = document.getElementById('lead-phone').value.trim();
   if(!name||!phone){showToast('Name and phone are required',true);return;}
+  const campaignId = document.getElementById('lead-campaign').value;
   const data = {
     name, phone,
-    department:  document.getElementById('lead-dept').value,
-    status:      document.getElementById('lead-status').value,
-    source:      document.getElementById('lead-source').value.trim(),
-    campaign:    document.getElementById('lead-campaign').value.trim(),
-    dateCreated: document.getElementById('lead-date').value,
-    notes:       document.getElementById('lead-notes').value.trim(),
+    department:    document.getElementById('lead-dept').value,
+    entity:        document.getElementById('lead-entity').value,
+    contactStatus: document.getElementById('lead-contact-status').value,
+    outcome:       document.getElementById('lead-contact-status').value==='Reached'
+                     ? document.getElementById('lead-outcome').value : 'Pending',
+    source:        document.getElementById('lead-source').value.trim(),
+    campaignId:    campaignId || null,
+    campaign:      campaignId ? campaignTitleFor(campaignId) : '',
+    dateCreated:   document.getElementById('lead-date').value,
+    notes:         document.getElementById('lead-notes').value.trim(),
   };
   try {
     if(editingLeadId){await updateLead(editingLeadId,data);showToast('Lead updated');}
@@ -4096,6 +4253,16 @@ window.editLeadRow = function(id){const l=ALL_LEADS.find(x=>x.id===id);if(l)open
 window.removeLeadRow = async function(id,name){
   if(!confirm(`Delete lead "${name}"?`))return;
   try{await deleteLead(id);showToast('Lead deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
+}
+
+// ── One-time status migration ────────────────────────────────────────────
+window.openMigrateLeadsPrompt = async function() {
+  if(!confirm('This converts any leads still using the old single-status model into the new Contact Status + Outcome model. Safe to run more than once. Proceed?')) return;
+  try {
+    const result = await migrateLegacyLeadStatuses();
+    if(result.migrated === 0) showToast('No old-style leads found — nothing to migrate ✓');
+    else showToast(`✓ Migrated ${result.migrated} lead(s) to the new status model`);
+  } catch(e) { showToast('Migration failed: '+e.message, true); }
 }
 
 // ── Excel upload ──────────────────────────────────────────────────────────
@@ -4154,7 +4321,6 @@ window.handleExcelUpload = function(input) {
       const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false, dateNF:'yyyy-mm-dd'});
       if(!rows.length){showToast('No data found in the file',true);return;}
 
-      // Auto-map columns (case-insensitive)
       const headers = Object.keys(rows[0]);
       const map = col => headers.find(h=>h.toLowerCase().includes(col.toLowerCase()))||null;
       const nameCol     = map('name');
@@ -4164,23 +4330,26 @@ window.handleExcelUpload = function(input) {
       const dateCol     = map('date');
       const statusCol   = map('status');
       const deptCol     = map('department')||map('dept');
+      const entityCol   = map('entity')||map('branch');
       const notesCol    = map('note')||map('comment')||map('notes');
 
       if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
 
-      // Map rows to lead objects
       pendingImportRows = rows.map(r=>{
         const rawDept = deptCol ? r[deptCol] : '';
         const matchedDept = matchDepartment(rawDept);
+        const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
         return {
           name:          r[nameCol]||'',
           phone:         String(r[phoneCol]||''),
           source:        sourceCol ? r[sourceCol]||'' : '',
           campaign:      campaignCol ? r[campaignCol]||'' : '',
+          entity:        entityCol ? r[entityCol]||'' : '',
           dateCreated:   dateCol ? parseExcelDate(r[dateCol]) : '',
-          status:        statusCol ? mapStatus(r[statusCol]) : 'Lead',
+          contactStatus: mappedStatus.contactStatus,
+          outcome:       mappedStatus.outcome,
           notes:         notesCol ? r[notesCol]||'' : '',
-          department:    matchedDept,       // null if sheet had no match — fallback applied at import time
+          department:    matchedDept,
           _rawDept:      rawDept ? String(rawDept) : '',
         };
       }).filter(r=>r.name&&r.phone);
@@ -4188,9 +4357,8 @@ window.handleExcelUpload = function(input) {
       const matchedCount   = pendingImportRows.filter(r=>r.department).length;
       const unmatchedCount = pendingImportRows.length - matchedCount;
 
-      // Build preview table
       const previewRows = pendingImportRows.slice(0,10);
-      const thCols = ['Name','Phone','Department','Source','Campaign','Date','Status'];
+      const thCols = ['Name','Phone','Department','Source','Campaign','Date','Contact Status'];
       document.getElementById('excel-preview-table').innerHTML =
         `<thead style="background:var(--navy);color:#fff"><tr>${thCols.map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
         <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
@@ -4200,7 +4368,7 @@ window.handleExcelUpload = function(input) {
           <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
           <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
           <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'<span style="color:var(--red)">not parsed</span>'}</td>
-          <td style="padding:5px 10px;font-size:11px">${r.status}</td>
+          <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
         </tr>`).join('')}
         ${pendingImportRows.length>10?`<tr><td colspan="7" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${pendingImportRows.length-10} more rows</td></tr>`:''}</tbody>`;
 
@@ -4209,8 +4377,9 @@ window.handleExcelUpload = function(input) {
         ? `${matchedCount} matched to a department${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`
         : `No department column found — all rows will use the default below`;
       document.getElementById('import-col-info').innerHTML =
-        `Detected: ${[nameCol,phoneCol,deptCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}`;
+        `Detected: ${[nameCol,phoneCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}`;
       document.getElementById('import-dept').value = DEPARTMENTS[0];
+      document.getElementById('import-campaign').value = '';
       document.getElementById('import-progress').style.display='none';
       document.getElementById('confirm-import-btn').disabled=false;
       document.getElementById('excel-overlay').classList.add('open');
@@ -4219,15 +4388,18 @@ window.handleExcelUpload = function(input) {
     }
   };
   reader.readAsBinaryString(file);
-  input.value=''; // reset so same file can be re-uploaded
+  input.value='';
 }
 
-function mapStatus(raw) {
+function mapLeadStatus(raw) {
   const r = String(raw).toLowerCase().trim();
-  if(r.includes('book')) return 'Booked';
-  if(r.includes('open')||r.includes('file')) return 'Open File';
-  if(r.includes('close')) return 'Closed';
-  return 'Lead';
+  if(r.includes('book'))                          return { contactStatus:'Reached',   outcome:'Booked' };
+  if(r.includes('open')||r.includes('file'))       return { contactStatus:'Reached',   outcome:'Open File' };
+  if(r.includes('close')||r.includes('unsuccess')) return { contactStatus:'Reached',   outcome:'Closed - Unsuccessful' };
+  if(r.includes('unreach')||r.includes('no answer'))return{ contactStatus:'Unreached', outcome:'Pending' };
+  if(r.includes('miss'))                           return { contactStatus:'Missed',    outcome:'Pending' };
+  if(r.includes('reach'))                          return { contactStatus:'Reached',   outcome:'Pending' };
+  return { contactStatus:'Untouched', outcome:'Pending' };
 }
 
 window.closeExcelPreview = function(){document.getElementById('excel-overlay').classList.remove('open');}
@@ -4235,11 +4407,18 @@ window.closeExcelPreview = function(){document.getElementById('excel-overlay').c
 window.confirmImport = async function() {
   if(!pendingImportRows.length) return;
   const fallbackDept = document.getElementById('import-dept').value;
+  const campaignId = document.getElementById('import-campaign').value;
+  const campaignName = campaignId ? campaignTitleFor(campaignId) : '';
   // Use each row's matched department from the sheet; only fall back to the
   // selected default for rows where the sheet had no department or no match.
   const leadsToImport = pendingImportRows.map(r=>{
     const { _rawDept, ...clean } = r;
-    return { ...clean, department: r.department || fallbackDept };
+    return {
+      ...clean,
+      department: r.department || fallbackDept,
+      campaignId: campaignId || null,
+      campaign:   campaignId ? campaignName : (clean.campaign || ''),
+    };
   });
   const btn = document.getElementById('confirm-import-btn');
   const progress = document.getElementById('import-progress');
@@ -4256,6 +4435,235 @@ window.confirmImport = async function() {
     showToast('Import failed: '+e.message, true);
     btn.disabled=false;
   }
+}
+
+// ── SIMPLE CSV PARSER (quote-aware) — used for Google Sheet imports ───────
+function parseCSVText(text) {
+  const rows = [];
+  const lines = text.split('\n');
+  if(lines.length < 2) return rows;
+  const headers = lines[0].replace(/\r/g,'').split(',').map(h=>h.replace(/^"|"$/g,'').trim());
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const vals = [];
+    let cur='', inQ=false;
+    for(let c=0;c<lines[i].length;c++){
+      const ch=lines[i][c];
+      if(ch==='"'){ inQ=!inQ; }
+      else if(ch===','&&!inQ){ vals.push(cur.trim()); cur=''; }
+      else cur+=ch;
+    }
+    vals.push(cur.trim());
+    const obj={};
+    headers.forEach((h,idx)=>{ obj[h]=(vals[idx]||'').replace(/\r$/,''); });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// ── GOOGLE SHEET LEADS IMPORT ───────────────────────────────────────────
+let pendingSheetImportRows = [];
+
+window.openSheetImportModal = function() {
+  document.getElementById('sheet-import-url').value = '';
+  document.getElementById('sheet-import-campaign').value = '';
+  document.getElementById('sheet-import-dept').value = DEPARTMENTS[0];
+  document.getElementById('sheet-import-status').style.display = 'none';
+  document.getElementById('sheet-import-preview-wrap').style.display = 'none';
+  document.getElementById('confirm-sheet-import-btn').disabled = true;
+  pendingSheetImportRows = [];
+  document.getElementById('sheet-import-overlay').classList.add('open');
+}
+window.closeSheetImportModal = function() {
+  document.getElementById('sheet-import-overlay').classList.remove('open');
+}
+window.onSheetImportCampaignChange = function() {
+  const campaignId = document.getElementById('sheet-import-campaign').value;
+  const campaign = ALL_INITIATIVES.find(i=>i.id===campaignId);
+  if(campaign?.googleSheetUrl) {
+    document.getElementById('sheet-import-url').value = campaign.googleSheetUrl;
+  }
+}
+
+window.fetchAndPreviewSheet = async function() {
+  const url = document.getElementById('sheet-import-url').value.trim();
+  if(!url) { showToast('Paste a Google Sheet link first', true); return; }
+  const statusEl = document.getElementById('sheet-import-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Fetching sheet...';
+  statusEl.style.color = 'var(--text-3)';
+
+  try {
+    const csvText = await fetchGoogleSheetCSV(url);
+    const rows = parseCSVText(csvText);
+    if(!rows.length) { statusEl.textContent = 'No rows found in that sheet'; statusEl.style.color = 'var(--red)'; return; }
+
+    const headers = Object.keys(rows[0]);
+    const map = col => headers.find(h=>h.toLowerCase().includes(col.toLowerCase()))||null;
+    const nameCol     = map('name');
+    const phoneCol    = map('phone')||map('mobile')||map('number');
+    const sourceCol   = map('source');
+    const dateCol     = map('date');
+    const statusCol   = map('status');
+    const deptCol     = map('department')||map('dept');
+    const entityCol   = map('entity')||map('branch');
+    const notesCol    = map('note')||map('comment')||map('notes');
+
+    if(!nameCol||!phoneCol) { statusEl.textContent = 'Could not find Name or Phone columns in that sheet'; statusEl.style.color = 'var(--red)'; return; }
+
+    const existingPhones = new Set(ALL_LEADS.map(l=>String(l.phone||'').replace(/\D/g,'')));
+    const campaignId = document.getElementById('sheet-import-campaign').value;
+    const campaignName = campaignId ? campaignTitleFor(campaignId) : '';
+
+    const allRows = rows.map(r=>{
+      const rawDept = deptCol ? r[deptCol] : '';
+      const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
+      const phone = String(r[phoneCol]||'');
+      return {
+        name: r[nameCol]||'', phone,
+        source: sourceCol ? r[sourceCol]||'' : '',
+        entity: entityCol ? r[entityCol]||'' : '',
+        dateCreated: dateCol ? parseExcelDate(r[dateCol]) : '',
+        contactStatus: mappedStatus.contactStatus,
+        outcome: mappedStatus.outcome,
+        notes: notesCol ? r[notesCol]||'' : '',
+        department: matchDepartment(rawDept),
+        campaignId: campaignId || null,
+        campaign: campaignId ? campaignName : '',
+        _isDuplicate: existingPhones.has(phone.replace(/\D/g,'')),
+      };
+    }).filter(r=>r.name && r.phone);
+
+    pendingSheetImportRows = allRows.filter(r=>!r._isDuplicate);
+    const dupCount = allRows.length - pendingSheetImportRows.length;
+
+    const previewRows = pendingSheetImportRows.slice(0,10);
+    document.getElementById('sheet-preview-table').innerHTML =
+      `<thead style="background:var(--navy);color:#fff"><tr>${['Name','Phone','Department','Source','Date','Contact Status'].map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
+      <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}</td>
+        <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
+        <td style="padding:5px 10px;font-size:11px">${r.department||`<span style="color:var(--orange)">uses default</span>`}</td>
+        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
+        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'—'}</td>
+        <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
+      </tr>`).join('')}</tbody>`;
+
+    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already in your leads list`:''}`;
+    statusEl.style.color = 'var(--green)';
+    document.getElementById('sheet-import-preview-wrap').style.display = 'block';
+    document.getElementById('confirm-sheet-import-btn').disabled = pendingSheetImportRows.length === 0;
+  } catch(e) {
+    statusEl.textContent = e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+window.confirmSheetImport = async function() {
+  if(!pendingSheetImportRows.length) return;
+  const fallbackDept = document.getElementById('sheet-import-dept').value;
+  const leadsToImport = pendingSheetImportRows.map(r=>{
+    const { _isDuplicate, ...clean } = r;
+    return { ...clean, department: r.department || fallbackDept };
+  });
+  const btn = document.getElementById('confirm-sheet-import-btn');
+  const progress = document.getElementById('sheet-import-progress');
+  btn.disabled = true;
+  progress.style.display = 'block';
+  try {
+    await bulkAddLeads(leadsToImport, (done,total)=>{
+      progress.textContent = `Importing... ${done} / ${total}`;
+    });
+    progress.textContent = `✓ ${leadsToImport.length} leads imported successfully!`;
+    showToast(`${leadsToImport.length} leads imported from Google Sheet ✓`);
+    setTimeout(()=>closeSheetImportModal(), 1500);
+  } catch(e) {
+    showToast('Import failed: '+e.message, true);
+    btn.disabled = false;
+  }
+}
+
+// ── PUBLIC LEAD STATS AGGREGATION ────────────────────────────────────────
+// Computes an anonymized, aggregate-only snapshot of the leads funnel and
+// writes it to a public config doc. Called whenever leads or campaigns
+// change, so the public dashboard stays current without ever needing read
+// access to individual names/phone numbers.
+let _statsDebounce = null;
+function computeAndPublishLeadStats() {
+  // Debounce — leads/initiatives can both fire in quick succession on load
+  clearTimeout(_statsDebounce);
+  _statsDebounce = setTimeout(async () => {
+    try {
+      const total = ALL_LEADS.length;
+      if(total === 0) { await setLeadStats({ total:0 }); return; }
+
+      const counts = { Untouched:0, Reached:0, Unreached:0, Missed:0 };
+      const outcomeCounts = { 'Pending':0, 'Open File':0, 'Booked':0, 'Closed - Unsuccessful':0 };
+      const byDept = {}, byEntity = {}, bySource = {}, byMonth = {}, byCampaign = {};
+
+      ALL_LEADS.forEach(l => {
+        const cs = l.contactStatus || 'Untouched';
+        const oc = l.outcome || 'Pending';
+        if(counts[cs]!==undefined) counts[cs]++;
+        if(outcomeCounts[oc]!==undefined) outcomeCounts[oc]++;
+
+        const bump = (obj, key) => {
+          if(!key) return;
+          if(!obj[key]) obj[key] = { total:0, reached:0, booked:0 };
+          obj[key].total++;
+          if(cs==='Reached') obj[key].reached++;
+          if(oc==='Booked') obj[key].booked++;
+        };
+        bump(byDept, l.department);
+        bump(byEntity, l.entity);
+        bump(bySource, l.source);
+
+        if(l.dateCreated) {
+          const month = l.dateCreated.substring(0,7);
+          if(!byMonth[month]) byMonth[month] = { total:0, reached:0, booked:0 };
+          byMonth[month].total++;
+          if(cs==='Reached') byMonth[month].reached++;
+          if(oc==='Booked') byMonth[month].booked++;
+        }
+
+        if(l.campaignId) {
+          if(!byCampaign[l.campaignId]) byCampaign[l.campaignId] = { total:0, reached:0, booked:0, openFile:0 };
+          byCampaign[l.campaignId].total++;
+          if(cs==='Reached') byCampaign[l.campaignId].reached++;
+          if(oc==='Booked') byCampaign[l.campaignId].booked++;
+          if(oc==='Open File') byCampaign[l.campaignId].openFile++;
+        }
+      });
+
+      // Attach campaign name + cost + CPL/CPA for each campaign with leads
+      const campaignStats = Object.entries(byCampaign).map(([id, stats]) => {
+        const campaign = ALL_INITIATIVES.find(i=>i.id===id);
+        const cost = campaign?.cost || 0;
+        const acquisitions = stats.booked + stats.openFile;
+        return {
+          campaignId: id,
+          title: campaign?.title || 'Unknown Campaign',
+          cost,
+          leads: stats.total,
+          reached: stats.reached,
+          booked: stats.booked,
+          openFile: stats.openFile,
+          cpl: stats.total > 0 ? Math.round((cost / stats.total) * 100) / 100 : null,
+          cpa: acquisitions > 0 ? Math.round((cost / acquisitions) * 100) / 100 : null,
+        };
+      }).sort((a,b) => b.leads - a.leads);
+
+      await setLeadStats({
+        total,
+        untouched: counts.Untouched, reached: counts.Reached,
+        unreached: counts.Unreached, missed: counts.Missed,
+        openFile: outcomeCounts['Open File'], booked: outcomeCounts['Booked'],
+        closedUnsuccessful: outcomeCounts['Closed - Unsuccessful'],
+        byDepartment: byDept, byEntity, bySource, byMonth,
+        campaigns: campaignStats,
+      });
+    } catch(e) { console.error('computeAndPublishLeadStats failed:', e); }
+  }, 800);
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
