@@ -558,25 +558,27 @@ tr.row-done:hover td{background:#DCF2E5}
         </div>
         <!-- 12-month grid -->
         <div id="metrics-month-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px"></div>
-        <!-- Save bar -->
+        <!-- Sync bar -->
         <div style="display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--border)">
-          <button class="btn btn-primary" onclick="saveMonthMetrics()">Save Month</button>
-          <span id="metrics-save-status" style="font-size:12px;font-weight:600;color:var(--green);display:none">✓ Saved successfully</span>
-          <span id="metrics-save-error" style="font-size:12px;font-weight:600;color:var(--red);display:none"></span>
-          <span id="metrics-saving-indicator" style="font-size:12px;color:var(--text-3);display:none">Saving...</span>
-          <span style="flex:1"></span>
-          <button class="btn btn-sm" onclick="runCleanupDuplicates()" title="Removes leftover duplicate metric entries from an old bug — safe to run any time">🧹 Clean Up Duplicates</button>
+          <button class="btn btn-primary" id="metricool-sync-btn" onclick="syncMetricool()">🔄 Sync Now</button>
+          <span id="metricool-sync-status" style="font-size:12px;color:var(--text-3)"></span>
         </div>
       </div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)">
         <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)" id="metrics-month-label">Select a month above</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:2px">Enter numbers — Engagement Rate is calculated automatically</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:2px">Values sync automatically from Metricool — edit a field and Save Month to manually override it</div>
           </div>
           <div id="metrics-history-links" style="display:flex;gap:6px;flex-wrap:wrap"></div>
         </div>
         <div id="metrics-grid-wrap" style="padding:4px 0"></div>
+        <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px">
+          <button class="btn btn-primary" onclick="saveMonthMetrics()">Save Month</button>
+          <span id="metrics-save-status" style="font-size:12px;font-weight:600;color:var(--green);display:none">✓ Saved successfully</span>
+          <span id="metrics-save-error" style="font-size:12px;font-weight:600;color:var(--red);display:none"></span>
+          <span id="metrics-saving-indicator" style="font-size:12px;color:var(--text-3);display:none">Saving...</span>
+        </div>
       </div>
     </div>
 
@@ -819,6 +821,33 @@ tr.row-done:hover td{background:#DCF2E5}
           <div id="dept-revenue-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"></div>
           <button class="btn btn-primary" onclick="saveDeptRevenueEstimates()">Save Estimates</button>
           <span id="dept-revenue-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+        </div>
+
+        <!-- Metricool Setup -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">📊 Metricool Setup <span id="metricool-setup-status" style="font-weight:400;font-size:11px"></span></div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:14px">Connects the Dashboard Metrics tab to Metricool's API so social performance numbers sync automatically instead of manual entry.</div>
+
+          <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.6">
+            ⚠️ <strong>Security note:</strong> this token is stored in Firestore and used directly from the browser, same tradeoff as the AI Setup key on the Content Generator page — acceptable for a small trusted internal team, but treat this admin login as sensitive. Find your token in Metricool under Settings → API.
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Metricool API Token</label>
+            <input class="field-input" type="password" id="mc-token-input" placeholder="Paste your Metricool API token">
+          </div>
+          <button class="btn btn-sm" onclick="fetchMetricoolProfiles()" style="margin-bottom:14px">Fetch My Profiles</button>
+
+          <div id="mc-profiles-wrap" style="display:none;margin-bottom:14px">
+            <div class="field-group">
+              <label class="field-label">Brand / Profile</label>
+              <select class="field-select" id="mc-profile-select"></select>
+              <div class="form-hint" style="font-size:10px;color:var(--text-3);margin-top:3px">The connected Metricool brand this dashboard pulls data from.</div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="saveMetricoolSettings()">Save Metricool Settings</button>
+          <span id="mc-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
         </div>
 
         <!-- Placeholder for future settings sections -->
@@ -1371,7 +1400,6 @@ tr.row-done:hover td{background:#DCF2E5}
 import {
   login, logout, watchAuth, getUserRole,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
-  getMetricsForPeriod, getMetricPeriods, saveMonthMetrics as saveMonthMetricsToDb, deleteMetric, cleanupDuplicateMetrics,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
@@ -1381,6 +1409,8 @@ import {
   watchBdTargets, setBdTargets,
   getBrandVoice, setBrandVoice, watchBrandVoice,
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
+  getMetricoolSettings, setMetricoolSettings, watchMetricoolSettings,
+  getMetricoolStats, setMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
   getAccessGate, setAccessGate, hashPassword,
   getAdminPasscode, setAdminPasscode,
   watchTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember, createTeamMemberWithLogin,
@@ -1393,7 +1423,7 @@ import {
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
   DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
-  HEALTH_DAY_CATEGORIES, METRIC_NAMES, getDeptColor
+  HEALTH_DAY_CATEGORIES, getDeptColor
 } from './firebase-data.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
@@ -1409,11 +1439,13 @@ let ALL_BD_CARDS = [];
 let ALL_WELLSPAN = [];
 let ALL_LOYALTY = [];
 let ALL_LEADS = [];
-let ALL_METRIC_PERIODS = [];
 let BD_TARGETS = {};
 let BRAND_VOICE = {};
 let ALL_ENTITIES = [];
 let ANTHROPIC_API_KEY = '';
+let METRICOOL_SETTINGS = { apiToken: '', userId: '', blogId: '' };
+let METRICOOL_FETCHED_PROFILES = [];
+let METRICOOL_STATS = null;
 let ANNUAL_BUDGET = 0;
 let currentType = 'Campaign';
 let editingId = null;
@@ -1440,6 +1472,7 @@ let unsubBdTargets = null;
 let unsubBrandVoice = null;
 let unsubEntities = null;
 let unsubAnthropicKey = null;
+let unsubMetricoolSettings = null;
 let unsubLeads = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
@@ -1567,6 +1600,7 @@ watchAuth(async user => {
     if(unsubBrandVoice) unsubBrandVoice();
     if(unsubEntities) unsubEntities();
     if(unsubAnthropicKey) unsubAnthropicKey();
+    if(unsubMetricoolSettings) unsubMetricoolSettings();
     if(unsubLeads) unsubLeads();
   }
 });
@@ -1588,6 +1622,7 @@ function initData() {
   unsubBrandVoice   = watchBrandVoice(data   => { BRAND_VOICE     = data; loadBrandVoiceForm(); });
   unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
+  unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
   unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); });
   initMetricsTab();
   initBudgetTab();
@@ -2550,37 +2585,134 @@ function fmtSAR(n) {
        : n.toLocaleString();
 }
 
-// ── METRICS — MONTHLY BULK ENTRY ──────────────────────────────────────────
-const METRIC_CATEGORIES = {
-  "Instagram Reach":"Instagram","Instagram Views":"Instagram",
-  "Instagram Engagements":"Instagram","Instagram Engagement Rate":"Instagram",
-  "Instagram New Followers":"Instagram","Instagram Conversations":"Instagram",
-  "TikTok Views":"TikTok","TikTok Engagements":"TikTok","TikTok New Followers":"TikTok",
-  "X Reach":"X","LinkedIn Reach":"LinkedIn","SM Messages Received":"Social Media",
-  "PR Mentions":"PR","Website Visits":"Website",
-};
-const METRIC_ICONS = {"Instagram":"📸","TikTok":"🎵","X":"𝕏","LinkedIn":"💼","Social Media":"✉️","PR":"📰","Website":"🌐"};
+// ── METRICS — METRICOOL-SYNCED SERIES ─────────────────────────────────────
+// METRICOOL_SERIES (label/network/agg per series) and metricoolMonthlyValue()
+// (the aggregation rule) live in firebase-data.js — shared with index.html so
+// "what number do we show for this month" can never drift between the two
+// pages. "source" on each series point is "metricool" (auto-synced) or
+// "manual" (a whole-month admin override that future syncs skip — see
+// mergeMetricoolSeries() below).
+const METRICOOL_NETWORK_ICONS = {"Instagram":"📸","TikTok":"🎵","LinkedIn":"💼","X":"𝕏"};
+const METRICOOL_BACKFILL_START = '2026-04-01'; // per project decision — no data requested before this date
 const MONTH_SHORT_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 let metricsYear  = new Date().getFullYear();
 let metricsMonth = new Date().getMonth() + 1; // 1-based
-let loadedMetricValues = {}; // snapshot of values as-loaded, used to detect true changes on save
+let loadedMetricValues = {}; // snapshot of displayed values as-loaded, used to detect true changes on save
 
 function getMetricsPeriod() {
   return `${metricsYear}-${String(metricsMonth).padStart(2,'0')}`;
 }
 
+// Merges freshly-fetched Metricool points into an existing series array by
+// date, never overwriting a point already flagged source:"manual" — this is
+// the mechanism that preserves admin overrides across future syncs.
+function mergeMetricoolSeries(existing, freshPoints) {
+  const byDate = {};
+  (existing||[]).forEach(p => { byDate[p.date] = p; });
+  freshPoints.forEach(p => {
+    if(byDate[p.date] && byDate[p.date].source === 'manual') return;
+    byDate[p.date] = p;
+  });
+  return Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date));
+}
+
+function metricoolPeriodsWithData() {
+  const periods = new Set();
+  const series = METRICOOL_STATS?.series || {};
+  Object.values(series).forEach(arr => (arr||[]).forEach(p => periods.add(p.date.slice(0,7))));
+  return periods;
+}
+
 async function initMetricsTab() {
-  ALL_METRIC_PERIODS = await getMetricPeriods();
+  METRICOOL_STATS = await getMetricoolStats();
   renderMetricsYearGrid();
+  renderMetricoolSyncStatus();
   await loadMetricsForPeriod();
+}
+
+function renderMetricoolSyncStatus() {
+  const el = document.getElementById('metricool-sync-status');
+  if(!el) return;
+  if(METRICOOL_STATS?.updatedAt) {
+    const d = METRICOOL_STATS.updatedAt.toDate ? METRICOOL_STATS.updatedAt.toDate() : new Date(METRICOOL_STATS.updatedAt);
+    el.textContent = `Last synced: ${d.toLocaleString()}`;
+    el.style.color = 'var(--text-3)';
+  } else {
+    el.textContent = 'Never synced yet';
+    el.style.color = 'var(--red)';
+  }
+}
+
+window.syncMetricool = async function() {
+  if(!METRICOOL_SETTINGS.apiToken || !METRICOOL_SETTINGS.blogId) {
+    showToast('Connect Metricool in Settings first', true); return;
+  }
+  const btn = document.getElementById('metricool-sync-btn');
+  const statusEl = document.getElementById('metricool-sync-status');
+  btn.disabled = true;
+  statusEl.textContent = 'Syncing…'; statusEl.style.color = 'var(--text-3)';
+  try {
+    const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
+    const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
+    const from = encodeURIComponent(`${METRICOOL_BACKFILL_START}T00:00:00+03:00`);
+    const to   = encodeURIComponent(`${new Date().toISOString().slice(0,10)}T23:59:59+03:00`);
+    const timelineDefs = [
+      ['instagram_reach',           'instagram', 'reach',           'posts'],
+      ['instagram_engagement_rate', 'instagram', 'engagement',      'posts'],
+      ['instagram_likes',           'instagram', 'likes',           'posts'],
+      ['instagram_comments',        'instagram', 'comments',        'posts'],
+      ['instagram_reel_views',      'instagram', 'videoviews',      'reels'],
+      ['tiktok_video_views',        'tiktok',    'video_views',     'account'],
+      ['linkedin_impressions',      'linkedin',  'impressionCount', 'account'],
+      ['linkedin_followers',        'linkedin',  'followers',       'account'],
+      ['twitter_followers',         'twitter',   'followers',       'account'],
+    ];
+    const series = { ...(METRICOOL_STATS?.series || {}) };
+    let failures = 0;
+    for(const [key, network, metric, subject] of timelineDefs) {
+      const url = `https://app.metricool.com/api/v2/analytics/timelines?userId=${userId}&blogId=${blogId}&network=${network}&metric=${metric}&subject=${subject}&from=${from}&to=${to}&timezone=Asia%2FRiyadh`;
+      try {
+        const res = await fetch(url, { headers: authHeaders });
+        if(!res.ok) { failures++; console.error(`Metricool sync failed for ${key}: HTTP ${res.status}`); continue; }
+        const body = await res.json();
+        const points = ((body.data && body.data[0] && body.data[0].values) || []).map(v => ({
+          date: v.dateTime.slice(0,10), value: v.value, source: 'metricool'
+        }));
+        series[key] = mergeMetricoolSeries(series[key], points);
+      } catch(e) { failures++; console.error(`Metricool sync failed for ${key}:`, e); }
+    }
+    // Instagram follower count — snapshot only, today's date, never backfilled
+    try {
+      const fRes = await fetch(`https://app.metricool.com/api/explore/followers/${blogId}?userId=${userId}&blogId=${blogId}`, { headers: authHeaders });
+      if(fRes.ok) {
+        const f = await fRes.json();
+        if(typeof f.instagramFollowers === 'number') {
+          const today = new Date().toISOString().slice(0,10);
+          series.instagram_followers = mergeMetricoolSeries(series.instagram_followers, [{date: today, value: f.instagramFollowers, source: 'metricool'}]);
+        }
+      } else { failures++; }
+    } catch(e) { failures++; console.error('Metricool follower snapshot failed:', e); }
+
+    METRICOOL_STATS = { ...(METRICOOL_STATS||{}), series };
+    await setMetricoolStats(METRICOOL_STATS);
+    renderMetricoolSyncStatus();
+    renderMetricsYearGrid();
+    await loadMetricsForPeriod();
+    showToast(failures ? `Synced with ${failures} series failing — check console` : '✓ Metricool sync complete', !!failures);
+  } catch(e) {
+    statusEl.textContent = 'Sync failed'; statusEl.style.color = 'var(--red)';
+    showToast('Sync failed: '+e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function renderMetricsYearGrid() {
   document.getElementById('metrics-year-label').textContent = metricsYear;
   const nextBtn = document.getElementById('metrics-year-next');
   if(nextBtn) nextBtn.disabled = metricsYear >= new Date().getFullYear() + 1;
-  const periodsSet = new Set(ALL_METRIC_PERIODS);
+  const periodsSet = metricoolPeriodsWithData();
   document.getElementById('metrics-month-grid').innerHTML = MONTH_SHORT_NAMES.map((name, i) => {
     const m        = i + 1;
     const period   = `${metricsYear}-${String(m).padStart(2,'0')}`;
@@ -2619,74 +2751,62 @@ async function loadMetricsForPeriod() {
   const [year, month] = period.split('-');
   const monthName = new Date(year, month-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
   document.getElementById('metrics-month-label').textContent = `${monthName} — Performance Metrics`;
-  const existing = await getMetricsForPeriod(period);
+
   const valueMap = {};
-  existing.forEach(m => { valueMap[m.metricName] = m.value; });
+  Object.keys(METRICOOL_SERIES).forEach(key => { valueMap[key] = metricoolMonthlyValue(METRICOOL_STATS, key, period); });
   loadedMetricValues = { ...valueMap }; // snapshot for change detection on save
-  const byCategory = {};
-  METRIC_NAMES.forEach(name => {
-    const cat = METRIC_CATEGORIES[name]||'Other';
-    if(!byCategory[cat]) byCategory[cat]=[];
-    byCategory[cat].push(name);
+
+  const byNetwork = {};
+  Object.entries(METRICOOL_SERIES).forEach(([key, def]) => {
+    if(!byNetwork[def.network]) byNetwork[def.network] = [];
+    byNetwork[def.network].push(key);
   });
+
   let html = '';
-  Object.entries(byCategory).forEach(([cat, names]) => {
+  Object.entries(byNetwork).forEach(([network, keys]) => {
     html += `<div style="padding:12px 20px;border-bottom:1px solid var(--border)">
-      <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">${METRIC_ICONS[cat]||'📊'} ${cat}</div>
+      <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">${METRICOOL_NETWORK_ICONS[network]||'📊'} ${network}</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-        ${names.map(name=>`
+        ${keys.map(key=>{
+          const def = METRICOOL_SERIES[key];
+          const val = valueMap[key];
+          const isManual = ((METRICOOL_STATS?.series?.[key])||[]).some(p => p.date.startsWith(period) && p.source==='manual');
+          return `
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">${name}</label>
-            <input class="filter-input" type="number" min="0"
-              id="metric-input-${name.replace(/\s+/g,'_')}"
-              value="${valueMap[name]??''}" placeholder="0"
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">${def.label}${isManual?' <span style="color:var(--orange)" title="Manually overridden — future syncs will skip this month">✎</span>':''}</label>
+            <input class="filter-input" type="number" min="0" step="any"
+              id="metric-input-${key}"
+              value="${val===null||val===undefined?'':def.isPercent?val.toFixed(2):val}" placeholder="—"
               style="width:100%;padding:7px 10px;font-size:13px;font-weight:600">
-          </div>`).join('')}
+          </div>`;}).join('')}
       </div>
     </div>`;
   });
   document.getElementById('metrics-grid-wrap').innerHTML = html;
-  setupEngagementRateCalc();
   // Reset save status indicators when loading new month
   ['metrics-save-status','metrics-save-error','metrics-saving-indicator'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.style.display='none';
   });
 }
 
-function setupEngagementRateCalc() {
-  const viewsEl = document.getElementById('metric-input-Instagram_Views');
-  const engEl   = document.getElementById('metric-input-Instagram_Engagements');
-  const rateEl  = document.getElementById('metric-input-Instagram_Engagement_Rate');
-  if(!viewsEl || !engEl || !rateEl) return;
-  rateEl.readOnly = true;
-  rateEl.style.cssText += ';background:var(--bg);color:var(--green);font-weight:700;cursor:default';
-  rateEl.title = 'Auto-calculated: (Engagements ÷ Views) × 100';
-  const calc = () => {
-    const v = parseFloat(viewsEl.value)||0;
-    const e = parseFloat(engEl.value)||0;
-    rateEl.value = v > 0 ? (e/v*100).toFixed(2) : '';
-  };
-  viewsEl.addEventListener('input', calc);
-  engEl.addEventListener('input', calc);
-  calc();
-}
-
 window.saveMonthMetrics = async function() {
-  const period     = getMetricsPeriod();
-  const metricsObj = {};
-  METRIC_NAMES.forEach(name => {
-    const el = document.getElementById('metric-input-'+name.replace(/\s+/g,'_'));
-    if(el && el.value !== '') metricsObj[name] = parseFloat(el.value)||0;
-  });
-  if(!Object.keys(metricsObj).length) { showToast('Enter at least one value before saving', true); return; }
+  const period = getMetricsPeriod();
+  const lastDay = new Date(new Date(period+'-01').getFullYear(), new Date(period+'-01').getMonth()+1, 0).toISOString().slice(0,10);
 
-  // Precisely count only fields that are new or actually changed vs what was loaded
   let changedCount = 0;
-  Object.entries(metricsObj).forEach(([name, val]) => {
-    const prev = loadedMetricValues[name];
-    if(prev === undefined || Number(prev) !== Number(val)) changedCount++;
+  const series = { ...(METRICOOL_STATS?.series || {}) };
+  Object.keys(METRICOOL_SERIES).forEach(key => {
+    const el = document.getElementById('metric-input-'+key);
+    if(!el || el.value === '') return;
+    const val = parseFloat(el.value);
+    const prev = loadedMetricValues[key];
+    if(prev !== null && prev !== undefined && Number(prev) === val) return; // unchanged, skip
+    changedCount++;
+    const withoutThisMonth = (series[key]||[]).filter(p => !(p.date.startsWith(period) && p.source==='manual'));
+    series[key] = [...withoutThisMonth, { date: lastDay, value: val, source: 'manual' }]
+      .sort((a,b) => a.date.localeCompare(b.date));
   });
-  if(changedCount === 0) { showToast('No changes to save — values match what\'s already stored', true); return; }
+  if(changedCount === 0) { showToast('No changes to save — values match what\'s already shown', true); return; }
 
   const statusEl  = document.getElementById('metrics-save-status');
   const errorEl   = document.getElementById('metrics-save-error');
@@ -2696,17 +2816,17 @@ window.saveMonthMetrics = async function() {
   savingEl.style.display = 'inline';
 
   try {
-    await saveMonthMetricsToDb(period, metricsObj);
+    METRICOOL_STATS = { ...(METRICOOL_STATS||{}), series };
+    await setMetricoolStats(METRICOOL_STATS);
     savingEl.style.display = 'none';
     statusEl.style.display = 'inline';
     setTimeout(() => { statusEl.style.display='none'; }, 5000);
     const [y,m] = period.split('-');
     const label = new Date(y,m-1,1).toLocaleString('en',{month:'long',year:'numeric'});
-    showToast(`✓ ${changedCount} metric${changedCount===1?'':'s'} updated for ${label}`);
-    loadedMetricValues = { ...metricsObj }; // reset baseline so a second save without edits reports 0 changes
-    ALL_METRIC_PERIODS = await getMetricPeriods();
+    showToast(`✓ ${changedCount} metric${changedCount===1?'':'s'} manually overridden for ${label}`);
     renderMetricsYearGrid();
     renderMetricHistoryLinks();
+    await loadMetricsForPeriod();
   } catch(e) {
     savingEl.style.display = 'none';
     errorEl.textContent    = 'Save failed: ' + e.message;
@@ -2715,25 +2835,12 @@ window.saveMonthMetrics = async function() {
   }
 }
 
-window.runCleanupDuplicates = async function() {
-  if(!confirm('This scans the entire metrics collection and permanently removes leftover duplicate entries from an old bug, keeping only the correct value for each metric+month. This cannot be undone. Proceed?')) return;
-  try {
-    const removed = await cleanupDuplicateMetrics();
-    if(removed === 0) { showToast('No duplicates found — your data is clean ✓'); }
-    else {
-      showToast(`✓ Removed ${removed} duplicate entr${removed===1?'y':'ies'}. Reloading current month...`);
-      ALL_METRIC_PERIODS = await getMetricPeriods();
-      renderMetricsYearGrid();
-      await loadMetricsForPeriod();
-    }
-  } catch(e) { showToast('Cleanup failed: '+e.message, true); }
-}
-
 function renderMetricHistoryLinks() {
   const el = document.getElementById('metrics-history-links');
-  if(!ALL_METRIC_PERIODS.length){el.innerHTML='<span style="font-size:11px;color:var(--text-3)">No data saved yet</span>';return;}
-  el.innerHTML='<span style="font-size:11px;color:var(--text-3);margin-right:4px">Saved:</span>'+
-    ALL_METRIC_PERIODS.slice(0,6).map(p=>{
+  const periods = Array.from(metricoolPeriodsWithData()).sort().reverse();
+  if(!periods.length){el.innerHTML='<span style="font-size:11px;color:var(--text-3)">No data synced yet</span>';return;}
+  el.innerHTML='<span style="font-size:11px;color:var(--text-3);margin-right:4px">Has data:</span>'+
+    periods.slice(0,6).map(p=>{
       const [y,m]=p.split('-');
       const label=new Date(y,m-1,1).toLocaleString('en',{month:'short',year:'2-digit'});
       return `<button class="btn btn-sm" onclick="jumpToPeriod('${p}')">${label}</button>`;
@@ -3625,6 +3732,58 @@ window.saveApiKey = async function() {
     s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
     loadApiKeyForm();
     showToast('API key saved — try generating content now');
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── METRICOOL SETUP ──────────────────────────────────────────────────────
+function loadMetricoolSettingsForm() {
+  const statusEl = document.getElementById('metricool-setup-status');
+  document.getElementById('mc-token-input').value = METRICOOL_SETTINGS.apiToken || '';
+  if(METRICOOL_SETTINGS.apiToken && METRICOOL_SETTINGS.blogId) {
+    statusEl.textContent = `✓ Connected — ${METRICOOL_SETTINGS.blogLabel || METRICOOL_SETTINGS.blogId}`;
+    statusEl.style.color = 'var(--green)';
+  } else {
+    statusEl.textContent = '— Required before syncing metrics';
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+window.fetchMetricoolProfiles = async function() {
+  const token = document.getElementById('mc-token-input').value.trim();
+  if(!token) { showToast('Enter your Metricool API token first', true); return; }
+  try {
+    const res = await fetch('https://app.metricool.com/api/admin/simpleProfiles', {
+      headers: { 'X-Mc-Auth': token, 'Content-Type': 'application/json' }
+    });
+    if(!res.ok) throw new Error(`Metricool returned ${res.status} — check the token`);
+    const profiles = await res.json();
+    METRICOOL_FETCHED_PROFILES = profiles;
+    const select = document.getElementById('mc-profile-select');
+    select.innerHTML = profiles.map(p => `<option value="${p.id}|${p.userId}">${p.label}</option>`).join('');
+    if(METRICOOL_SETTINGS.blogId) {
+      const match = profiles.find(p => String(p.id) === String(METRICOOL_SETTINGS.blogId));
+      if(match) select.value = `${match.id}|${match.userId}`;
+    }
+    document.getElementById('mc-profiles-wrap').style.display = 'block';
+    showToast(`Found ${profiles.length} connected brand${profiles.length===1?'':'s'}`);
+  } catch(e) { showToast('Could not fetch profiles: '+e.message, true); }
+}
+
+window.saveMetricoolSettings = async function() {
+  const apiToken = document.getElementById('mc-token-input').value.trim();
+  if(!apiToken) { showToast('Enter your Metricool API token first', true); return; }
+  const select = document.getElementById('mc-profile-select');
+  if(!select.value) { showToast('Click "Fetch My Profiles" and pick a brand first', true); return; }
+  const [blogId, userId] = select.value.split('|');
+  const blogLabel = select.options[select.selectedIndex].textContent;
+  try {
+    const data = { apiToken, userId, blogId, blogLabel };
+    await setMetricoolSettings(data);
+    METRICOOL_SETTINGS = data;
+    const s = document.getElementById('mc-save-status');
+    s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
+    loadMetricoolSettingsForm();
+    showToast('Metricool settings saved');
   } catch(e) { showToast('Save failed: '+e.message, true); }
 }
 
