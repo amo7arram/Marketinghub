@@ -2594,6 +2594,12 @@ function fmtSAR(n) {
 // mergeMetricoolSeries() below).
 const METRICOOL_NETWORK_ICONS = {"Instagram":"📸","TikTok":"🎵","LinkedIn":"💼","X":"𝕏"};
 const METRICOOL_BACKFILL_START = '2026-04-01'; // per project decision — no data requested before this date
+// Metricool's API sends no Access-Control-Allow-Origin header, so a direct
+// browser fetch() is blocked by CORS on the deployed site (confirmed live —
+// curl doesn't enforce CORS, which is why this wasn't caught earlier). This
+// Cloudflare Worker is a stateless passthrough that adds the missing CORS
+// headers; it never stores the token, just forwards it per-request.
+const METRICOOL_API_BASE = 'https://metricooldash.ahmed-moharram.workers.dev/api';
 const MONTH_SHORT_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 let metricsYear  = new Date().getFullYear();
@@ -2671,7 +2677,7 @@ window.syncMetricool = async function() {
     const series = { ...(METRICOOL_STATS?.series || {}) };
     let failures = 0;
     for(const [key, network, metric, subject] of timelineDefs) {
-      const url = `https://app.metricool.com/api/v2/analytics/timelines?userId=${userId}&blogId=${blogId}&network=${network}&metric=${metric}&subject=${subject}&from=${from}&to=${to}&timezone=Asia%2FRiyadh`;
+      const url = `${METRICOOL_API_BASE}/v2/analytics/timelines?userId=${userId}&blogId=${blogId}&network=${network}&metric=${metric}&subject=${subject}&from=${from}&to=${to}&timezone=Asia%2FRiyadh`;
       try {
         const res = await fetch(url, { headers: authHeaders });
         if(!res.ok) { failures++; console.error(`Metricool sync failed for ${key}: HTTP ${res.status}`); continue; }
@@ -2684,7 +2690,7 @@ window.syncMetricool = async function() {
     }
     // Instagram follower count — snapshot only, today's date, never backfilled
     try {
-      const fRes = await fetch(`https://app.metricool.com/api/explore/followers/${blogId}?userId=${userId}&blogId=${blogId}`, { headers: authHeaders });
+      const fRes = await fetch(`${METRICOOL_API_BASE}/explore/followers/${blogId}?userId=${userId}&blogId=${blogId}`, { headers: authHeaders });
       if(fRes.ok) {
         const f = await fRes.json();
         if(typeof f.instagramFollowers === 'number') {
@@ -3752,7 +3758,7 @@ window.fetchMetricoolProfiles = async function() {
   const token = document.getElementById('mc-token-input').value.trim();
   if(!token) { showToast('Enter your Metricool API token first', true); return; }
   try {
-    const res = await fetch('https://app.metricool.com/api/admin/simpleProfiles', {
+    const res = await fetch(`${METRICOOL_API_BASE}/admin/simpleProfiles`, {
       headers: { 'X-Mc-Auth': token, 'Content-Type': 'application/json' }
     });
     if(!res.ok) throw new Error(`Metricool returned ${res.status} — check the token`);
