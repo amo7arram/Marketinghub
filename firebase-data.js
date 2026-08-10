@@ -928,3 +928,77 @@ export function watchLeadStats(callback) {
     err => { console.error('watchLeadStats:', err.code); callback(null); }
   );
 }
+
+// ── METRICOOL SETTINGS (admin-only) ───────────────────────────────────────
+// Stored as config/metricool_settings → { apiToken, userId, blogId }
+// Same sensitivity as config/ai_settings — the raw token is visible to
+// anyone with admin login and dev tools open. Firestore rule for this
+// document must be authenticated-read/write only (see ARCHITECTURE.md).
+export async function getMetricoolSettings() {
+  const snap = await getDoc(doc(db, CONFIG, "metricool_settings"));
+  return snap.exists() ? snap.data() : { apiToken: '', userId: '', blogId: '' };
+}
+export function setMetricoolSettings(data) {
+  return setDoc(doc(db, CONFIG, "metricool_settings"), data, { merge: true });
+}
+export function watchMetricoolSettings(callback) {
+  return onSnapshot(doc(db, CONFIG, "metricool_settings"),
+    snap => callback(snap.exists() ? snap.data() : { apiToken: '', userId: '', blogId: '' }),
+    err => { console.error('watchMetricoolSettings:', err.code); callback({ apiToken: '', userId: '', blogId: '' }); }
+  );
+}
+
+// ── PUBLIC METRICOOL STATS (aggregated social performance, no PII) ───────
+// Written by admin.html's "Sync Now" action. Stored separately from the
+// raw Metricool token so the public portal never needs the credential —
+// only this pre-computed snapshot. Shape:
+//   { updatedAt, series: { <seriesKey>: [{date, value, source}] } }
+// where seriesKey is e.g. "instagram_reach", "linkedin_followers", and
+// source is "metricool" (auto-synced) or "manual" (admin override for
+// that month — see docs/DATA_MODEL.md).
+export async function getMetricoolStats() {
+  const snap = await getDoc(doc(db, CONFIG, "metricool_stats"));
+  return snap.exists() ? snap.data() : null;
+}
+export function setMetricoolStats(stats) {
+  return setDoc(doc(db, CONFIG, "metricool_stats"), { ...stats, updatedAt: Timestamp.now() });
+}
+export function watchMetricoolStats(callback) {
+  return onSnapshot(doc(db, CONFIG, "metricool_stats"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchMetricoolStats:', err.code); callback(null); }
+  );
+}
+
+// Shared between admin.html (which syncs+edits these series) and index.html
+// (which only ever reads them) so the aggregation rule for "what number do
+// we show for this month" can never drift between the two pages.
+export const METRICOOL_SERIES = {
+  instagram_reach:           { label:'Instagram Reach',           network:'Instagram', agg:'sum' },
+  instagram_engagement_rate: { label:'Instagram Engagement Rate', network:'Instagram', agg:'avg', isPercent:true },
+  instagram_likes:           { label:'Instagram Likes',           network:'Instagram', agg:'sum' },
+  instagram_comments:        { label:'Instagram Comments',        network:'Instagram', agg:'sum' },
+  instagram_reel_views:      { label:'Instagram Reel Views',      network:'Instagram', agg:'sum' },
+  instagram_followers:       { label:'Instagram Followers',       network:'Instagram', agg:'last' },
+  tiktok_video_views:        { label:'TikTok Views',              network:'TikTok',    agg:'sum' },
+  linkedin_impressions:      { label:'LinkedIn Impressions',      network:'LinkedIn',  agg:'sum' },
+  linkedin_followers:        { label:'LinkedIn Followers',        network:'LinkedIn',  agg:'last' },
+  twitter_followers:         { label:'X Followers',               network:'X',         agg:'last' },
+};
+
+// Derives one display number for a series+month from a metricool_stats doc:
+// a manual override (if any) wins outright; otherwise sum/average/latest of
+// Metricool-sourced points, per that series' aggregation rule. Returns null
+// if there's no data at all for that month.
+export function metricoolMonthlyValue(stats, seriesKey, period) {
+  const def = METRICOOL_SERIES[seriesKey];
+  const pts = ((stats?.series?.[seriesKey])||[]).filter(p => p.date.startsWith(period));
+  const manual = pts.find(p => p.source === 'manual');
+  if(manual) return manual.value;
+  const auto = pts.filter(p => p.source !== 'manual');
+  if(!auto.length) return null;
+  if(def.agg === 'sum') return auto.reduce((s,p)=>s+p.value,0);
+  if(def.agg === 'avg') return auto.reduce((s,p)=>s+p.value,0)/auto.length;
+  if(def.agg === 'last') return auto[auto.length-1].value;
+  return null;
+}
