@@ -590,25 +590,6 @@ tr.row-done:hover td{background:#DCF2E5}
           <div style="font-size:12px;color:var(--text-3)">Generate bilingual captions from an existing initiative, or start from a blank brief. Review and edit before saving.</div>
         </div>
 
-        <!-- AI Setup — API key required, shown prominently until configured -->
-        <div id="ai-setup-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:20px;overflow:hidden">
-          <div onclick="toggleApiKeyPanel()" style="cursor:pointer;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--bg)">
-            <div style="font-size:13px;font-weight:700;color:var(--text)">🔑 AI Setup <span id="ai-setup-status" style="font-weight:400;font-size:11px"></span></div>
-            <span id="ak-toggle-icon" style="font-size:12px;color:var(--text-3)">▼ Configure</span>
-          </div>
-          <div id="ak-panel" style="display:none;padding:20px">
-            <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.6">
-              ⚠️ <strong>Security note:</strong> this key is stored in Firestore and used directly from the browser. Anyone with admin login who opens browser dev tools can see it in network requests. This is an acceptable tradeoff for a small trusted internal team, but treat this key as sensitive — don't share this admin login casually. Get a key at <strong>console.anthropic.com</strong> (separate from your Claude.ai subscription — pay-per-use, typically a few dollars/month at low volume).
-            </div>
-            <div class="field-group">
-              <label class="field-label">Anthropic API Key</label>
-              <input class="field-input" type="password" id="ak-input" placeholder="sk-ant-api03-...">
-            </div>
-            <button class="btn btn-primary" onclick="saveApiKey()">Save API Key</button>
-            <span id="ak-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
-          </div>
-        </div>
-
         <!-- Brand Voice Settings — collapsible -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:20px;overflow:hidden">
           <div onclick="toggleBrandVoicePanel()" style="cursor:pointer;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--bg)">
@@ -821,6 +802,25 @@ tr.row-done:hover td{background:#DCF2E5}
           <div id="dept-revenue-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"></div>
           <button class="btn btn-primary" onclick="saveDeptRevenueEstimates()">Save Estimates</button>
           <span id="dept-revenue-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+        </div>
+
+        <!-- AI Setup — API key required, shown prominently until configured -->
+        <div id="ai-setup-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:20px;overflow:hidden">
+          <div onclick="toggleApiKeyPanel()" style="cursor:pointer;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--bg)">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">🔑 AI Setup <span id="ai-setup-status" style="font-weight:400;font-size:11px"></span></div>
+            <span id="ak-toggle-icon" style="font-size:12px;color:var(--text-3)">▼ Configure</span>
+          </div>
+          <div id="ak-panel" style="display:none;padding:20px">
+            <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.6">
+              ⚠️ <strong>Security note:</strong> this key is stored in Firestore and used directly from the browser. Anyone with admin login who opens browser dev tools can see it in network requests. This is an acceptable tradeoff for a small trusted internal team, but treat this key as sensitive — don't share this admin login casually. Get a key at <strong>console.anthropic.com</strong> (separate from your Claude.ai subscription — pay-per-use, typically a few dollars/month at low volume).
+            </div>
+            <div class="field-group">
+              <label class="field-label">Anthropic API Key</label>
+              <input class="field-input" type="password" id="ak-input" placeholder="sk-ant-api03-...">
+            </div>
+            <button class="btn btn-primary" onclick="saveApiKey()">Save API Key</button>
+            <span id="ak-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+          </div>
         </div>
 
         <!-- Metricool Setup -->
