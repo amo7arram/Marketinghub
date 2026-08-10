@@ -447,13 +447,13 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         </div>
         <div style="font-size:10px;color:var(--text-3);margin-top:-14px;margin-bottom:20px">Applies to Social Media Performance, Department Activity, and Leads by Department below</div>
 
-        <!-- Social Media Performance -->
+        <!-- Social Media Performance — synced from Metricool -->
         <div class="dash-section-title">Social Media Performance</div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
-          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-views">—</div><div class="sm-kpi-label">👁 Views</div><div class="sm-kpi-sub">Instagram + TikTok</div></div>
-          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-reach">—</div><div class="sm-kpi-label">📡 Reach</div><div class="sm-kpi-sub">All Channels</div></div>
-          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-eng">—</div><div class="sm-kpi-label">💬 Engagements</div><div class="sm-kpi-sub">Instagram</div></div>
-          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-conv">—</div><div class="sm-kpi-label">✉️ Conversations</div><div class="sm-kpi-sub">Instagram DMs</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-ig-reach">—</div><div class="sm-kpi-label">📡 Instagram Reach</div><div class="sm-kpi-sub" id="kpi-ig-reach-delta"></div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-ig-reels">—</div><div class="sm-kpi-label">🎬 Instagram Reel Views</div><div class="sm-kpi-sub" id="kpi-ig-reels-delta"></div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-tiktok-views">—</div><div class="sm-kpi-label">🎵 TikTok Views</div><div class="sm-kpi-sub" id="kpi-tiktok-views-delta"></div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="kpi-li-followers">—</div><div class="sm-kpi-label">💼 LinkedIn Followers</div><div class="sm-kpi-sub" id="kpi-li-followers-delta"></div></div>
         </div>
 
         <!-- Website Chart — hidden, data kept for admin metrics -->
@@ -711,7 +711,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 import {
   watchInitiatives, watchResources, watchMetrics, watchPromotions,
   watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets, watchEntities, watchHealthDays,
-  watchLeadStats,
+  watchLeadStats, watchMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
   promoStatus, getAccessGate, hashPassword,
   DEPARTMENTS, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
@@ -719,6 +719,7 @@ import {
 let ALL_ENTITIES = [];
 let HEALTH_DAYS = [];
 let LEAD_STATS = null;
+let METRICOOL_STATS = null;
 
 let RESOURCES   = [];
 let METRICS     = [];
@@ -1062,6 +1063,12 @@ window.renderDashboard = function() {
 }
 
 // Only KPIs — called by period navigation, no chart re-render
+const DASHBOARD_KPI_CARDS = [
+  { key:'instagram_reach',      valId:'kpi-ig-reach',     deltaId:'kpi-ig-reach-delta' },
+  { key:'instagram_reel_views', valId:'kpi-ig-reels',     deltaId:'kpi-ig-reels-delta' },
+  { key:'tiktok_video_views',   valId:'kpi-tiktok-views', deltaId:'kpi-tiktok-views-delta' },
+  { key:'linkedin_followers',   valId:'kpi-li-followers', deltaId:'kpi-li-followers-delta' },
+];
 function renderDashboardKPIs() {
   try {
     const periods = getAvailablePeriods();
@@ -1070,25 +1077,32 @@ function renderDashboardKPIs() {
 
     if(periods.length) {
       const currentPeriod = periods[dashPeriodIdx] || periods[0];
+      const prevPeriod    = periods[dashPeriodIdx+1] || null;
       navLabel.textContent = periodLabel(currentPeriod);
       const prevBtn = document.getElementById('period-prev');
       const nextBtn = document.getElementById('period-next');
       if(prevBtn) prevBtn.disabled = dashPeriodIdx >= periods.length-1;
       if(nextBtn) nextBtn.disabled = dashPeriodIdx <= 0;
 
-      const pms   = getPeriodMetrics(currentPeriod);
-      const views = getMVal('Instagram Views',pms) + getMVal('TikTok Views',pms);
-      const reach = getMVal('Instagram Reach',pms) + getMVal('X Reach',pms) + getMVal('LinkedIn Reach',pms);
-      const eng   = getMVal('Instagram Engagements',pms) + getMVal('TikTok Engagements',pms);
-      const conv  = getMVal('SM Messages Received',pms); // conversations = SM messages received
-      document.getElementById('kpi-views').textContent = fmt(views)||'0';
-      document.getElementById('kpi-reach').textContent = fmt(reach)||'0';
-      document.getElementById('kpi-eng').textContent   = fmt(eng)||'0';
-      document.getElementById('kpi-conv').textContent  = fmt(conv)||'0';
+      DASHBOARD_KPI_CARDS.forEach(k => {
+        const val    = metricoolMonthlyValue(METRICOOL_STATS, k.key, currentPeriod);
+        const prev   = prevPeriod ? metricoolMonthlyValue(METRICOOL_STATS, k.key, prevPeriod) : null;
+        const valEl  = document.getElementById(k.valId);
+        const deltaEl = document.getElementById(k.deltaId);
+        if(valEl) valEl.textContent = val!==null ? fmt(val) : '—';
+        if(deltaEl) {
+          if(val!==null && prev!==null && prev>0) {
+            const pct = Math.round((val-prev)/prev*100);
+            deltaEl.innerHTML = `<span style="${pct>=0?'color:var(--green)':'color:var(--red)'}">${pct>=0?'▲':'▼'} ${Math.abs(pct)}%</span> vs last month`;
+          } else {
+            deltaEl.textContent = 'vs last month';
+          }
+        }
+      });
     } else {
-      navLabel.textContent = 'No monthly data yet — add metrics in admin';
+      navLabel.textContent = 'No monthly data yet — sync Metricool in admin';
       ['period-prev','period-next'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=true; });
-      ['kpi-views','kpi-reach','kpi-eng','kpi-conv'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='0'; });
+      DASHBOARD_KPI_CARDS.forEach(k=>{ const el=document.getElementById(k.valId); if(el) el.textContent='—'; });
     }
     // Keep SM Analytics in sync if open
     if(document.getElementById('page-smanalytics')?.classList.contains('active')) renderSmAnalytics();
@@ -1192,57 +1206,30 @@ function renderDeptActivityBar() {
   } catch(e) { console.error('Dept activity bar error:', e); }
 }
 
-// ── SM ANALYTICS PAGE ────────────────────────────────────────────────────
-const SMA_CHANNELS = [
-  {
-    key:'Instagram', icon:'📸', color:'#E1306C',
-    metrics:[
-      {name:'Instagram Reach',      label:'Reach'},
-      {name:'Instagram Views',      label:'Views'},
-      {name:'Instagram Engagements',label:'Engagements'},
-      {name:'Instagram Engagement Rate', label:'Engagement Rate', pct:true},
-      {name:'Instagram New Followers',   label:'New Followers'},
-      {name:'Instagram Conversations',   label:'Conversations'},
-    ]
-  },
-  {
-    key:'TikTok', icon:'🎵', color:'#000000',
-    metrics:[
-      {name:'TikTok Views',        label:'Views'},
-      {name:'TikTok Engagements',  label:'Engagements'},
-      {name:'TikTok New Followers',label:'New Followers'},
-    ]
-  },
-  {
-    key:'X (Twitter)', icon:'𝕏', color:'#1DA1F2',
-    metrics:[{name:'X Reach', label:'Reach'}]
-  },
-  {
-    key:'LinkedIn', icon:'💼', color:'#0A66C2',
-    metrics:[{name:'LinkedIn Reach', label:'Reach'}]
-  },
-  {
-    key:'Social Media', icon:'✉️', color:'#6C5CE7',
-    metrics:[
-      {name:'SM Messages Received', label:'Messages Received'},
-      {name:'PR Mentions',          label:'PR Mentions'},
-    ]
-  },
-  {
-    key:'Website', icon:'🌐', color:'#1DB87A',
-    metrics:[{name:'Website Visits', label:'Monthly Visitors'}]
-  },
-];
+// ── SM ANALYTICS PAGE — synced from Metricool ────────────────────────────
+// Channel grouping is derived from METRICOOL_SERIES (firebase-data.js) so
+// this page can never list a metric admin.html isn't actually syncing.
+const SMA_NETWORK_META = {
+  Instagram: { icon:'📸', color:'#E1306C', chartKey:'instagram_reach' },
+  TikTok:    { icon:'🎵', color:'#000000', chartKey:'tiktok_video_views' },
+  LinkedIn:  { icon:'💼', color:'#0A66C2', chartKey:'linkedin_followers' },
+  X:         { icon:'𝕏', color:'#1DA1F2', chartKey:'twitter_followers' },
+};
+let smaTrendCharts = {}; // one Chart.js instance per network, keyed by network name
+
+function metricoolSeriesFullHistory(seriesKey) {
+  return ((METRICOOL_STATS?.series?.[seriesKey])||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+}
 
 function renderSmAnalytics() {
   try {
     const periods = getAvailablePeriods();
     const labelEl = document.getElementById('sma-period-label');
 
-    if(!periods.length) {
+    if(!periods.length || !METRICOOL_STATS?.series) {
       if(labelEl) labelEl.textContent = 'No data yet';
       document.getElementById('sma-content').innerHTML =
-        '<div class="empty-state"><div class="empty-state-icon">📊</div>No metrics entered yet — add monthly data in the admin panel</div>';
+        '<div class="empty-state"><div class="empty-state-icon">📊</div>No Metricool data synced yet — connect and sync in the admin panel</div>';
       return;
     }
 
@@ -1250,37 +1237,68 @@ function renderSmAnalytics() {
     const prevPeriod    = periods[dashPeriodIdx+1] || null;
     if(labelEl) labelEl.textContent = periodLabel(currentPeriod);
 
-    const pms     = getPeriodMetrics(currentPeriod);
-    const prevPms = prevPeriod ? getPeriodMetrics(prevPeriod) : [];
+    const byNetwork = {};
+    Object.entries(METRICOOL_SERIES).forEach(([key, def]) => {
+      if(!byNetwork[def.network]) byNetwork[def.network] = [];
+      byNetwork[def.network].push({ key, ...def });
+    });
 
     let html = '';
-    SMA_CHANNELS.forEach(ch => {
+    Object.entries(byNetwork).forEach(([network, seriesList]) => {
+      const meta = SMA_NETWORK_META[network] || { icon:'📊', color:'var(--navy)' };
       html += `<div class="card" style="margin-bottom:16px">
         <div class="card-header" style="margin-bottom:12px">
           <div class="card-title" style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:18px">${ch.icon}</span>
-            <span style="color:${ch.color}">${ch.key}</span>
+            <span style="font-size:18px">${meta.icon}</span>
+            <span style="color:${meta.color}">${network}</span>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px">
-          ${ch.metrics.map(m=>{
-            const val  = getMVal(m.name, pms);
-            const prev = getMVal(m.name, prevPms);
-            const pct  = prev > 0 ? Math.round((val-prev)/prev*100) : null;
-            const unit = m.pct ? '%' : '';
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px">
+          ${seriesList.map(s=>{
+            const val  = metricoolMonthlyValue(METRICOOL_STATS, s.key, currentPeriod);
+            const prev = prevPeriod ? metricoolMonthlyValue(METRICOOL_STATS, s.key, prevPeriod) : null;
+            const pct  = (val!==null && prev!==null && prev>0) ? Math.round((val-prev)/prev*100) : null;
+            const unit = s.isPercent ? '%' : '';
             const delta = pct !== null
               ? `<div style="font-size:10px;margin-top:4px;${pct>=0?'color:var(--green)':'color:var(--red)'}">${pct>=0?'▲':'▼'} ${Math.abs(pct)}% vs last month</div>`
               : '';
             return `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;border:1px solid var(--border)">
-              <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">${m.label}</div>
-              <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);line-height:1">${val?fmt(val)+''+unit:'—'}</div>
+              <div style="font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">${s.label}</div>
+              <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--text);line-height:1">${val!==null?fmt(val)+unit:'—'}</div>
               ${delta}
             </div>`;
           }).join('')}
         </div>
+        <div class="chart-container" style="height:160px">
+          <canvas id="sma-chart-${network}"></canvas>
+        </div>
       </div>`;
     });
     document.getElementById('sma-content').innerHTML = html;
+
+    // Trend charts — full history since METRICOOL_BACKFILL_START, independent
+    // of the period nav above (that only scopes the stat tiles + deltas).
+    Object.keys(byNetwork).forEach(network => {
+      const meta = SMA_NETWORK_META[network];
+      if(!meta) return;
+      const canvas = document.getElementById(`sma-chart-${network}`);
+      if(!canvas) return;
+      const points = metricoolSeriesFullHistory(meta.chartKey);
+      const labels = points.map(p => new Date(p.date).toLocaleString('en',{month:'short',day:'numeric'}));
+      const values = points.map(p => p.value);
+      if(smaTrendCharts[network]) smaTrendCharts[network].destroy();
+      smaTrendCharts[network] = new Chart(canvas, {
+        type:'line',
+        data:{ labels, datasets:[{
+          label: METRICOOL_SERIES[meta.chartKey].label,
+          data: values, borderColor: meta.color, backgroundColor: meta.color+'14',
+          tension:0.35, borderWidth:2, pointRadius:0, fill:true
+        }]},
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ display:false } },
+          scales:{ x:{ ticks:{font:{size:8},maxTicksLimit:8} }, y:{ beginAtZero:true, ticks:{font:{size:9}}, grid:{color:'rgba(0,0,0,0.04)'} } } }
+      });
+    });
   } catch(e) { console.error('SM Analytics error:', e); }
 }
 
@@ -2232,6 +2250,7 @@ async function initPortal() {
   watchEntities(data => { ALL_ENTITIES = data; populateEntityFilters(); });
   watchHealthDays(data => { HEALTH_DAYS = data; renderAll(); });
   watchLeadStats(data => { LEAD_STATS = data; renderAll(); });
+  watchMetricoolStats(data => { METRICOOL_STATS = data; renderAll(); });
   initPortalData();
 }
 

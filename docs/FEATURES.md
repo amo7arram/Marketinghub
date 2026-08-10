@@ -10,8 +10,8 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 *unless the Public Access Gate is enabled in admin Settings.
 
-- **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance, department activity mix, leads-by-department breakdown, this-month campaign/health-day list, featured initiatives
-- **SM Analytics** — detailed monthly social/website metrics, channel by channel
+- **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance (synced from Metricool, with month-over-month trend arrows), department activity mix, leads-by-department breakdown, this-month campaign/health-day list, featured initiatives
+- **SM Analytics** — per-network (Instagram/TikTok/LinkedIn/X) stat tiles with trend deltas, plus a full-history trend chart per network, all synced from Metricool
 - **SM Calendar** — grid and full table view of scheduled social content and physician videos, filterable by department/entity/channel, click-through to full detail (captions, headline, assets)
 - **Promotions Calendar** — active/upcoming promotions with pricing and discount %
 - **Well-span Program** — wellness packages plus any promotion flagged `isWellspan`
@@ -68,12 +68,16 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - CRUD for the public resource library
 
 ### Dashboard Metrics
-- Monthly manual entry of social/website performance numbers
+- Social/performance numbers sync automatically from Metricool ("🔄 Sync Now") — Instagram reach/engagement rate/likes/comments/reel views/followers, TikTok views, LinkedIn impressions/followers, X followers
+- Per-month manual override still available — edit any field and Save Month; that value is tagged and skipped by future syncs until cleared
+- **Not covered by Metricool** (confirmed unavailable via their API, not just unconfigured): Instagram Conversations, X Reach/Impressions, TikTok engagement, SM Messages Received, PR Mentions, Website Visits — these no longer have any entry point in this tab
+- ⚠️ The public Business Development KPI Progress tracker (index.html) still depends on the old manually-entered `metrics` collection for some of its numbers and currently has no update path — see `docs/DATA_MODEL.md`'s `metrics` section
 
 ### Settings
 - **Entities** — add/remove business entities (blocked from deletion if still referenced anywhere)
 - **Team Members** — directory + optional real login account creation (Admin / Agent / Coordinator role), using a secondary Firebase app instance so creating a user doesn't sign out the admin
 - **Department Revenue Estimates** — per-department average revenue, used as an ROI fallback
+- **Metricool Setup** — API token + brand/profile selection (via "Fetch My Profiles"), stored in `config/metricool_settings`; powers Dashboard Metrics syncing
 - **Public Access Gate** — enable/disable + set the password gate on the public portal
 - **Admin Login Passcode ("Magic Word")** — set a shared passcode as an alternative login path; changing it force-logs-out the current session
 - **Brand Voice** — AI generation tone, formality, closing hashtag, CTA text, banned words — feeds every AI caption/content generation call system-wide

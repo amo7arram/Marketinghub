@@ -176,9 +176,9 @@ Standalone budget line items (distinct from `initiatives.cost`, which tracks cos
 
 ---
 
-## `metrics`
+## `metrics` — ⚠️ legacy, retired
 
-Monthly social media / website performance snapshots, entered manually in admin.
+Monthly social media / website performance snapshots, formerly entered manually in admin.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -186,6 +186,30 @@ Monthly social media / website performance snapshots, entered manually in admin.
 | `period` | string (YYYY-MM) | |
 | `value` | number | |
 | `createdAt` | Timestamp | |
+
+**Superseded by `config/metricool_stats` (below).** As of the Metricool integration, `admin.html`'s Dashboard Metrics tab and `index.html`'s Social Media Performance / SM Analytics sections no longer read or write this collection — social metrics are now synced automatically from Metricool instead of typed in by hand. Existing documents are left in place untouched (same treatment as the legacy `hdCategory` field above) rather than deleted. **One exception:** `index.html`'s Business Development KPI Progress tracker (`renderBdKpiProgress()`, tracks actuals against `config/bd_targets`) still reads this collection — it was out of scope for the Metricool redesign, so those numbers are now frozen at whatever was last manually entered before the switchover, since there is no longer any admin UI that writes here. This needs a follow-up decision (migrate it to Metricool series too, where the metric exists, or restore a small manual-entry path for `Website Visits` and other non-Metricool figures it depends on).
+
+---
+
+## `config/metricool_stats` — series structure
+
+See the `config` table below for where this fits among other single-document config entries. Documented separately here because its internal shape is more involved than a flat field list:
+
+```
+config/metricool_stats = {
+  updatedAt: Timestamp,
+  series: {
+    <seriesKey>: [ { date: "YYYY-MM-DD", value: number, source: "metricool" | "manual" }, ... ],
+    ...
+  }
+}
+```
+
+`seriesKey` is one of the entries in `METRICOOL_SERIES` (`firebase-data.js`) — currently `instagram_reach`, `instagram_engagement_rate`, `instagram_likes`, `instagram_comments`, `instagram_reel_views`, `instagram_followers`, `tiktok_video_views`, `linkedin_impressions`, `linkedin_followers`, `twitter_followers`. Each maps to a specific Metricool API call (network/metric/subject) — see `admin.html`'s `syncMetricool()` for the exact mapping, verified live against Metricool's real API responses rather than assumed from their docs.
+
+Points are daily. `source:"metricool"` points come from admin.html's "Sync Now" action; `source:"manual"` points are a whole-month admin override (dated to the last day of that month) that future syncs skip — see `mergeMetricoolSeries()` in `admin.html`. `metricoolMonthlyValue(stats, seriesKey, period)` (`firebase-data.js`, shared by both `admin.html` and `index.html` so the two pages can never disagree) derives one display number per series+month: a manual override wins outright if present, otherwise the series' points for that month are summed, averaged, or the latest one is taken, depending on that series' `agg` rule (`sum` for volume metrics like reach/views, `avg` for the engagement-rate percentage, `last` for point-in-time follower counts).
+
+**Known gap:** `instagram_followers` has no historical data available from Metricool at all (no working follower-history endpoint was found for Instagram specifically, unlike LinkedIn/X which do have real daily follower timelines) — only a live snapshot via a separate endpoint. Per project decision, this series only starts accumulating data from whenever syncing began; there is no backfill for it, unlike the other series which were backfilled from 2026-04-01.
 
 ---
 
@@ -229,6 +253,8 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 | `admin_passcode` | The "Magic Word" shared passcode hash |
 | `lead_stats` | **Public-readable** aggregated leads funnel snapshot — written by admin, read by `index.html`. Contains zero PII by design. |
 | `department_revenue_estimates` | Per-department average revenue, used as the ROI fallback when actual `leads.revenueValue` isn't entered |
+| `metricool_settings` | Metricool API token + userId/blogId (⚠️ stored here, visible client-side — same tradeoff as `ai_settings`, see `ARCHITECTURE.md` §4). Needs an authenticated-only Firestore rule, same sensitivity class as `ai_settings`. |
+| `metricool_stats` | **Public-readable** synced social performance series — written by `admin.html`'s "Sync Now" action, read by `index.html`. Contains zero PII by design (aggregate public social numbers only). See the `config/metricool_stats` series structure section above. Needs a public-read/authenticated-write Firestore rule, same pattern as `lead_stats`. |
 
 ---
 
