@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IMC — Call Center Leads</title>
+<title>IMC — Contact Center Control</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -40,6 +40,27 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .btn-primary{background:var(--navy);color:#fff;border-color:var(--navy)}
 .btn-primary:hover{background:#003f7a}
 .content{padding:20px 24px}
+.tabs{display:flex;gap:4px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab{padding:12px 18px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:var(--navy);border-bottom-color:var(--navy)}
+.page{display:none}
+.page.active{display:block}
+
+/* PROMOTIONS */
+.badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.03em;white-space:nowrap}
+.promotions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.promo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+.promo-card.active-promo{border-color:var(--green);border-width:2px}
+.promo-card.expired-promo{opacity:0.65}
+.promo-card-header{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.promo-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;flex:1}
+.promo-discount-badge{flex-shrink:0;background:var(--green);color:#fff;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;padding:4px 10px;border-radius:8px;line-height:1}
+.promo-card-body{padding:0 16px 14px;font-size:11px;color:var(--text-3);line-height:1.55}
+.promo-price-row{display:flex;align-items:center;gap:10px;margin-top:10px}
+.promo-price-orig{font-size:12px;color:var(--text-3);text-decoration:line-through}
+.promo-price-new{font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--green)}
+.promo-price-sar{font-size:10px;color:var(--text-3);margin-top:2px}
+.promo-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
 
 /* STATS */
 .stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
@@ -87,7 +108,7 @@ tr:hover td{background:var(--bg)}
 <div class="login-wrap" id="login-wrap">
   <div class="login-card">
     <img class="login-logo-img" src="logo.jpg" alt="IMC">
-    <div class="login-sub">Call Center — Leads Access</div>
+    <div class="login-sub">Contact Center Control — Agent Access</div>
     <div class="login-error" id="login-error"></div>
     <div class="login-field"><label class="login-label">Email</label><input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa"></div>
     <div class="login-field"><label class="login-label">Password</label><input class="login-input" type="password" id="login-password" placeholder="••••••••"></div>
@@ -99,38 +120,54 @@ tr:hover td{background:var(--bg)}
   <div class="topbar">
     <div class="topbar-logo">
       <img class="topbar-logo-img" src="logo.jpg" alt="IMC">
-      <span class="topbar-logo-text">Call Center · Leads</span>
+      <span class="topbar-logo-text">Contact Center Control</span>
     </div>
     <button class="btn" onclick="doLogout()">Sign Out</button>
   </div>
 
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('leads',this)">Leads</div>
+    <div class="tab" onclick="switchTab('promotions',this)">Promotions</div>
+  </div>
+
   <div class="content">
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-val" id="s-total">—</div><div class="stat-label">Total</div></div>
-      <div class="stat-card"><div class="stat-val" id="s-untouched">—</div><div class="stat-label">Untouched</div></div>
-      <div class="stat-card"><div class="stat-val" id="s-reached">—</div><div class="stat-label">Reached</div></div>
-      <div class="stat-card"><div class="stat-val" id="s-unreached">—</div><div class="stat-label">Unreached</div></div>
-      <div class="stat-card"><div class="stat-val" id="s-missed">—</div><div class="stat-label">Missed</div></div>
-      <div class="stat-card"><div class="stat-val" id="s-booked">—</div><div class="stat-label">Booked</div></div>
+    <div class="page active" id="page-leads">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-val" id="s-total">—</div><div class="stat-label">Total</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-untouched">—</div><div class="stat-label">Untouched</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-reached">—</div><div class="stat-label">Reached</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-unreached">—</div><div class="stat-label">Unreached</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-missed">—</div><div class="stat-label">Missed</div></div>
+        <div class="stat-card"><div class="stat-val" id="s-booked">—</div><div class="stat-label">Booked</div></div>
+      </div>
+
+      <div class="filters-bar">
+        <input class="filter-input" type="text" id="f-search" placeholder="Search name or phone..." oninput="resetPageAndRender()" style="width:200px">
+        <select class="filter-select" id="f-contact" onchange="resetPageAndRender()"><option value="">All Contact Status</option></select>
+        <select class="filter-select" id="f-outcome" onchange="resetPageAndRender()"><option value="">All Outcomes</option></select>
+        <select class="filter-select" id="f-dept" onchange="resetPageAndRender()"><option value="">All Departments</option></select>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table style="min-width:1000px">
+          <thead><tr>
+            <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
+            <th>Campaign</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Notes</th><th></th>
+          </tr></thead>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="11">Loading leads...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
     </div>
 
-    <div class="filters-bar">
-      <input class="filter-input" type="text" id="f-search" placeholder="Search name or phone..." oninput="resetPageAndRender()" style="width:200px">
-      <select class="filter-select" id="f-contact" onchange="resetPageAndRender()"><option value="">All Contact Status</option></select>
-      <select class="filter-select" id="f-outcome" onchange="resetPageAndRender()"><option value="">All Outcomes</option></select>
-      <select class="filter-select" id="f-dept" onchange="resetPageAndRender()"><option value="">All Departments</option></select>
+    <div class="page" id="page-promotions">
+      <div class="filters-bar">
+        <select class="filter-select" id="p-status" onchange="renderPromotionsTab()"><option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option></select>
+        <select class="filter-select" id="p-dept" onchange="renderPromotionsTab()"><option value="">All Departments</option></select>
+        <select class="filter-select" id="p-entity" onchange="renderPromotionsTab()"><option value="">All Entities</option></select>
+      </div>
+      <div class="promotions-grid" id="promotions-grid"></div>
     </div>
-
-    <div style="overflow-x:auto">
-      <table style="min-width:1000px">
-        <thead><tr>
-          <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
-          <th>Campaign</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Notes</th><th></th>
-        </tr></thead>
-        <tbody id="table-body"><tr class="empty-row"><td colspan="11">Loading leads...</td></tr></tbody>
-      </table>
-    </div>
-    <div class="pagination" id="pagination"></div>
   </div>
 </div>
 
@@ -164,11 +201,13 @@ tr:hover td{background:var(--bg)}
 import {
   login, logout, watchAuth, getUserRole,
   watchLeads, updateLead, watchInitiatives,
-  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, DEPARTMENTS
+  watchPromotions, promoStatus, getDeptColor,
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, DEPARTMENTS, ENTITIES
 } from './firebase-data.js';
 
 let ALL_LEADS = [];
 let ALL_CAMPAIGNS = [];
+let ALL_PROMOTIONS = [];
 let editingLeadId = null;
 let currentPage = 1;
 const PER_PAGE = 50;
@@ -208,6 +247,7 @@ watchAuth(async user => {
       populateFilters();
       watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); renderTable(); });
       watchLeads(data => { ALL_LEADS = data; renderStats(); renderTable(); });
+      watchPromotions(data => { ALL_PROMOTIONS = data; renderPromotionsTab(); });
     } catch(e) {
       const errEl = document.getElementById('login-error');
       errEl.textContent = 'Could not verify access: ' + e.message;
@@ -226,6 +266,17 @@ function populateFilters() {
   document.getElementById('f-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('f-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('f-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('p-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('p-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────
+window.switchTab = function(id, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-'+id).classList.add('active');
+  if(id==='promotions') renderPromotionsTab();
 }
 
 function campaignTitleFor(id) {
@@ -357,6 +408,64 @@ window.saveEdit = async function() {
     showToast('✓ Lead updated');
     closeEditModal();
   } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── PROMOTIONS (read-only) ──────────────────────────────────────────────
+const PROMO_STATUS_COLOR = {
+  Active:   {bg:'#D4F0E2', t:'#0D6E44'},
+  Upcoming: {bg:'#F0F2F7', t:'#8890A8'},
+  Expired:  {bg:'#FDE4E4', t:'#B0234A'},
+};
+window.renderPromotionsTab = function() {
+  const grid = document.getElementById('promotions-grid');
+  if(!grid) return;
+  const statusF = document.getElementById('p-status')?.value || '';
+  const deptF   = document.getElementById('p-dept')?.value || '';
+  const entityF = document.getElementById('p-entity')?.value || '';
+
+  const data = ALL_PROMOTIONS.filter(p=>{
+    if(statusF && promoStatus(p.startDate,p.endDate)!==statusF) return false;
+    if(deptF   && p.department!==deptF) return false;
+    if(entityF && !(p.entity||[]).includes(entityF)) return false;
+    return true;
+  });
+
+  if(!data.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No promotions match the current filters</div>';
+    return;
+  }
+
+  grid.innerHTML = data.map(p=>{
+    const status = promoStatus(p.startDate, p.endDate);
+    const sc = PROMO_STATUS_COLOR[status] || PROMO_STATUS_COLOR.Upcoming;
+    const dc = getDeptColor(p.department);
+    return `<div class="promo-card ${status==='Active'?'active-promo':status==='Expired'?'expired-promo':''}">
+      <div class="promo-card-header">
+        <div class="promo-card-title">${p.title||''}</div>
+        <div class="promo-discount-badge">${p.discountPct||0}%</div>
+      </div>
+      <div class="promo-card-body">
+        <div>${p.description ? p.description.substring(0,110)+(p.description.length>110?'...':'') : ''}</div>
+        <div class="promo-price-row">
+          <div>
+            <div class="promo-price-orig">${p.originalPrice?.toLocaleString()||''} SAR</div>
+            <div class="promo-price-new">${p.discountedPrice?.toLocaleString()||''}</div>
+            <div class="promo-price-sar">SAR</div>
+          </div>
+        </div>
+      </div>
+      <div class="promo-card-footer">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          <span class="badge" style="background:${dc.bg};color:${dc.t}">${p.department||''}</span>
+          ${(p.entity||[]).map(e=>`<span class="badge" style="background:var(--bg);color:var(--text-2)">${e}</span>`).join('')}
+        </div>
+        <div style="text-align:right">
+          <span class="badge" style="background:${sc.bg};color:${sc.t}">${status}</span>
+          <div style="margin-top:2px">${p.endDate?'Ends '+p.endDate:'Open-ended'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
