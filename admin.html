@@ -403,11 +403,13 @@ tr.row-done:hover td{background:#DCF2E5}
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick="openMigrateLeadsPrompt()" title="One-time: converts old-style lead statuses to the new model">↻ Migrate Old Statuses</button>
+          <button class="btn" onclick="openNormalizePhonesPrompt()" title="One-time: unifies phone number formatting across all leads">☎ Normalize Phone Numbers</button>
           <label class="btn" style="cursor:pointer">
             📁 Upload Excel
             <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(this)">
           </label>
           <button class="btn" onclick="openSheetImportModal()">🔗 Import from Google Sheet</button>
+          <button class="btn" onclick="exportFilteredLeads()" title="Exports every lead matching the current filters, not just the current page">⬇️ Export Filtered</button>
           <button class="btn btn-primary" onclick="openLeadForm()">+ Add Lead</button>
         </div>
       </div>
@@ -415,6 +417,7 @@ tr.row-done:hover td{background:#DCF2E5}
       <div id="bulk-action-bar" style="display:none;align-items:center;gap:12px;background:#EAF4FF;border:1px solid var(--navy);border-radius:var(--radius);padding:10px 16px;margin-bottom:12px">
         <span id="bulk-selected-count" style="font-size:12px;font-weight:700;color:var(--navy)">0 selected</span>
         <button class="btn btn-sm btn-primary" onclick="openBulkEditModal()">✏️ Bulk Edit</button>
+        <button class="btn btn-sm" onclick="exportSelectedLeads()">⬇️ Export Selected</button>
         <button class="btn btn-sm btn-danger" onclick="bulkDeleteLeads()">🗑 Delete Selected</button>
         <span style="flex:1"></span>
         <button class="btn btn-sm" onclick="clearLeadSelection()">Clear selection</button>
@@ -1419,6 +1422,7 @@ import {
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
+  normalizePhone, normalizeAllLeadPhones,
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
@@ -4216,7 +4220,28 @@ function campaignTitleFor(campaignId) {
   return c ? c.title : null;
 }
 
-window.renderLeadsTable = function() {
+// ── EXCEL EXPORT ─────────────────────────────────────────────────────────
+function exportLeadsToExcel(leads, filenamePrefix='leads-export') {
+  if(!leads.length) { showToast('No leads to export', true); return; }
+  const rows = leads.map(l => ({
+    Name: l.name||'', Phone: l.phone||'', Department: l.department||'', Entity: l.entity||'',
+    Source: l.source||'', Campaign: l.campaign || campaignTitleFor(l.campaignId) || '',
+    'Date Created': l.dateCreated||'', 'Contact Status': l.contactStatus||'Untouched',
+    Outcome: l.outcome||'Pending', Revenue: l.revenueValue ?? '', Notes: l.notes||'',
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Leads');
+  XLSX.writeFile(wb, `${filenamePrefix}-${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast(`✓ Exported ${leads.length} lead${leads.length===1?'':'s'}`);
+}
+window.exportSelectedLeads = function() {
+  exportLeadsToExcel([...selectedLeadIds].map(id => ALL_LEADS.find(l=>l.id===id)).filter(Boolean), 'leads-selected');
+}
+window.exportFilteredLeads = function() {
+  exportLeadsToExcel(getFilteredLeads(), 'leads-filtered');
+}
+
+function getFilteredLeads() {
   const q        = (document.getElementById('lead-search')?.value||'').toLowerCase();
   const contactF = document.getElementById('lead-filter-contact')?.value||'';
   const outcomeF = document.getElementById('lead-filter-outcome')?.value||'';
@@ -4224,7 +4249,7 @@ window.renderLeadsTable = function() {
   const entityF  = document.getElementById('lead-filter-entity')?.value||'';
   const campaignF= document.getElementById('lead-filter-campaign')?.value||'';
 
-  let data = ALL_LEADS.filter(l=>{
+  return ALL_LEADS.filter(l=>{
     if(contactF && (l.contactStatus||'Untouched')!==contactF) return false;
     if(outcomeF && (l.outcome||'Pending')!==outcomeF) return false;
     if(deptF && l.department!==deptF) return false;
@@ -4233,6 +4258,10 @@ window.renderLeadsTable = function() {
     if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source}`.toLowerCase().includes(q)) return false;
     return true;
   });
+}
+
+window.renderLeadsTable = function() {
+  let data = getFilteredLeads();
 
   const validIds = new Set(ALL_LEADS.map(l=>l.id));
   selectedLeadIds.forEach(id => { if(!validIds.has(id)) selectedLeadIds.delete(id); });
@@ -4276,6 +4305,7 @@ window.renderLeadsTable = function() {
           </td>
           <td style="font-size:11px;color:var(--text-3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.notes||''}">${l.notes||'—'}</td>
           <td class="row-actions">
+            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
             <button class="btn btn-sm" onclick="editLeadRow('${l.id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="removeLeadRow('${l.id}','${(l.name||'').replace(/'/g,"\\'")}')">Delete</button>
           </td>
@@ -4294,6 +4324,11 @@ window.renderLeadsTable = function() {
 }
 
 window.changeLeadContactStatus = async function(id, contactStatus) {
+  const lead = ALL_LEADS.find(x=>x.id===id);
+  if(lead?.outcome==='Booked' && !confirm('This lead is marked Booked — changing its status may affect reported revenue. Continue?')) {
+    renderLeadsTable(); // reset the dropdown to its actual saved value
+    return;
+  }
   try {
     const updates = { contactStatus };
     // Leaving Reached clears any outcome that no longer applies
@@ -4302,6 +4337,11 @@ window.changeLeadContactStatus = async function(id, contactStatus) {
   } catch(e) { showToast('Update failed: '+e.message, true); }
 }
 window.changeLeadOutcome = async function(id, outcome) {
+  const lead = ALL_LEADS.find(x=>x.id===id);
+  if(lead?.outcome==='Booked' && outcome!==lead.outcome && !confirm('This lead is marked Booked — changing its status may affect reported revenue. Continue?')) {
+    renderLeadsTable();
+    return;
+  }
   try { await updateLead(id, { outcome }); }
   catch(e) { showToast('Update failed: '+e.message, true); }
 }
@@ -4407,12 +4447,25 @@ window.confirmBulkEdit = async function() {
   }
 
   const ids = [...selectedLeadIds];
+  const changesStatus = !!(contactVal || outcomeVal);
+  const lockedIds = changesStatus ? ids.filter(id => ALL_LEADS.find(l=>l.id===id)?.outcome==='Booked') : [];
+  let applyStatusToLocked = false;
+  if(lockedIds.length) {
+    applyStatusToLocked = confirm(`${lockedIds.length} selected lead(s) are marked Booked. Changing status/outcome may affect reported revenue.\n\nOK = apply to all selected, including Booked ones\nCancel = apply everything else, but skip the status change for Booked leads`);
+  }
+  const { contactStatus, outcome, ...restObj } = updateObj;
+
   const btn = document.getElementById('confirm-bulk-edit-btn');
   btn.disabled = true;
   btn.textContent = `Applying to ${ids.length}...`;
   try {
-    await Promise.all(ids.map(id => updateLead(id, updateObj)));
-    showToast(`✓ ${ids.length} lead${ids.length===1?'':'s'} updated`);
+    await Promise.all(ids.map(id => {
+      const isLocked = lockedIds.includes(id);
+      const obj = (isLocked && !applyStatusToLocked) ? restObj : updateObj;
+      return Object.keys(obj).length ? updateLead(id, obj) : Promise.resolve();
+    }));
+    const skipped = (!applyStatusToLocked) ? lockedIds.length : 0;
+    showToast(`✓ ${ids.length} lead${ids.length===1?'':'s'} updated${skipped?` (status change skipped for ${skipped} Booked lead${skipped===1?'':'s'})`:''}`);
     closeBulkEditModal();
     selectedLeadIds.clear();
   } catch(e) {
@@ -4473,7 +4526,7 @@ function renderLeadContactHistory(lead) {
 window.closeLeadForm = function() { document.getElementById('lead-overlay').classList.remove('open'); }
 window.saveLead = async function() {
   const name  = document.getElementById('lead-name').value.trim();
-  const phone = document.getElementById('lead-phone').value.trim();
+  const phone = normalizePhone(document.getElementById('lead-phone').value.trim());
   if(!name||!phone){showToast('Name and phone are required',true);return;}
   const campaignId = document.getElementById('lead-campaign').value;
   const data = {
@@ -4490,6 +4543,12 @@ window.saveLead = async function() {
     notes:         document.getElementById('lead-notes').value.trim(),
     revenueValue:  parseFloat(document.getElementById('lead-revenue').value) || null,
   };
+  if(editingLeadId) {
+    const original = ALL_LEADS.find(x=>x.id===editingLeadId);
+    if(original?.outcome==='Booked' && (data.contactStatus!==original.contactStatus || data.outcome!==original.outcome)) {
+      if(!confirm('This lead is marked Booked — changing its status may affect reported revenue. Continue?')) return;
+    }
+  }
   try {
     if(editingLeadId){await updateLead(editingLeadId,data);showToast('Lead updated');}
     else{await addLead(data);showToast('Lead added');}
@@ -4510,6 +4569,18 @@ window.openMigrateLeadsPrompt = async function() {
     if(result.migrated === 0) showToast('No old-style leads found — nothing to migrate ✓');
     else showToast(`✓ Migrated ${result.migrated} lead(s) to the new status model`);
   } catch(e) { showToast('Migration failed: '+e.message, true); }
+}
+
+window.openNormalizePhonesPrompt = async function() {
+  const changing = ALL_LEADS.filter(l => l.phone && normalizePhone(l.phone) !== l.phone);
+  if(!changing.length) { showToast('All phone numbers are already normalized ✓'); return; }
+  const examples = changing.slice(0,5).map(l => `${l.phone}  →  ${normalizePhone(l.phone)}`).join('\n');
+  const more = changing.length > 5 ? `\n...and ${changing.length-5} more` : '';
+  if(!confirm(`This will reformat ${changing.length} lead phone number(s) to a unified format. Examples:\n\n${examples}${more}\n\nSafe to run more than once. Proceed?`)) return;
+  try {
+    const result = await normalizeAllLeadPhones();
+    showToast(`✓ Normalized ${result.migrated} phone number(s)`);
+  } catch(e) { showToast('Normalization failed: '+e.message, true); }
 }
 
 // ── Excel upload ──────────────────────────────────────────────────────────
@@ -4588,7 +4659,7 @@ window.handleExcelUpload = function(input) {
         const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
         return {
           name:          r[nameCol]||'',
-          phone:         String(r[phoneCol]||''),
+          phone:         normalizePhone(r[phoneCol]),
           source:        sourceCol ? r[sourceCol]||'' : '',
           campaign:      campaignCol ? r[campaignCol]||'' : '',
           entity:        entityCol ? r[entityCol]||'' : '',
@@ -4772,8 +4843,8 @@ window.fetchAndPreviewSheet = async function() {
     const allRows = rows.map(r=>{
       const rawDept = deptCol ? r[deptCol] : '';
       const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
-      const phone = String(r[phoneCol]||'');
-      const pairKey = `${phone.replace(/\D/g,'')}__${campaignId||''}`;
+      const phone = normalizePhone(r[phoneCol]);
+      const pairKey = `${phone}__${campaignId||''}`;
       return {
         name: r[nameCol]||'', phone,
         source: sourceCol ? r[sourceCol]||'' : '',
