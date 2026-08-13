@@ -872,6 +872,34 @@ export async function migrateLegacyLeadStatuses() {
   return { migrated: legacy.length };
 }
 
+// ── PHONE NORMALIZATION ────────────────────────────────────────────────────
+// Unifies phone numbers to bare-digits international format (e.g.
+// "966539958558", no +, no spaces/dashes) — the format wa.me and tel: links
+// need, and the format the Contact History lookup (which matches leads by
+// exact phone string) has always silently depended on. Shared by every
+// phone-write site: admin.html's manual add/edit form, Excel import, Google
+// Sheet import, and call-center.html's edit modal.
+export function normalizePhone(raw) {
+  if (!raw) return '';
+  let digits = String(raw).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0')) digits = '966' + digits.slice(1); // local 0-prefixed (05XXXXXXXX)
+  else if (digits.length === 9 && digits.startsWith('5')) digits = '966' + digits; // local, no leading 0
+  return digits; // already-international numbers (966..., other country codes) pass through unchanged
+}
+
+// One-time migration: normalizes every existing lead's phone number. Safe to
+// run more than once — only touches documents whose stored phone differs
+// from its normalized form.
+export async function normalizeAllLeadPhones() {
+  const snap = await getDocs(collection(db, LEADS));
+  const updates = snap.docs
+    .map(d => ({ id: d.id, phone: d.data().phone }))
+    .filter(l => l.phone && normalizePhone(l.phone) !== l.phone);
+  await Promise.all(updates.map(l => updateDoc(doc(db, LEADS, l.id), { phone: normalizePhone(l.phone) })));
+  return { migrated: updates.length };
+}
+
 // ── LEADS ↔ GOOGLE SHEETS (live-read, on-demand sync) ─────────────────────
 // Extracts the sheet ID from any normal Google Sheets share URL.
 export function parseGoogleSheetId(url) {
