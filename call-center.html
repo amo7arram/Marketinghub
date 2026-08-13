@@ -201,7 +201,7 @@ tr:hover td{background:var(--bg)}
 import {
   login, logout, watchAuth, getUserRole,
   watchLeads, updateLead, watchInitiatives,
-  watchPromotions, promoStatus, getDeptColor,
+  watchPromotions, promoStatus, getDeptColor, normalizePhone,
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, DEPARTMENTS, ENTITIES
 } from './firebase-data.js';
 
@@ -340,17 +340,25 @@ function renderTable() {
           <td style="color:var(--text-3);font-size:11px">${l.source||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${campaignLabel}</td>
           <td style="color:var(--text-3);font-size:11px;white-space:nowrap">${l.dateCreated||'—'}</td>
-          <td><select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
-            ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
-          </select></td>
-          <td>${cs==='Reached'
-            ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
-                ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
-              </select>`
-            : `<span style="color:var(--text-3);font-size:11px">—</span>`}
+          <td>${oc==='Booked'
+            ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
+            : `<select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
+                ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
+              </select>`}
+          </td>
+          <td>${oc==='Booked'
+            ? `<span class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" title="Booked leads are locked — ask an admin to change this">${oc}</span>`
+            : cs==='Reached'
+              ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
+                  ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
+                </select>`
+              : `<span style="color:var(--text-3);font-size:11px">—</span>`}
           </td>
           <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${l.notes||''}">${l.notes||'—'}</td>
-          <td><button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button></td>
+          <td>
+            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
+            <button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button>
+          </td>
         </tr>`;
       }).join('')
     : `<tr class="empty-row"><td colspan="11">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
@@ -372,6 +380,8 @@ function renderPagination(totalCount, totalPages, startIdx, pageCount) {
 window.goToPage = function(p) { currentPage = p; renderTable(); }
 
 window.changeContactStatus = async function(id, contactStatus) {
+  const lead = ALL_LEADS.find(x=>x.id===id);
+  if(lead?.outcome==='Booked') { showToast('Booked leads are locked — ask an admin to change this', true); renderTable(); return; }
   try {
     const updates = { contactStatus };
     if(contactStatus !== 'Reached') updates.outcome = 'Pending';
@@ -379,6 +389,8 @@ window.changeContactStatus = async function(id, contactStatus) {
   } catch(e) { showToast('Update failed: '+e.message, true); }
 }
 window.changeOutcome = async function(id, outcome) {
+  const lead = ALL_LEADS.find(x=>x.id===id);
+  if(lead?.outcome==='Booked') { showToast('Booked leads are locked — ask an admin to change this', true); renderTable(); return; }
   try { await updateLead(id, { outcome }); }
   catch(e) { showToast('Update failed: '+e.message, true); }
 }
@@ -397,7 +409,7 @@ window.openEditModal = function(id) {
 window.closeEditModal = function() { document.getElementById('edit-overlay').classList.remove('open'); }
 window.saveEdit = async function() {
   const name = document.getElementById('edit-name').value.trim();
-  const phone = document.getElementById('edit-phone').value.trim();
+  const phone = normalizePhone(document.getElementById('edit-phone').value.trim());
   if(!name || !phone) { showToast('Name and phone are required', true); return; }
   try {
     await updateLead(editingLeadId, {
