@@ -808,7 +808,12 @@ const LEADS = "leads";
 // contactStatus — mutually exclusive, always sums to 100% of leads.
 // outcome — only meaningful once contactStatus is "Reached".
 export const CONTACT_STATUSES = ["Untouched", "Reached", "Unreached", "Missed"];
-export const OUTCOMES = ["Pending", "Open File", "Booked", "Closed - Unsuccessful"];
+export const OUTCOMES = ["Pending", "Open File", "Follow-up Scheduled", "Booked", "Wrong Number", "Already a Patient", "Closed - Unsuccessful"];
+
+// Reasons captured only when outcome is "Closed - Unsuccessful" — separates
+// *why* a lead didn't convert from the fact that it didn't, since the old
+// single catch-all outcome value threw that information away.
+export const CLOSURE_REASONS = ["Not Interested", "Price/Insurance Objection", "Went Elsewhere", "Wrong Department/Specialty", "Unable to Reach After Multiple Attempts", "Other"];
 
 export const CONTACT_STATUS_COLORS = {
   "Untouched": {bg:"#F0F2F7", t:"#8890A8"},
@@ -819,7 +824,10 @@ export const CONTACT_STATUS_COLORS = {
 export const OUTCOME_COLORS = {
   "Pending":                {bg:"#F0F2F7", t:"#8890A8"},
   "Open File":              {bg:"#FFF0D4", t:"#9B5800"},
+  "Follow-up Scheduled":    {bg:"#E4EDFF", t:"#1649A3"},
   "Booked":                 {bg:"#D4F0E2", t:"#0D6E44"},
+  "Wrong Number":           {bg:"#F5F0E8", t:"#8C6D3F"},
+  "Already a Patient":      {bg:"#F3E9FA", t:"#7C3F9E"},
   "Closed - Unsuccessful":  {bg:"#FDE4E4", t:"#B0234A"},
 };
 
