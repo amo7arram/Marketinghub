@@ -145,6 +145,7 @@ tr:hover td{background:var(--bg)}
       </div>
 
       <div class="filters-bar">
+        <select class="filter-select" id="f-scope" onchange="resetPageAndRender()"><option value="mine">My Leads</option><option value="all">All Leads</option></select>
         <input class="filter-input" type="text" id="f-search" placeholder="Search name or phone..." oninput="resetPageAndRender()" style="width:200px">
         <select class="filter-select" id="f-contact" onchange="resetPageAndRender()"><option value="">All Contact Status</option></select>
         <select class="filter-select" id="f-outcome" onchange="resetPageAndRender()"><option value="">All Outcomes</option></select>
@@ -155,9 +156,9 @@ tr:hover td{background:var(--bg)}
         <table style="min-width:1000px">
           <thead><tr>
             <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Campaign</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Notes</th><th></th>
+            <th>Campaign</th><th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="table-body"><tr class="empty-row"><td colspan="11">Loading leads...</td></tr></tbody>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="13">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
@@ -170,6 +171,22 @@ tr:hover td{background:var(--bg)}
         <select class="filter-select" id="p-entity" onchange="renderPromotionsTab()"><option value="">All Entities</option></select>
       </div>
       <div class="promotions-grid" id="promotions-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CAMPAIGN INFO POPOVER -->
+<div class="modal-overlay" id="campaign-info-overlay">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="campaign-info-title">Campaign</div>
+      <button class="modal-close" onclick="closeCampaignInfo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="campaign-info-body"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCampaignInfo()">Close</button>
     </div>
   </div>
 </div>
@@ -205,7 +222,7 @@ import {
   login, logout, watchAuth, getUserRole,
   watchLeads, updateLead, watchInitiatives,
   watchPromotions, promoStatus, getDeptColor, normalizePhone,
-  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, DEPARTMENTS, ENTITIES
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS, ENTITIES
 } from './firebase-data.js';
 
 let ALL_LEADS = [];
@@ -214,6 +231,8 @@ let ALL_PROMOTIONS = [];
 let editingLeadId = null;
 let currentPage = 1;
 const PER_PAGE = 50;
+let CURRENT_USER_UID = null;
+let CURRENT_USER_ROLE = null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 window.doLogin = async function() {
@@ -245,9 +264,13 @@ watchAuth(async user => {
         await logout();
         return;
       }
+      CURRENT_USER_UID = user.uid;
+      CURRENT_USER_ROLE = role;
       document.getElementById('login-wrap').style.display = 'none';
       document.getElementById('page-wrap').classList.add('active');
       populateFilters();
+      // Agents default to seeing only their own assigned leads; admins default to all.
+      document.getElementById('f-scope').value = role === 'admin' ? 'all' : 'mine';
       watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); renderTable(); });
       watchLeads(data => { ALL_LEADS = data; renderStats(); renderTable(); });
       watchPromotions(data => { ALL_PROMOTIONS = data; renderPromotionsTab(); });
@@ -288,6 +311,22 @@ function campaignTitleFor(id) {
   return c ? c.title : null;
 }
 
+// Shows the campaign's agent script + post link — background context before calling.
+window.showCampaignInfo = function(campaignId) {
+  const c = ALL_CAMPAIGNS.find(x=>x.id===campaignId);
+  if(!c) return;
+  document.getElementById('campaign-info-title').textContent = c.title || 'Campaign';
+  const scriptHtml = c.agentScript
+    ? `<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap">${c.agentScript}</div>`
+    : `<div style="font-size:12px;color:var(--text-3)">No agent script set for this campaign yet.</div>`;
+  const linkHtml = c.postLink
+    ? `<div style="margin-top:14px"><a href="${c.postLink}" target="_blank" class="btn btn-sm">🔗 View Post / Content</a></div>`
+    : '';
+  document.getElementById('campaign-info-body').innerHTML = scriptHtml + linkHtml;
+  document.getElementById('campaign-info-overlay').classList.add('open');
+}
+window.closeCampaignInfo = function() { document.getElementById('campaign-info-overlay').classList.remove('open'); }
+
 // ── STATS ─────────────────────────────────────────────────────────────
 function renderStats() {
   const counts = { Untouched:0, Reached:0, Unreached:0, Missed:0 };
@@ -309,12 +348,14 @@ function renderStats() {
 window.resetPageAndRender = function() { currentPage = 1; renderTable(); }
 
 function renderTable() {
+  const scopeF = document.getElementById('f-scope')?.value || 'mine';
   const q = (document.getElementById('f-search')?.value||'').toLowerCase();
   const contactF = document.getElementById('f-contact')?.value||'';
   const outcomeF = document.getElementById('f-outcome')?.value||'';
   const deptF = document.getElementById('f-dept')?.value||'';
 
   let data = ALL_LEADS.filter(l=>{
+    if(scopeF==='mine' && l.assignedAgentUid!==CURRENT_USER_UID) return false;
     if(contactF && (l.contactStatus||'Untouched')!==contactF) return false;
     if(outcomeF && (l.outcome||'Pending')!==outcomeF) return false;
     if(deptF && l.department!==deptF) return false;
@@ -341,7 +382,8 @@ function renderTable() {
           <td style="color:var(--text-3);font-size:11px">${l.department||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${l.entity||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${l.source||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${campaignLabel}</td>
+          <td style="color:var(--text-3);font-size:11px">${l.campaignId?`<a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script & post link">${campaignLabel} ℹ️</a>`:campaignLabel}</td>
+          <td style="color:var(--text-3);font-size:11px">${l.assignedAgentName||'— Unassigned —'}</td>
           <td style="color:var(--text-3);font-size:11px;white-space:nowrap">${l.dateCreated||'—'}</td>
           <td>${oc==='Booked'
             ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
@@ -357,6 +399,13 @@ function renderTable() {
                 </select>`
               : `<span style="color:var(--text-3);font-size:11px">—</span>`}
           </td>
+          <td>${oc==='Closed - Unsuccessful'
+            ? `<select class="status-select" style="background:var(--bg);color:var(--text-2)" onchange="changeClosureReason('${l.id}',this.value)">
+                <option value=""${!l.closureReason?' selected':''}>— Select —</option>
+                ${CLOSURE_REASONS.map(r=>`<option${l.closureReason===r?' selected':''}>${r}</option>`).join('')}
+              </select>`
+            : `<span style="color:var(--text-3);font-size:11px">—</span>`}
+          </td>
           <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${l.notes||''}">${l.notes||'—'}</td>
           <td>
             ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
@@ -364,7 +413,7 @@ function renderTable() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="11">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="13">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
 
   renderPagination(data.length, totalPages, startIdx, pageData.length);
 }
@@ -394,7 +443,13 @@ window.changeContactStatus = async function(id, contactStatus) {
 window.changeOutcome = async function(id, outcome) {
   const lead = ALL_LEADS.find(x=>x.id===id);
   if(lead?.outcome==='Booked') { showToast('Booked leads are locked — ask an admin to change this', true); renderTable(); return; }
-  try { await updateLead(id, { outcome }); }
+  // Clear a stale closure reason once outcome moves away from Closed - Unsuccessful
+  const updates = outcome==='Closed - Unsuccessful' ? { outcome } : { outcome, closureReason: null };
+  try { await updateLead(id, updates); }
+  catch(e) { showToast('Update failed: '+e.message, true); }
+}
+window.changeClosureReason = async function(id, closureReason) {
+  try { await updateLead(id, { closureReason: closureReason || null }); }
   catch(e) { showToast('Update failed: '+e.message, true); }
 }
 
