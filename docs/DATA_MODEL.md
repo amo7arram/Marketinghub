@@ -258,6 +258,27 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 
 ---
 
+## `config/lead_stats` — aggregate structure
+
+Computed by `computeAndPublishLeadStats()` in `admin.html` (debounced, re-runs whenever `leads`/`department_revenue_estimates` change) from the real `leads` collection — never from the manually-entered `initiatives.leadsGenerated`/`promotions.leadsGenerated` fields, which are a separate, easily-stale figure used only by the Business Development KPI Progress tracker.
+
+```
+config/lead_stats = {
+  total, untouched, reached, unreached, missed, openFile, booked, closedUnsuccessful,
+  byDepartment: { [dept]: {total, reached, booked} },   // all-time cumulative, not month-scoped
+  byEntity:     { [entity]: {total, reached, booked} }, // all-time cumulative
+  bySource:     { [source]: {total, reached, booked} }, // all-time cumulative
+  byMonth:      { [YYYY-MM]: {total, reached, booked} },
+  byMonthDept:  { [YYYY-MM]: { [dept]: count } },        // powers index.html's "Leads by Department" chart
+  campaigns:    [ {campaignId, title, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
+  updatedAt,
+}
+```
+
+`byDepartment`/`byEntity`/`bySource` are all-time totals with no month dimension — `byMonthDept` was added specifically because the Dashboard's monthly department breakdown needed one and none of the existing structures had it.
+
+---
+
 ## Cross-Collection Relationships (informal — not enforced by Firestore)
 
 ```

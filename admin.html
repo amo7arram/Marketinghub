@@ -4926,7 +4926,7 @@ function computeAndPublishLeadStats() {
 
       const counts = { Untouched:0, Reached:0, Unreached:0, Missed:0 };
       const outcomeCounts = { 'Pending':0, 'Open File':0, 'Booked':0, 'Closed - Unsuccessful':0 };
-      const byDept = {}, byEntity = {}, bySource = {}, byMonth = {}, byCampaign = {};
+      const byDept = {}, byEntity = {}, bySource = {}, byMonth = {}, byCampaign = {}, byMonthDept = {};
 
       ALL_LEADS.forEach(l => {
         const cs = l.contactStatus || 'Untouched';
@@ -4951,6 +4951,11 @@ function computeAndPublishLeadStats() {
           byMonth[month].total++;
           if(cs==='Reached') byMonth[month].reached++;
           if(oc==='Booked') byMonth[month].booked++;
+
+          if(l.department) {
+            if(!byMonthDept[month]) byMonthDept[month] = {};
+            byMonthDept[month][l.department] = (byMonthDept[month][l.department]||0) + 1;
+          }
         }
 
         if(l.campaignId) {
@@ -5002,7 +5007,7 @@ function computeAndPublishLeadStats() {
         unreached: counts.Unreached, missed: counts.Missed,
         openFile: outcomeCounts['Open File'], booked: outcomeCounts['Booked'],
         closedUnsuccessful: outcomeCounts['Closed - Unsuccessful'],
-        byDepartment: byDept, byEntity, bySource, byMonth,
+        byDepartment: byDept, byEntity, bySource, byMonth, byMonthDept,
         campaigns: campaignStats,
       });
     } catch(e) { console.error('computeAndPublishLeadStats failed:', e); }

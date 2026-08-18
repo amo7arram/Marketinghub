@@ -1125,16 +1125,13 @@ function renderLeadsCharts() {
     const [ly, lm] = selectedPeriod.split('-').map(Number);
     const labelEl = document.getElementById('leads-dept-month-label');
     if(labelEl) labelEl.textContent = new Date(ly, lm-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
-    const byDept = {};
 
-    // Initiatives — any type, with a department and leadsGenerated, in the selected month
-    ALL.filter(i=>i.leadsGenerated && i.department && i.startDate?.startsWith(selectedPeriod)).forEach(i=>{
-      byDept[i.department] = (byDept[i.department]||0) + i.leadsGenerated;
-    });
-    // Promotions also carry a department — include their leads too, same month scope
-    PROMOTIONS.filter(p=>p.leadsGenerated && p.department && p.startDate?.startsWith(selectedPeriod)).forEach(p=>{
-      byDept[p.department] = (byDept[p.department]||0) + p.leadsGenerated;
-    });
+    // Real CRM lead counts for the selected month, by department — computed
+    // in admin.html's computeAndPublishLeadStats() from actual leads records
+    // (not the manually-entered initiatives/promotions.leadsGenerated field,
+    // which this chart used to read and which drifts out of sync with the
+    // live CRM).
+    const byDept = (LEAD_STATS && LEAD_STATS.byMonthDept && LEAD_STATS.byMonthDept[selectedPeriod]) || {};
 
     const dc = document.getElementById('leadsDeptChart');
     const emptyEl = document.getElementById('leadsDeptChart-empty');
