@@ -48,15 +48,24 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Package and loyalty card CRUD, shown on the corresponding public pages
 
 ### Leads CRM
-- Two-dimension status tracking: Contact Status (Untouched/Reached/Unreached/Missed) + Outcome (Pending/Open File/Booked/Closed-Unsuccessful, only active once Reached)
+- Two-dimension status tracking: Contact Status (Untouched/Reached/Unreached/Missed) + Outcome (Pending/Open File/Follow-up Scheduled/Booked/Wrong Number/Already a Patient/Closed-Unsuccessful, only active once Reached)
+- **Closure Reason** — a second, conditional dropdown shown only when Outcome is Closed - Unsuccessful, capturing *why* (Not Interested, Price/Insurance Objection, Went Elsewhere, Wrong Department/Specialty, Unable to Reach After Multiple Attempts, Other). Cleared automatically if Outcome moves away from Closed - Unsuccessful.
+- **Booked lock** — once Outcome is Booked, changing Contact Status/Outcome (inline, the edit modal, or bulk edit) requires confirming first, since it can affect reported revenue numbers elsewhere in the app
 - Inline status editing directly in the table
+- **Lead assignment** — assign a lead to any team member with real login access, via a row-level "Assign" button or in bulk via Bulk Edit; assigned agent shown in its own column. Drives Contact Center Control's default "My Leads" filter for that agent.
+- **Bulk Edit** — Department/Entity/Contact Status/Outcome/Date, plus Campaign (bulk-attach leads to a campaign) and Assign to Agent, applied only to fields explicitly set
+- **Campaign script popover** — clicking a lead's Campaign cell (when linked) shows that campaign's Agent Script (calling context, edited on the campaign record) and Post Link, if set
+- **WhatsApp / click-to-call** — icon links per lead (`wa.me`/`tel:`), using the lead's normalized phone number
+- **Excel export** — Export Selected (from a bulk selection) or Export Filtered (whatever the current filters produce), reusing the same XLSX library used for import
+- **Phone number normalization** — all phone writes (manual entry, Excel import, Sheet import) unify to bare-digits international format; a one-time "☎ Normalize Phone Numbers" migration button (with a before/after preview) backfills existing records
 - Excel upload with automatic column detection (name/phone/department/entity/source/campaign/date/status/notes), department fuzzy-matching, and a campaign-attribution picker
 - **Google Sheet live import** — paste a link (or auto-fill from a campaign's saved sheet URL), fetch, preview, import. Deduplicates by phone+campaign combination (not phone alone), so the same person can correctly appear under multiple campaigns as separate interactions
 - Contact History — opening any lead shows every other lead record sharing that phone number (date, campaign, status, outcome)
 - Revenue Value field per lead, feeding campaign ROI
-- Bulk actions: select multiple leads, bulk-edit Department/Entity/Contact Status/Outcome, or bulk-delete
+- Bulk delete
 - One-time migration tool for legacy single-field statuses
 - Pagination (50/page)
+- **"📋 Process Reference"** link to `docs/lead-management-process.html`, the end-to-end lead management process diagram
 
 ### Budget
 - Annual budget vs. spend tracking, combining `expenses` and `initiatives.cost`
@@ -95,13 +104,26 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 ---
 
-## Call Center Leads (`call-center.html`) — `role: agent` or `admin`
+## Contact Center Control (`call-center.html`) — `role: agent` or `admin`
 
-- View-only access to the full leads table (search, filter by status/outcome/department)
-- Inline edit: Contact Status, Outcome
-- Edit modal: Name, Phone, Notes, Revenue Value
-- **Cannot:** delete leads, bulk-edit, import (Excel or Sheet), add new leads, or reassign Department/Entity/Campaign
+Tab-based: **Leads** and **Promotions**. (A third Inbox tab — social media messages via Metricool — was investigated but skipped: every Metricool Inbox endpoint returns 401 for this account, pointing to Inbox not being enabled on the Metricool plan, not a code issue.)
+
+### Leads tab
+- **My Leads / All Leads** — defaults to leads assigned to the logged-in agent (`assignedAgentUid`); admins default to All Leads. A filter toggle switches between the two — not a hard access boundary, just the default view. Assigned-agent shown read-only.
+- Search, filter by status/outcome/department
+- Inline edit: Contact Status, Outcome, and a conditional Closure Reason (same as admin.html)
+- **Booked lock, no override** — once Outcome is Booked, Contact Status/Outcome render as static badges instead of editable dropdowns; agents cannot change them at all (admin.html allows an admin override with confirmation, this page doesn't)
+- Edit modal: Name, Phone (normalized on save), Notes, Revenue Value
+- **Campaign script popover** — same as admin.html, read-only
+- **WhatsApp / click-to-call** — same icon links as admin.html
+- **Cannot:** delete leads, bulk-edit, import (Excel or Sheet), add new leads, reassign a lead to a different agent, or reassign Department/Entity/Campaign
 - Deliberately excludes campaign cost/budget data from view
+
+### Promotions tab
+- Read-only card grid of promotions (title, discount %, price, department/entity tags, Active/Upcoming/Expired status), filterable — lets agents reference current offers while on a call
+
+### Both tabs
+- **"📋 Process Reference"** link (topbar) to `docs/lead-management-process.html`
 
 ---
 

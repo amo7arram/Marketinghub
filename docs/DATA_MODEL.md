@@ -29,7 +29,8 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `websiteUpdateType` | string | `News Article`, `Department Page Update`, `Doctor Profile Added`, `Doctor Profile Removed`, `Other` |
 | `websiteUpdateLink` | string | URL — for `type: "Website Update"` |
 | `physicianName` | string | Optional — for `type: "Physician Video"`, tracks which doctor is featured |
-| `postLink` | string | URL to the published content, once live |
+| `postLink` | string | URL to the published content, once live. Originally shown only for `SM Content`/`Event`/`Print`/`Physician Video`; now also shown for `type: "Campaign"` so a campaign container can carry one representative post link, surfaced to agents alongside `agentScript` (see below). |
+| `agentScript` | string | **`type: "Campaign"` only.** 1-2 paragraphs of calling context/talking points, shown to agents via a click-through popover on the Campaign cell in both `admin.html`'s and `call-center.html`'s leads tables, wherever a lead's `campaignId` points to this record. |
 | `captionEN` / `captionAR` | string | AI-generated or manually written captions |
 | `captionHeadline` | string | Short on-image headline text |
 | `cost` | number \| null | SAR — feeds the Budget tab and campaign CPL/CPA/ROI calculations |
@@ -39,7 +40,7 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `featuredBD` | boolean | Shows on the Business Development page |
 | `parentCampaignId` | string \| null | **Critical field** — links a single activity to a parent `Campaign`-type initiative. Absence means the activity is standalone. |
 | `googleSheetUrl` | string | Only on `type: "Campaign"` — optional linked Google Sheet for live lead import |
-| `assignedTo` | string | Team member name, sourced from `team_members` |
+| `assignedTo` | string | Team member name, sourced from `team_members` — **who's working on producing this content**, unrelated to `leads.assignedAgentUid`/`assignedAgentName` (which lead a call-center agent should follow up on). Two different assignment concepts that happen to share a similar name. |
 | `reach` / `impressions` / `engagements` | number \| null | Manually entered performance figures |
 | `createdAt` / `updatedAt` | Firestore Timestamp | |
 
@@ -95,7 +96,10 @@ The CRM core. Each document is **one interaction** — a person engaging with on
 | `campaign` | string | Denormalized campaign title, kept for display and for legacy free-text imports where no `campaignId` exists |
 | `dateCreated` | string (YYYY-MM-DD) | |
 | `contactStatus` | string | `Untouched`, `Reached`, `Unreached`, `Missed` — **mutually exclusive, always sums to 100% of leads** |
-| `outcome` | string | `Pending`, `Open File`, `Booked`, `Closed - Unsuccessful` — **only meaningful when `contactStatus === "Reached"`** |
+| `outcome` | string | `Pending`, `Open File`, `Follow-up Scheduled`, `Booked`, `Wrong Number`, `Already a Patient`, `Closed - Unsuccessful` (`OUTCOMES` in `firebase-data.js`) — **only meaningful when `contactStatus === "Reached"`**. Once `outcome === "Booked"`, both `contactStatus`/`outcome` are locked in the UI (agents: no override; admin: override with a confirm prompt) — a workflow guard, not a Firestore rule, to protect revenue reporting from accidental edits. |
+| `closureReason` | string \| null | Only meaningful when `outcome === "Closed - Unsuccessful"` — one of `CLOSURE_REASONS` (`firebase-data.js`). Captures *why* a lead didn't convert, cleared automatically if `outcome` changes away from Closed - Unsuccessful. |
+| `assignedAgentUid` | string \| null | Firebase Auth UID of the agent this lead is assigned to. Set only by admins (`admin.html`) — agents can't reassign, matching the existing role boundary (`ARCHITECTURE.md` §4.1). Only team members with `hasLoginAccount && authUid` can be assigned, since anyone else could never see the lead in their own scoped view. Drives Contact Center Control's default "My Leads" filter (`l.assignedAgentUid === auth.currentUser.uid`). |
+| `assignedAgentName` | string | Denormalized display name, same convention as `campaign`/`campaignId`. |
 | `revenueValue` | number \| null | SAR — actual known revenue from this booking, feeds campaign ROI |
 | `notes` | string | |
 | `createdAt`, `updatedAt` | Timestamp | |
