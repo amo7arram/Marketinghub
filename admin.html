@@ -429,9 +429,9 @@ tr.row-done:hover td{background:#DCF2E5}
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
             <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Campaign</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Notes</th><th></th>
+            <th>Campaign</th><th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="12" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="14" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
@@ -946,6 +946,10 @@ tr.row-done:hover td{background:#DCF2E5}
       <div class="field-group" id="fld-contenttype-wrap"><label class="field-label">Content Type</label><select class="field-select" id="fld-contentType"></select></div>
       <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
       <div class="field-group" id="fld-postlink-wrap"><label class="field-label" id="fld-postlink-label">Post / Content Link</label><input class="field-input" id="fld-postLink" placeholder="https://..."></div>
+      <div class="field-group" id="fld-agentscript-wrap">
+        <label class="field-label">Agent Script <span style="color:var(--text-3);font-weight:400;font-size:11px">— shown to agents before calling leads from this campaign, 1-2 paragraphs max</span></label>
+        <textarea class="field-textarea" id="fld-agentScript" style="min-height:70px" placeholder="e.g. This lead came from our Women's Health Ramadan campaign on Instagram, offering 20% off maternity packages. Mention the free consultation add-on."></textarea>
+      </div>
       <div class="field-group" id="fld-cost-wrap"><label class="field-label">Cost (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, appears in Budget tab</span></label><input class="field-input" type="number" id="fld-cost" placeholder="0.00" min="0" step="0.01"></div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Leads Generated <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label><input class="field-input" type="number" id="fld-leads" placeholder="0" min="0"></div>
@@ -1228,10 +1232,55 @@ tr.row-done:hover td{background:#DCF2E5}
         <label class="field-label">Outcome</label>
         <select class="field-select" id="bulk-outcome"><option value="">— No change —</option></select>
       </div>
+      <div class="field-group">
+        <label class="field-label">Campaign</label>
+        <select class="field-select" id="bulk-campaign"><option value="">— No change —</option></select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Assign to Agent</label>
+        <select class="field-select" id="bulk-assign"><option value="">— No change —</option></select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeBulkEditModal()">Cancel</button>
       <button class="btn btn-primary" id="confirm-bulk-edit-btn" onclick="confirmBulkEdit()">Apply to Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CAMPAIGN INFO POPOVER ── -->
+<div class="modal-overlay" id="campaign-info-overlay">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title" id="campaign-info-title">Campaign</div>
+      <button class="modal-close" onclick="closeCampaignInfo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="campaign-info-body"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCampaignInfo()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ASSIGN LEAD MODAL ── -->
+<div class="modal-overlay" id="assign-lead-overlay">
+  <div class="modal" style="width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Assign Lead</div>
+      <button class="modal-close" onclick="closeAssignLeadModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group">
+        <label class="field-label">Agent</label>
+        <select class="field-select" id="assign-lead-agent"><option value="">— Unassigned —</option></select>
+        <div class="form-hint" style="font-size:10px;color:var(--text-3);margin-top:3px">Only team members with login access can be assigned.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeAssignLeadModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmAssignLead()">Assign</button>
     </div>
   </div>
 </div>
@@ -1289,7 +1338,8 @@ tr.row-done:hover td{background:#DCF2E5}
       </div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Contact Status</label><select class="field-select" id="lead-contact-status" onchange="toggleLeadOutcomeField()"></select></div>
-        <div class="field-group" id="lead-outcome-wrap"><label class="field-label">Outcome</label><select class="field-select" id="lead-outcome"></select></div>
+        <div class="field-group" id="lead-outcome-wrap"><label class="field-label">Outcome</label><select class="field-select" id="lead-outcome" onchange="toggleLeadClosureReasonField()"></select></div>
+        <div class="field-group" id="lead-closure-reason-wrap" style="display:none"><label class="field-label">Closure Reason</label><select class="field-select" id="lead-closure-reason"><option value="">— Select —</option></select></div>
       </div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Source</label><input class="field-input" id="lead-source" placeholder="e.g. Meta Ads, Google, Walk-in"></div>
@@ -1424,7 +1474,7 @@ import {
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
   normalizePhone, normalizeAllLeadPhones,
-  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS,
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
   DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
@@ -1614,7 +1664,7 @@ function initData() {
   populateStaticSelects();
   unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
-  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); });
+  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
@@ -1736,6 +1786,22 @@ function populateLeadCampaignSelects() {
   if(sheetImportCampaign) sheetImportCampaign.innerHTML = sheetOptionsHtml;
   const importCampaign = document.getElementById('import-campaign');
   if(importCampaign) importCampaign.innerHTML = sheetOptionsHtml;
+  const bulkCampaign = document.getElementById('bulk-campaign');
+  if(bulkCampaign) bulkCampaign.innerHTML = '<option value="">— No change —</option>' + optionsHtml.replace('<option value="">— Not linked to a campaign —</option>', '');
+}
+
+// Populates the "Assign to Agent" dropdowns (single-lead Assign modal +
+// Bulk Edit) from team members who can actually log in to Contact Center
+// Control — assigning to someone without login access would create a lead
+// nobody could ever see in their scoped "My Leads" view.
+function populateAssignLeadSelect() {
+  const assignable = ALL_TEAM_MEMBERS.filter(m => m.hasLoginAccount && m.authUid && m.active !== false);
+  const optionsHtml = assignable.map(m=>`<option value="${m.authUid}">${m.name}</option>`).join('');
+
+  const single = document.getElementById('assign-lead-agent');
+  if(single) single.innerHTML = '<option value="">— Unassigned —</option>' + optionsHtml;
+  const bulk = document.getElementById('bulk-assign');
+  if(bulk) bulk.innerHTML = '<option value="">— No change —</option>' + optionsHtml;
 }
 
 
@@ -1768,6 +1834,7 @@ function populateStaticSelects() {
   document.getElementById('sheet-import-dept').innerHTML = leadDeptHtml;
   document.getElementById('lead-contact-status').innerHTML = CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('lead-outcome').innerHTML = OUTCOMES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('lead-closure-reason').innerHTML += CLOSURE_REASONS.map(r=>`<option>${r}</option>`).join('');
   document.getElementById('lead-filter-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('lead-filter-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('bulk-department').innerHTML += leadDeptHtml;
@@ -1847,7 +1914,8 @@ window.selectType = function(type) {
   show('fld-eventscope-wrap',        type==='Event');
   show('fld-physicianname-wrap',     type==='Physician Video');
   show('fld-parentcampaign-wrap',    !isCampaign);
-  show('fld-postlink-wrap',          type==='SM Content' || type==='Event' || type==='Print' || type==='Physician Video');
+  show('fld-postlink-wrap',          isCampaign || type==='SM Content' || type==='Event' || type==='Print' || type==='Physician Video');
+  show('fld-agentscript-wrap',       isCampaign);
   show('fld-caption-gen-wrap',       type==='Event' || type==='SM Content' || type==='Print' || type==='Physician Video');
   show('fld-perf-wrap',              isCampaign || type==='SM Content' || type==='Physician Video');
   show('fld-eng-wrap',               isCampaign || type==='SM Content' || type==='Physician Video');
@@ -1907,6 +1975,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-physicianName').value = initiative?.physicianName || '';
   document.getElementById('fld-parentCampaign').value = initiative?.parentCampaignId || '';
   document.getElementById('fld-postLink').value = initiative?.postLink || '';
+  document.getElementById('fld-agentScript').value = initiative?.agentScript || '';
   // Load previously generated/saved captions, if any
   if(initiative?.captionEN || initiative?.captionAR) {
     document.getElementById('gen-caption-en').value = initiative?.captionEN || '';
@@ -1981,6 +2050,7 @@ window.saveInitiative = async function() {
     physicianName: document.getElementById('fld-physicianName').value.trim(),
     parentCampaignId: document.getElementById('fld-parentCampaign').value || null,
     postLink: document.getElementById('fld-postLink').value.trim(),
+    agentScript: document.getElementById('fld-agentScript').value.trim(),
     captionEN:       document.getElementById('gen-caption-en').value.trim() || null,
     captionAR:       document.getElementById('gen-caption-ar').value.trim() || null,
     captionHeadline: document.getElementById('gen-caption-headline').value.trim() || null,
@@ -4221,6 +4291,23 @@ function campaignTitleFor(campaignId) {
   return c ? c.title : null;
 }
 
+// Shows the campaign's agent script + post link — background context for
+// an agent before calling a lead tied to this campaign.
+window.showCampaignInfo = function(campaignId) {
+  const c = ALL_INITIATIVES.find(i=>i.id===campaignId && i.type==='Campaign');
+  if(!c) return;
+  document.getElementById('campaign-info-title').textContent = c.title || 'Campaign';
+  const scriptHtml = c.agentScript
+    ? `<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap">${c.agentScript}</div>`
+    : `<div style="font-size:12px;color:var(--text-3)">No agent script set for this campaign yet.</div>`;
+  const linkHtml = c.postLink
+    ? `<div style="margin-top:14px"><a href="${c.postLink}" target="_blank" class="btn btn-sm">🔗 View Post / Content</a></div>`
+    : '';
+  document.getElementById('campaign-info-body').innerHTML = scriptHtml + linkHtml;
+  document.getElementById('campaign-info-overlay').classList.add('open');
+}
+window.closeCampaignInfo = function() { document.getElementById('campaign-info-overlay').classList.remove('open'); }
+
 // ── EXCEL EXPORT ─────────────────────────────────────────────────────────
 function exportLeadsToExcel(leads, filenamePrefix='leads-export') {
   if(!leads.length) { showToast('No leads to export', true); return; }
@@ -4288,7 +4375,8 @@ window.renderLeadsTable = function() {
           <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.entity||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.source||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${campaignLabel}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.campaignId?`<a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script & post link">${campaignLabel} ℹ️</a>`:campaignLabel}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.assignedAgentName||'— Unassigned —'}</td>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${l.dateCreated||'—'}</td>
           <td>
             <select style="font-size:10px;padding:3px 5px;border:1px solid ${csColor.bg};border-radius:4px;background:${csColor.bg};color:${csColor.t};font-weight:600;cursor:pointer;font-family:inherit"
@@ -4304,15 +4392,25 @@ window.renderLeadsTable = function() {
                 </select>`
               : `<span style="font-size:10px;color:var(--text-3)">—</span>`}
           </td>
+          <td>
+            ${oc==='Closed - Unsuccessful'
+              ? `<select style="font-size:10px;padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-family:inherit"
+                  onchange="changeLeadClosureReason('${l.id}',this.value)">
+                  <option value=""${!l.closureReason?' selected':''}>— Select —</option>
+                  ${CLOSURE_REASONS.map(r=>`<option${l.closureReason===r?' selected':''}>${r}</option>`).join('')}
+                </select>`
+              : `<span style="font-size:10px;color:var(--text-3)">—</span>`}
+          </td>
           <td style="font-size:11px;color:var(--text-3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.notes||''}">${l.notes||'—'}</td>
           <td class="row-actions">
             ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
+            <button class="btn btn-sm" onclick="openAssignLeadModal('${l.id}')">Assign</button>
             <button class="btn btn-sm" onclick="editLeadRow('${l.id}')">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="removeLeadRow('${l.id}','${(l.name||'').replace(/'/g,"\\'")}')">Delete</button>
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="12" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
+    : `<tr><td colspan="14" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
 
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
@@ -4343,7 +4441,13 @@ window.changeLeadOutcome = async function(id, outcome) {
     renderLeadsTable();
     return;
   }
-  try { await updateLead(id, { outcome }); }
+  // Clear a stale closure reason once outcome moves away from Closed - Unsuccessful
+  const updates = outcome==='Closed - Unsuccessful' ? { outcome } : { outcome, closureReason: null };
+  try { await updateLead(id, updates); }
+  catch(e) { showToast('Update failed: '+e.message, true); }
+}
+window.changeLeadClosureReason = async function(id, closureReason) {
+  try { await updateLead(id, { closureReason: closureReason || null }); }
   catch(e) { showToast('Update failed: '+e.message, true); }
 }
 
@@ -4423,6 +4527,8 @@ window.openBulkEditModal = function() {
   document.getElementById('bulk-entity').value = '';
   document.getElementById('bulk-contact-status').value = '';
   document.getElementById('bulk-outcome').value = '';
+  document.getElementById('bulk-campaign').value = '';
+  document.getElementById('bulk-assign').value = '';
   document.getElementById('bulk-edit-overlay').classList.add('open');
 }
 window.closeBulkEditModal = function() {
@@ -4434,6 +4540,10 @@ window.confirmBulkEdit = async function() {
   const entityVal  = document.getElementById('bulk-entity').value;
   const contactVal = document.getElementById('bulk-contact-status').value;
   const outcomeVal = document.getElementById('bulk-outcome').value;
+  const campaignSel = document.getElementById('bulk-campaign');
+  const campaignVal = campaignSel.value;
+  const assignSel = document.getElementById('bulk-assign');
+  const assignVal = assignSel.value;
 
   const updateObj = {};
   if(dateVal)    updateObj.dateCreated   = dateVal;
@@ -4441,6 +4551,14 @@ window.confirmBulkEdit = async function() {
   if(entityVal)  updateObj.entity        = entityVal;
   if(contactVal) updateObj.contactStatus = contactVal;
   if(outcomeVal) updateObj.outcome       = outcomeVal;
+  if(campaignVal) {
+    updateObj.campaignId = campaignVal;
+    updateObj.campaign   = campaignTitleFor(campaignVal) || '';
+  }
+  if(assignVal) {
+    updateObj.assignedAgentUid  = assignVal;
+    updateObj.assignedAgentName = assignSel.options[assignSel.selectedIndex].textContent;
+  }
 
   if(!Object.keys(updateObj).length) {
     showToast('Set at least one field to apply', true);
@@ -4481,6 +4599,12 @@ window.confirmBulkEdit = async function() {
 window.toggleLeadOutcomeField = function() {
   const isReached = document.getElementById('lead-contact-status').value === 'Reached';
   document.getElementById('lead-outcome-wrap').style.display = isReached ? '' : 'none';
+  toggleLeadClosureReasonField();
+}
+window.toggleLeadClosureReasonField = function() {
+  const isClosed = document.getElementById('lead-contact-status').value === 'Reached'
+    && document.getElementById('lead-outcome').value === 'Closed - Unsuccessful';
+  document.getElementById('lead-closure-reason-wrap').style.display = isClosed ? '' : 'none';
 }
 
 window.openLeadForm = function(lead=null) {
@@ -4492,6 +4616,7 @@ window.openLeadForm = function(lead=null) {
   document.getElementById('lead-entity').value         = lead?.entity||'';
   document.getElementById('lead-contact-status').value = lead?.contactStatus||'Untouched';
   document.getElementById('lead-outcome').value        = lead?.outcome||'Pending';
+  document.getElementById('lead-closure-reason').value = lead?.closureReason||'';
   toggleLeadOutcomeField();
   document.getElementById('lead-source').value         = lead?.source||'';
   document.getElementById('lead-campaign').value       = lead?.campaignId||'';
@@ -4537,6 +4662,9 @@ window.saveLead = async function() {
     contactStatus: document.getElementById('lead-contact-status').value,
     outcome:       document.getElementById('lead-contact-status').value==='Reached'
                      ? document.getElementById('lead-outcome').value : 'Pending',
+    closureReason: (document.getElementById('lead-contact-status').value==='Reached'
+                     && document.getElementById('lead-outcome').value==='Closed - Unsuccessful')
+                     ? (document.getElementById('lead-closure-reason').value || null) : null,
     source:        document.getElementById('lead-source').value.trim(),
     campaignId:    campaignId || null,
     campaign:      campaignId ? campaignTitleFor(campaignId) : '',
@@ -4560,6 +4688,27 @@ window.editLeadRow = function(id){const l=ALL_LEADS.find(x=>x.id===id);if(l)open
 window.removeLeadRow = async function(id,name){
   if(!confirm(`Delete lead "${name}"?`))return;
   try{await deleteLead(id);showToast('Lead deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
+}
+
+// ── Assign lead to agent ────────────────────────────────────────────────
+let assigningLeadId = null;
+window.openAssignLeadModal = function(id) {
+  const l = ALL_LEADS.find(x=>x.id===id);
+  if(!l) return;
+  assigningLeadId = id;
+  document.getElementById('assign-lead-agent').value = l.assignedAgentUid || '';
+  document.getElementById('assign-lead-overlay').classList.add('open');
+}
+window.closeAssignLeadModal = function() { document.getElementById('assign-lead-overlay').classList.remove('open'); }
+window.confirmAssignLead = async function() {
+  const sel = document.getElementById('assign-lead-agent');
+  const authUid = sel.value;
+  const name = authUid ? sel.options[sel.selectedIndex].textContent : '';
+  try {
+    await updateLead(assigningLeadId, { assignedAgentUid: authUid || null, assignedAgentName: name });
+    showToast(authUid ? `✓ Assigned to ${name}` : '✓ Unassigned');
+    closeAssignLeadModal();
+  } catch(e) { showToast('Assign failed: '+e.message, true); }
 }
 
 // ── One-time status migration ────────────────────────────────────────────
