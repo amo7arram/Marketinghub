@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IMC Lead Management Process</title>
+<style>
+  :root{
+    --navy:#004D8C;
+    --blue:#0073BA;
+    --sky:#0094D9;
+    --light:#99DCF3;
+    --tint:#EAF4FB;
+    --slate:#44546A;
+    --muted:#5E7184;
+    --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:var(--slate);
+    color:var(--navy);
+  }
+  .page{
+    background:var(--white);
+    max-width:2500px;
+    margin:0 auto;
+    position:relative;
+  }
+
+  header{
+    background:var(--navy);
+    color:var(--white);
+    padding:38px 60px 30px 60px;
+    position:relative;
+    overflow:hidden;
+  }
+  header .eyebrow{
+    font-size:12px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    color:var(--light);
+    font-weight:600;
+    margin-bottom:8px;
+  }
+  header h1{
+    margin:0;
+    font-size:34px;
+    font-weight:600;
+    letter-spacing:.2px;
+  }
+  header p.sub{
+    margin:8px 0 0 0;
+    color:var(--light);
+    font-size:14.5px;
+    max-width:840px;
+    line-height:1.5;
+  }
+  .logo-tag{
+    position:absolute;
+    top:38px;
+    right:60px;
+    text-align:right;
+    color:var(--white);
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:.5px;
+  }
+  .logo-tag span{
+    display:block;
+    font-weight:400;
+    font-size:11px;
+    color:var(--light);
+    margin-top:2px;
+  }
+  .pulse-strip{
+    height:3px;
+    width:100%;
+    margin-top:26px;
+    background:repeating-linear-gradient(90deg,
+      var(--sky) 0 2px, transparent 2px 14px);
+    opacity:.75;
+  }
+
+  .legend{
+    display:flex;
+    gap:28px;
+    flex-wrap:wrap;
+    align-items:center;
+    padding:16px 60px;
+    background:var(--tint);
+    border-bottom:1px solid var(--light);
+    font-size:12.5px;
+    color:var(--slate);
+  }
+  .legend b{color:var(--navy);}
+  .lg-item{display:flex;align-items:center;gap:8px;}
+  .lg-box{width:22px;height:16px;border-radius:4px;background:var(--white);border:1.5px solid var(--sky);}
+  .lg-diamond{width:16px;height:16px;background:var(--tint);border:1.5px solid var(--blue);transform:rotate(45deg);}
+  .lg-exit{width:22px;height:16px;border-radius:10px;border:1.5px dashed var(--muted);background:var(--white);}
+  .lg-end{width:22px;height:16px;border-radius:10px;background:var(--navy);}
+  .lg-line{width:26px;height:0;border-top:2px solid var(--blue);}
+  .lg-dash{width:26px;height:0;border-top:2px dashed var(--muted);}
+
+  .canvas{
+    padding:10px 0 40px 0;
+    overflow-x:auto;
+  }
+  .canvas-inner{
+    min-width:2100px;
+  }
+
+  .lane{
+    display:flex;
+    border-bottom:1px solid var(--tint);
+    padding:34px 0 56px 0;
+    position:relative;
+  }
+  .lane:nth-child(even){background:var(--tint);}
+  .lane-label{
+    width:190px;
+    flex-shrink:0;
+    padding:0 18px 0 60px;
+    position:sticky;
+    left:0;
+    z-index:5;
+  }
+  .lane-num{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:26px;height:26px;
+    border-radius:50%;
+    background:var(--navy);
+    color:var(--white);
+    font-size:12px;
+    font-weight:700;
+    margin-bottom:10px;
+  }
+  .lane-label h3{
+    margin:0 0 4px 0;
+    font-size:15.5px;
+    color:var(--navy);
+    font-weight:600;
+    line-height:1.25;
+  }
+  .lane-label .owner{
+    font-size:11.5px;
+    color:var(--muted);
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+
+  .lane-flow{
+    display:flex;
+    align-items:center;
+    flex-wrap:nowrap;
+    gap:0;
+    padding-right:40px;
+  }
+
+  .step{
+    width:172px;
+    flex-shrink:0;
+    background:var(--white);
+    border:1.5px solid var(--light);
+    border-radius:12px;
+    padding:14px 14px;
+    box-shadow:0 2px 6px rgba(0,77,140,.08);
+    position:relative;
+  }
+  .step .icon{
+    width:30px;height:30px;
+    border-radius:50%;
+    background:var(--sky);
+    color:var(--white);
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:700;
+    margin-bottom:8px;
+  }
+  .step.navy .icon{background:var(--navy);}
+  .step h4{
+    margin:0 0 4px 0;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--navy);
+    line-height:1.3;
+  }
+  .step p{
+    margin:0;
+    font-size:10.8px;
+    color:var(--muted);
+    line-height:1.4;
+  }
+  .step .sla{
+    margin-top:7px;
+    display:inline-block;
+    font-size:9.5px;
+    font-weight:700;
+    color:var(--blue);
+    background:var(--tint);
+    border-radius:6px;
+    padding:2px 6px;
+  }
+
+  .source-card{ width:154px; }
+  .source-card .icon{width:26px;height:26px;font-size:12px;}
+
+  .arrow-h{
+    width:30px;height:2px;
+    background:var(--blue);
+    flex-shrink:0;
+    position:relative;
+    margin:0 2px;
+  }
+  .arrow-h::after{
+    content:"";
+    position:absolute;right:-1px;top:50%;
+    transform:translateY(-50%);
+    width:0;height:0;
+    border-top:5px solid transparent;
+    border-bottom:5px solid transparent;
+    border-left:7px solid var(--blue);
+  }
+  .arrow-h.dash{background:transparent;border-top:2px dashed var(--muted);}
+  .arrow-h.dash::after{border-left-color:var(--muted);}
+
+  .diamond-wrap{
+    position:relative;
+    width:104px;
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .diamond{
+    width:96px;height:96px;
+    background:var(--tint);
+    border:2px solid var(--blue);
+    transform:rotate(45deg);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .diamond span{
+    transform:rotate(-45deg);
+    text-align:center;
+    font-size:10.5px;
+    font-weight:600;
+    color:var(--navy);
+    width:64px;
+    line-height:1.25;
+  }
+  .yes-tag{
+    position:absolute;
+    top:-14px;left:50%;
+    transform:translateX(-50%);
+    font-size:9px;font-weight:700;
+    color:var(--blue);
+    background:var(--white);
+    padding:0 4px;
+  }
+
+  .branch-down{
+    position:absolute;
+    top:100%;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    margin-top:2px;
+  }
+  .branch-down .no-tag{
+    font-size:9px;font-weight:700;color:var(--muted);
+    margin-bottom:2px;
+    white-space:nowrap;
+  }
+  .branch-down .stem{
+    width:2px;height:16px;
+    border-left:2px dashed var(--muted);
+  }
+  .exit-chip{
+    margin-top:2px;
+    width:150px;
+    background:var(--white);
+    border:1.5px dashed var(--muted);
+    border-radius:20px;
+    padding:8px 12px;
+    text-align:center;
+    font-size:10px;
+    color:var(--slate);
+    font-weight:600;
+    line-height:1.35;
+  }
+  .exit-chip small{
+    display:block;
+    font-weight:400;
+    color:var(--muted);
+    margin-top:2px;
+  }
+
+  .loop-chip{
+    margin-top:2px;
+    width:150px;
+    background:var(--white);
+    border:1.5px dashed var(--blue);
+    border-radius:20px;
+    padding:8px 12px;
+    text-align:center;
+    font-size:10px;
+    color:var(--blue);
+    font-weight:600;
+    line-height:1.35;
+  }
+
+  .sources-row{
+    display:flex;
+    gap:14px;
+    flex-shrink:0;
+  }
+  .funnel{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    margin:0 22px;
+    flex-shrink:0;
+  }
+  .funnel .stem{
+    width:2px;height:26px;
+    background:var(--blue);
+  }
+  .funnel .cap{
+    font-size:9.5px;font-weight:700;color:var(--navy);
+    background:var(--light);
+    border-radius:12px;
+    padding:4px 10px;
+    margin-top:4px;
+    white-space:nowrap;
+  }
+
+  .handoff{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:6px 0 0 60px;
+    margin-top:-38px;
+    position:relative;
+    z-index:2;
+  }
+  .handoff .chev{
+    width:0;height:0;
+    border-left:9px solid transparent;
+    border-right:9px solid transparent;
+    border-top:11px solid var(--navy);
+  }
+  .handoff .txt{
+    font-size:11px;
+    font-weight:700;
+    color:var(--navy);
+    letter-spacing:.2px;
+    background:var(--white);
+    padding:2px 10px;
+    border:1px solid var(--light);
+    border-radius:12px;
+  }
+
+  .end-badge{
+    flex-shrink:0;
+    width:150px;
+    background:var(--navy);
+    color:var(--white);
+    border-radius:12px;
+    padding:14px;
+    text-align:center;
+  }
+  .end-badge .ring{
+    width:26px;height:26px;
+    border-radius:50%;
+    border:2px solid var(--white);
+    margin:0 auto 8px auto;
+  }
+  .end-badge h4{margin:0 0 4px 0;font-size:12.5px;font-weight:700;}
+  .end-badge p{margin:0;font-size:10px;color:var(--light);line-height:1.4;}
+
+  .offline-note{
+    margin:16px 60px 0 60px;
+    padding:14px 18px;
+    background:var(--white);
+    border:1.5px dashed var(--sky);
+    border-radius:12px;
+    font-size:11.5px;
+    color:var(--slate);
+    line-height:1.5;
+  }
+  .offline-note b{color:var(--navy);}
+
+  .feedback-note{
+    margin:26px 60px 40px 60px;
+    padding:18px 22px;
+    border:1.5px dashed var(--blue);
+    border-radius:14px;
+    background:var(--tint);
+    display:flex;
+    gap:16px;
+    align-items:center;
+  }
+  .feedback-note .icon{
+    width:40px;height:40px;flex-shrink:0;
+    border-radius:50%;
+    background:var(--navy);
+    color:var(--white);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;font-weight:700;
+  }
+  .feedback-note h4{margin:0 0 3px 0;font-size:13.5px;color:var(--navy);}
+  .feedback-note p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.4;}
+
+  footer{
+    background:var(--navy);
+    color:var(--light);
+    padding:20px 60px;
+    font-size:11px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  footer .status{
+    background:rgba(255,255,255,.12);
+    padding:4px 12px;
+    border-radius:12px;
+    font-weight:600;
+    color:var(--white);
+  }
+  @media print{
+    body{background:var(--white);}
+    .canvas{overflow:visible;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo-tag">IMC <span>International Medical Center · Jeddah</span></div>
+    <div class="eyebrow">Marketing Operations · Process Map · Draft v2</div>
+    <h1>Lead Management Process</h1>
+    <p class="sub">Flow from lead generation across marketing channels, through community manager data integrity review, the Leads Dashboard, and outbound qualification — closing at appointment booking. Revenue is attributed post-campaign via HIS cross-reference.</p>
+    <div class="pulse-strip"></div>
+  </header>
+
+  <div class="legend">
+    <div class="lg-item"><div class="lg-box"></div><span><b>Process step</b></span></div>
+    <div class="lg-item"><div class="lg-diamond"></div><span><b>Decision point</b></span></div>
+    <div class="lg-item"><div class="lg-exit"></div><span><b>Exit / archived outcome</b></span></div>
+    <div class="lg-item"><div class="lg-end"></div><span><b>Process end</b></span></div>
+    <div class="lg-item"><div class="lg-line"></div><span><b>Main flow</b></span></div>
+    <div class="lg-item"><div class="lg-dash"></div><span><b>Loop / offline step</b></span></div>
+    <div class="lg-item" style="margin-left:auto;">All thresholds (SLA hours, retry counts) are placeholders — flag for validation with Outbound team.</div>
+  </div>
+
+  <div class="canvas">
+  <div class="canvas-inner">
+
+    <!-- LANE 1 : LEAD GENERATION -->
+    <div class="lane">
+      <div class="lane-label">
+        <div class="lane-num">1</div>
+        <h3>Lead Generation</h3>
+        <div class="owner">Marketing · Channel Teams</div>
+      </div>
+      <div class="lane-flow">
+        <div class="sources-row">
+          <div class="step source-card"><div class="icon">▤</div><h4>Paid Social</h4><p>Meta / TikTok / Snapchat lead-gen ads</p></div>
+          <div class="step source-card"><div class="icon">◉</div><h4>Events &amp; Activations</h4><p>Wellness Festival booths, roadshows</p></div>
+          <div class="step source-card navy"><div class="icon">◈</div><h4>Partnerships &amp; Sports</h4><p>Sponsorships, corporate tie-ups</p></div>
+          <div class="step source-card"><div class="icon">✆</div><h4>WhatsApp Business</h4><p>Direct patient inquiries</p></div>
+        </div>
+        <div class="funnel">
+          <div class="stem"></div>
+          <div class="cap">All sources converge →</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="handoff"><div class="chev"></div><div class="txt">Handoff — raw leads pass to Community Manager for data integrity check</div></div>
+
+    <!-- LANE 2 : DATA INTEGRITY CHECK -->
+    <div class="lane">
+      <div class="lane-label">
+        <div class="lane-num">2</div>
+        <h3>Data Integrity Check</h3>
+        <div class="owner">Social Media Community Manager</div>
+      </div>
+      <div class="lane-flow">
+        <div class="step navy"><div class="icon">①</div><h4>Review raw lead</h4><p>Pulled from each channel before dashboard entry</p></div>
+        <div class="arrow-h"></div>
+        <div class="step"><div class="icon">②</div><h4>Verify contact data</h4><p>Valid phone number / name format, no test or spam entries</p></div>
+        <div class="arrow-h"></div>
+        <div class="diamond-wrap">
+          <div class="diamond"><span>Data valid?</span></div>
+          <div class="yes-tag">Yes</div>
+          <div class="branch-down">
+            <div class="no-tag">No — correct or discard</div>
+            <div class="stem"></div>
+            <div class="exit-chip">Rejected / Invalid<small>Logged, not sent to dashboard</small></div>
+          </div>
+        </div>
+        <div class="arrow-h"></div>
+        <div class="step navy"><div class="icon">✓</div><h4>Cleared lead</h4><p>Verified record forwarded to Leads Dashboard</p></div>
+      </div>
+    </div>
+
+    <div class="handoff"><div class="chev"></div><div class="txt">Handoff — verified leads logged into the central dashboard</div></div>
+
+    <!-- LANE 3 : DASHBOARD -->
+    <div class="lane">
+      <div class="lane-label">
+        <div class="lane-num">3</div>
+        <h3>Lead Capture &amp; Dashboard</h3>
+        <div class="owner">Marketing Operations</div>
+      </div>
+      <div class="lane-flow">
+        <div class="step navy"><div class="icon">①</div><h4>Lead logged</h4><p>Enters IMC Leads Dashboard with auto timestamp</p></div>
+        <div class="arrow-h"></div>
+        <div class="step"><div class="icon">②</div><h4>Auto-tagging</h4><p>Source, campaign, specialty interest, site (Jeddah / Makkah)</p></div>
+        <div class="arrow-h"></div>
+        <div class="diamond-wrap">
+          <div class="diamond"><span>Duplicate record?</span></div>
+          <div class="yes-tag">Yes ↻</div>
+          <div class="branch-down">
+            <div class="no-tag">No</div>
+            <div class="stem"></div>
+          </div>
+        </div>
+        <div class="arrow-h"></div>
+        <div class="step"><div class="icon">③</div><h4>Status: New</h4><p>"Pending Outbound" flag set in dashboard</p><span class="sla">Sync: hourly batch</span></div>
+        <div class="arrow-h"></div>
+        <div class="step navy"><div class="icon">④</div><h4>Routed to queue</h4><p>Assigned to Outbound Contact Center</p></div>
+      </div>
+    </div>
+
+    <div class="handoff"><div class="chev"></div><div class="txt">Handoff — new leads pushed to Outbound queue for first contact</div></div>
+
+    <!-- LANE 4 : OUTBOUND -->
+    <div class="lane">
+      <div class="lane-label">
+        <div class="lane-num">4</div>
+        <h3>Outbound Qualification</h3>
+        <div class="owner">Contact Center / Outbound Team</div>
+      </div>
+      <div class="lane-flow">
+        <div class="step"><div class="icon">①</div><h4>Agent assigned</h4><p>Routed by specialty &amp; language</p></div>
+        <div class="arrow-h"></div>
+        <div class="step"><div class="icon">②</div><h4>First call attempt</h4><p>Initial outbound contact</p><span class="sla">SLA: within 2 business hrs</span></div>
+        <div class="arrow-h"></div>
+        <div class="diamond-wrap">
+          <div class="diamond"><span>Reached?</span></div>
+          <div class="yes-tag">Yes</div>
+          <div class="branch-down">
+            <div class="no-tag">No — retry ×3 / 48h</div>
+            <div class="stem"></div>
+            <div class="exit-chip">Unreachable<small>Archived for remarketing</small></div>
+          </div>
+        </div>
+        <div class="arrow-h"></div>
+        <div class="step navy"><div class="icon">③</div><h4>Qualification call</h4><p>Interest, specialty need, insurance / self-pay, urgency</p></div>
+        <div class="arrow-h"></div>
+        <div class="diamond-wrap">
+          <div class="diamond"><span>Qualified?</span></div>
+          <div class="yes-tag">Yes</div>
+          <div class="branch-down">
+            <div class="no-tag">No</div>
+            <div class="stem"></div>
+            <div class="exit-chip">Disqualified<small>Reason logged in dashboard</small></div>
+          </div>
+        </div>
+        <div class="arrow-h"></div>
+        <div class="step navy"><div class="icon">④</div><h4>Appointment booked</h4><p>Agent books appointment · Status: Booked</p></div>
+        <div class="arrow-h"></div>
+        <div class="end-badge">
+          <div class="ring"></div>
+          <h4>Process ends here</h4>
+          <p>Show / consultation outcome is not tracked in this workflow</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="offline-note">
+      <b>Note:</b> Attendance, consultation, and clinical outcome happen inside hospital systems outside marketing's visibility, so the CRM process closes at booking. Commercial outcomes are recovered separately below via campaign-level cross-reference against the HIS.
+    </div>
+
+    <!-- LANE 5 : REVENUE ATTRIBUTION -->
+    <div class="lane" style="border-bottom:none;">
+      <div class="lane-label">
+        <div class="lane-num">5</div>
+        <h3>Revenue Attribution</h3>
+        <div class="owner">Marketing + IT (Post-Campaign)</div>
+      </div>
+      <div class="lane-flow">
+        <div class="step navy"><div class="icon">①</div><h4>Campaign closes</h4><p>Lead list finalized for the campaign / period</p></div>
+        <div class="arrow-h dash"></div>
+        <div class="step"><div class="icon">②</div><h4>Phone numbers shared with IT</h4><p>Exported list of campaign lead numbers</p><span class="sla">Cadence: post-campaign</span></div>
+        <div class="arrow-h dash"></div>
+        <div class="step"><div class="icon">③</div><h4>IT cross-references HIS</h4><p>Matches numbers against registration / billing records</p></div>
+        <div class="arrow-h dash"></div>
+        <div class="step navy"><div class="icon">④</div><h4>Matched revenue returned</h4><p>Attributed back to source channel &amp; campaign in dashboard</p></div>
+        <div class="arrow-h"></div>
+        <div class="step"><div class="icon">⑤</div><h4>Attribution report</h4><p>CAC, conversion rate, ROI by channel</p></div>
+        <div class="arrow-h dash"></div>
+        <div class="loop-chip">↺ Feeds back into<br>Lane 1 budget allocation</div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+
+  <div class="feedback-note">
+    <div class="icon">↺</div>
+    <div>
+      <h4>Closed feedback loop</h4>
+      <p>Post-campaign HIS cross-reference (Lane 5) is reviewed against source-level performance (Lane 1) to reallocate budget toward the highest-ROI channels — completing the loop from spend to matched revenue.</p>
+    </div>
+  </div>
+
+  <footer>
+    <div>IMC Lead Management Process — Draft v2 · Prepared for internal workshop review</div>
+    <div class="status">Status: Ready for team adjustment</div>
+  </footer>
+
+</div>
+</body>
+</html>
