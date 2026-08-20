@@ -168,13 +168,13 @@ Marketing requests submitted by coordinators via `request.html`.
 
 ## `expenses`
 
-Standalone budget line items (distinct from `initiatives.cost`, which tracks cost per campaign/activity — `expenses` is for costs not tied to a specific initiative).
+Standalone budget line items (distinct from `initiatives.cost`, which tracks cost per campaign/activity — `expenses` is for costs not tied to a specific initiative). **No `department` field** — only initiative-linked costs can be attributed to a department; anything relying on a department-scoped spend breakdown (e.g. the AI Reports feature below) must say so explicitly rather than presenting an incomplete picture as complete.
 
 | Field | Type | Notes |
 |---|---|---|
 | `title`, `description` | string | |
-| `amount` | number | SAR |
-| `category` | string | |
+| `cost` | number | SAR (corrected — this field was previously documented here as `amount`, which doesn't match the actual code) |
+| `type`, `entity` | string | `type` is a category (e.g. Paid Social, Print Production); `entity` is a single business entity, not an array like `initiatives.entity` |
 | `date` | string | |
 | `createdAt` | Timestamp | |
 
@@ -284,6 +284,14 @@ config/lead_stats = {
 ```
 
 `byDepartment`/`byEntity`/`bySource` are all-time totals with no month dimension — `byMonthDept` was added specifically because the Dashboard's monthly department breakdown needed one and none of the existing structures had it.
+
+---
+
+## AI Reports — writes nothing (deliberate exception)
+
+`admin.html`'s AI Reports tab is the one feature in this app that persists nothing at all — no new collection, no new `config` document. It's purely ephemeral: pick a month, generate, download via the browser's print dialog, and the report is gone once you navigate away or regenerate. This was an explicit product decision (archiving was considered and deferred as a "nice to have"), not an oversight — don't add a Firestore write path here without discussing it first, since it changes the feature's whole design (it currently means zero new Firestore rules, zero PII-retention concerns beyond what already exists in `leads`).
+
+It does introduce one new **cross-system correlation pattern** worth knowing about: it matches Metricool's `/v2/scheduler/posts` response (real published post media, fetched live at report-generation time, never stored) back to our own `initiatives` records by comparing `providers[].publicUrl` (Metricool's live post URL per network) against `initiatives.postLink` — both are the same underlying URL, just captured on two different systems. This is how the report can show a real screenshot of what was actually posted, tied to the specific initiative that produced it, without ever storing the image or the match anywhere.
 
 ---
 

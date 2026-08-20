@@ -148,6 +148,19 @@ tr.row-done:hover td{background:#DCF2E5}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
 .toast.show{display:block}
 .toast.error{background:var(--red)}
+.air-kpi-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px}
+.air-kpi-table th{text-align:left;padding:8px 10px;background:var(--bg);font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)}
+.air-kpi-table td{padding:8px 10px;border-bottom:1px solid var(--border)}
+.air-insight-card{border-left:3px solid var(--border-strong);border-radius:0 8px 8px 0;background:var(--bg);padding:12px 16px;margin-bottom:10px}
+.air-outlook-box{background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius-lg);padding:16px 20px;margin:20px 0}
+@media print {
+  body * { visibility: hidden; }
+  #air-report-output, #air-report-output * { visibility: visible; }
+  #air-report-output { position: absolute; top: 0; left: 0; width: 100%; padding: 12px 24px; }
+  .air-no-print { display: none !important; }
+  .cgen-card { box-shadow: none; break-inside: avoid; }
+  .air-insight-card { break-inside: avoid; }
+}
 </style>
 </head>
 <body>
@@ -223,6 +236,7 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
     <div class="tab" onclick="switchTab('contentgen',this)" style="display:none">✨ Content Generator</div>
     <div class="tab" onclick="switchTab('campaigngen',this)">🎬 Campaign Generator</div>
+    <div class="tab" onclick="switchTab('aireports',this)">📊 AI Reports</div>
     <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
   </div>
 
@@ -714,6 +728,37 @@ tr.row-done:hover td{background:#DCF2E5}
             <button class="btn btn-primary" id="cgen-save-all-btn" onclick="saveCampaignContent()" style="flex:1">✓ Create Campaign & Save All Content</button>
           </div>
           <div id="cgen-save-status" style="font-size:12px;color:var(--text-3);display:none;margin-top:10px;text-align:center"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI REPORTS PAGE -->
+    <div class="page" id="page-aireports">
+      <div style="max-width:900px">
+        <div style="background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px">
+          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">📊 AI Reports</div>
+          <div style="font-size:12px;color:var(--text-3)">Generate a board-ready monthly executive report from your real data — activities, leads, spend, social performance and competitors. Nothing here is saved; download the finished report via your browser's print dialog.</div>
+        </div>
+
+        <!-- BRIEF FORM -->
+        <div id="air-brief-section">
+          <div class="field-row">
+            <div class="field-group"><label class="field-label">Report Month<span style="color:var(--red)">*</span></label><input class="field-input" type="month" id="air-month"></div>
+            <div class="field-group"><label class="field-label">Department Focus <span style="color:var(--text-3);font-weight:400;font-size:11px">(optional — leave empty to auto-select the most active departments)</span></label><div class="chip-select" id="air-departments"></div></div>
+          </div>
+          <div class="field-group"><label class="field-label">Board Brief<span style="color:var(--red)">*</span></label><textarea class="field-textarea" id="air-brief-text" style="min-height:120px" placeholder="Board priorities this month, context the data can't know on its own, specific questions to address..."></textarea></div>
+
+          <button class="btn btn-primary" id="air-generate-btn" onclick="generateAiReport()" style="width:100%;padding:12px;font-size:13px">Generate Report</button>
+          <div id="air-status" style="font-size:12px;color:var(--text-3);display:none;margin-top:10px;text-align:center"></div>
+        </div>
+
+        <!-- REPORT OUTPUT -->
+        <div id="air-report-section" style="display:none">
+          <div class="air-no-print" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <button class="btn btn-sm" onclick="backToAiReportBrief()">← Back to Brief</button>
+            <button class="btn btn-primary" onclick="downloadAiReport()">🖨️ Download (Print to PDF)</button>
+          </div>
+          <div id="air-report-output"></div>
         </div>
       </div>
     </div>
@@ -1465,7 +1510,7 @@ import {
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
   getMetricoolSettings, setMetricoolSettings, watchMetricoolSettings,
   getMetricoolStats, setMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
-  saveMonthMetrics as saveLegacyMonthMetrics, getMetricsForPeriod as getLegacyMetricsForPeriod,
+  saveMonthMetrics as saveLegacyMonthMetrics, getMetricsForPeriod as getLegacyMetricsForPeriod, getAllMetrics,
   getAccessGate, setAccessGate, hashPassword,
   getAdminPasscode, setAdminPasscode,
   watchTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember, createTeamMemberWithLogin,
@@ -1503,6 +1548,8 @@ let METRICOOL_SETTINGS = { apiToken: '', userId: '', blogId: '' };
 let METRICOOL_FETCHED_PROFILES = [];
 let METRICOOL_STATS = null;
 let ANNUAL_BUDGET = 0;
+let AIR_REPORT = null;       // last Claude-returned AI Report JSON
+let AIR_REPORT_DATA = null;  // last assembled client-side data for the AI Report (needed to render matched images)
 let currentType = 'Campaign';
 let editingId = null;
 let editingResourceId = null;
@@ -1698,6 +1745,7 @@ window.switchTab = function(id, el, groupId) {
   document.getElementById('page-'+id).classList.add('active');
   if(id==='contentgen') initContentGenTab();
   if(id==='campaigngen') initCampaignGenTab();
+  if(id==='aireports') initAiReportsTab();
   if(id==='settings') initSettingsTab();
 }
 
@@ -3536,6 +3584,432 @@ window.saveCampaignContent = async function() {
   } finally {
     btn.disabled = false; btn.textContent = '✓ Create Campaign & Save All Content';
   }
+}
+
+// ── AI REPORTS ─────────────────────────────────────────────────────────
+function initAiReportsTab() {
+  const monthInput = document.getElementById('air-month');
+  if(monthInput && !monthInput.value) {
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    monthInput.value = `${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`;
+    monthInput.max   = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+  const deptWrap = document.getElementById('air-departments');
+  if(deptWrap && !deptWrap.children.length) {
+    deptWrap.innerHTML = DEPARTMENTS.map(d =>
+      `<div class="chip" data-val="${d}" onclick="this.classList.toggle('active')">${d}</div>`
+    ).join('');
+  }
+}
+
+function airPriorMonth(period) {
+  const [y,m] = period.split('-').map(Number);
+  const d = new Date(y, m-2, 1); // m is 1-based; m-2 lands on the previous month
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function airAutoActiveDepartments(reportMonth) {
+  const counts = {};
+  ALL_INITIATIVES.forEach(i => { if(i.department && (i.startDate||'').startsWith(reportMonth)) counts[i.department] = (counts[i.department]||0)+1; });
+  ALL_LEADS.forEach(l => { if(l.department && (l.dateCreated||'').startsWith(reportMonth)) counts[l.department] = (counts[l.department]||0)+1; });
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([d])=>d);
+}
+
+function airYtdMetricoolSum(seriesKey, throughPeriod) {
+  const [year, throughMonth] = throughPeriod.split('-').map(Number);
+  let sum = 0;
+  for(let m=1; m<=throughMonth; m++) {
+    const val = metricoolMonthlyValue(METRICOOL_STATS, seriesKey, `${year}-${String(m).padStart(2,'0')}`);
+    if(val !== null && val !== undefined) sum += val;
+  }
+  return sum;
+}
+
+function airNormalizeUrl(u) {
+  try { const p = new URL(u); return (p.origin + p.pathname).toLowerCase().replace(/\/$/,''); }
+  catch(e) { return String(u||'').toLowerCase().replace(/\/$/,''); }
+}
+
+// Pure client-side data assembly — no Claude call here, and every number is
+// computed here in JS, never delegated to the model. This is what guarantees
+// the report can never disagree with the live public dashboard (index.html's
+// BD KPI Progress uses the identical formulas — see renderBdKpiProgress()).
+async function assembleAiReportData(brief) {
+  const dataGaps = [];
+  const reportMonth = brief.month;
+  const priorMonth  = airPriorMonth(reportMonth);
+  const [reportYear] = reportMonth.split('-');
+  const departments = brief.departments.length ? brief.departments : airAutoActiveDepartments(reportMonth);
+
+  const departmentData = departments.map(dept => {
+    const initiatives = ALL_INITIATIVES.filter(i => i.department===dept && (i.startDate||'').startsWith(reportMonth));
+    const leadsThis = ALL_LEADS.filter(l => l.department===dept && (l.dateCreated||'').startsWith(reportMonth));
+    const leadsLast = ALL_LEADS.filter(l => l.department===dept && (l.dateCreated||'').startsWith(priorMonth));
+    return {
+      department: dept,
+      initiatives: initiatives.map(i => ({ id:i.id, title:i.title, type:i.type, postLink:i.postLink||null, captionEN:i.captionEN||null, objective:i.objective||null })),
+      leadsThisMonth: leadsThis.length,
+      leadsLastMonth: leadsLast.length,
+      bookedThisMonth: leadsThis.filter(l=>l.outcome==='Booked').length,
+      candidates: [], // filled in below once Metricool posts are fetched
+    };
+  });
+
+  // KPI Performance — identical formulas to index.html's renderBdKpiProgress()
+  // (fixed this session, commit 961c724) so this report can never disagree
+  // with the live public dashboard.
+  const overallLeadsThis = ALL_LEADS.filter(l => (l.dateCreated||'').startsWith(reportMonth));
+  const overallLeadsLast = ALL_LEADS.filter(l => (l.dateCreated||'').startsWith(priorMonth));
+  const mv = (key, period) => { const v = metricoolMonthlyValue(METRICOOL_STATS, key, period); return (v===null||v===undefined) ? 0 : v; };
+
+  let legacyMetrics = [];
+  try { legacyMetrics = await getAllMetrics(); }
+  catch(e) { dataGaps.push('Website Visitors history unavailable this run'); }
+  const websiteVisitsFor = (period) => legacyMetrics.find(m=>m.metricName==='Website Visits' && m.period===period)?.value || 0;
+  const ytdWebsiteVisitors = legacyMetrics
+    .filter(m => m.metricName==='Website Visits' && m.period.startsWith(reportYear) && m.period <= reportMonth)
+    .reduce((s,m)=>s+(m.value||0), 0);
+
+  const ytdLeadsAll = ALL_LEADS.filter(l => (l.dateCreated||'').startsWith(reportYear) && l.dateCreated.substring(0,7) <= reportMonth);
+
+  const kpiRows = [
+    { metric:'Views', thisMonth: mv('instagram_reel_views',reportMonth)+mv('tiktok_video_views',reportMonth),
+      lastMonth: mv('instagram_reel_views',priorMonth)+mv('tiktok_video_views',priorMonth),
+      ytd: airYtdMetricoolSum('instagram_reel_views',reportMonth)+airYtdMetricoolSum('tiktok_video_views',reportMonth),
+      target: BD_TARGETS.views||0 },
+    { metric:'Impressions / Reach', thisMonth: mv('instagram_reach',reportMonth)+mv('linkedin_impressions',reportMonth),
+      lastMonth: mv('instagram_reach',priorMonth)+mv('linkedin_impressions',priorMonth),
+      ytd: airYtdMetricoolSum('instagram_reach',reportMonth)+airYtdMetricoolSum('linkedin_impressions',reportMonth),
+      target: BD_TARGETS.impressions||0 },
+    { metric:'Engagements', thisMonth: mv('instagram_likes',reportMonth)+mv('instagram_comments',reportMonth),
+      lastMonth: mv('instagram_likes',priorMonth)+mv('instagram_comments',priorMonth),
+      ytd: airYtdMetricoolSum('instagram_likes',reportMonth)+airYtdMetricoolSum('instagram_comments',reportMonth),
+      target: BD_TARGETS.engagements||0 },
+    { metric:'Website Visitors', thisMonth: websiteVisitsFor(reportMonth), lastMonth: websiteVisitsFor(priorMonth),
+      ytd: ytdWebsiteVisitors, target: BD_TARGETS.websiteVisitors||0 },
+    { metric:'Leads Generated', thisMonth: overallLeadsThis.length, lastMonth: overallLeadsLast.length,
+      ytd: ytdLeadsAll.length, target: BD_TARGETS.leadsGenerated||0 },
+    { metric:'Bookings', thisMonth: overallLeadsThis.filter(l=>l.outcome==='Booked').length,
+      lastMonth: overallLeadsLast.filter(l=>l.outcome==='Booked').length,
+      ytd: ytdLeadsAll.filter(l=>l.outcome==='Booked').length, target: BD_TARGETS.estimatedBookings||0 },
+  ];
+
+  // Spend — ALL_EXPENSES has no department field (only initiative-linked
+  // costs can be department-attributed), flagged explicitly for the render.
+  const expensesThis = ALL_EXPENSES.filter(e => (e.date||'').startsWith(reportMonth));
+  const expensesLast = ALL_EXPENSES.filter(e => (e.date||'').startsWith(priorMonth));
+  const initCostsThis = ALL_INITIATIVES.filter(i => i.cost && (i.startDate||'').startsWith(reportMonth));
+  const initCostsLast = ALL_INITIATIVES.filter(i => i.cost && (i.startDate||'').startsWith(priorMonth));
+  const spendByDepartment = {};
+  initCostsThis.forEach(i => { if(i.department) spendByDepartment[i.department] = (spendByDepartment[i.department]||0) + i.cost; });
+  const spend = {
+    thisMonth: expensesThis.reduce((s,e)=>s+(e.cost||0),0) + initCostsThis.reduce((s,i)=>s+(i.cost||0),0),
+    lastMonth: expensesLast.reduce((s,e)=>s+(e.cost||0),0) + initCostsLast.reduce((s,i)=>s+(i.cost||0),0),
+    byDepartment: spendByDepartment,
+    departmentCoverageNote: 'Department breakdown covers initiative-linked costs only — standalone expense line items have no department field.',
+  };
+
+  // Metricool posts for this month — real media matched back to our own
+  // initiatives via postLink ↔ providers[].publicUrl.
+  const imageMap = {};
+  const competitors = {};
+  if(METRICOOL_SETTINGS.apiToken && METRICOOL_SETTINGS.blogId) {
+    try {
+      const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
+      const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
+      const [ry, rm] = reportMonth.split('-').map(Number);
+      const lastDay = new Date(ry, rm, 0).getDate();
+      const start = encodeURIComponent(`${reportMonth}-01T00:00:00`);
+      const end   = encodeURIComponent(`${reportMonth}-${String(lastDay).padStart(2,'0')}T23:59:59`);
+      const url = `${METRICOOL_API_BASE}/v2/scheduler/posts?userId=${userId}&blogId=${blogId}&start=${start}&end=${end}&timezone=Asia%2FRiyadh`;
+      const res = await fetch(url, { headers: authHeaders });
+      if(res.ok) {
+        const body = await res.json();
+        const postsByUrl = {};
+        (body.data||[]).forEach(post => { (post.providers||[]).forEach(p => { if(p.publicUrl) postsByUrl[airNormalizeUrl(p.publicUrl)] = post; }); });
+        departmentData.forEach(deptBlock => {
+          const candidates = [];
+          deptBlock.initiatives.forEach(init => {
+            if(!init.postLink) return;
+            const match = postsByUrl[airNormalizeUrl(init.postLink)];
+            if(!match) return;
+            const imageUrl = (match.media||[]).find(u => !u.toLowerCase().endsWith('.mp4'));
+            if(imageUrl) imageMap[init.id] = imageUrl;
+            candidates.push({ initiativeId: init.id, title: init.title, caption: (match.text||init.captionEN||'').slice(0,200), hasImage: !!imageUrl });
+          });
+          deptBlock.candidates = candidates.slice(0,4);
+        });
+      } else { dataGaps.push('Could not fetch social post content from Metricool this run'); }
+    } catch(e) { dataGaps.push('Could not fetch social post content from Metricool this run'); }
+
+    // Competitor analysis — per network, tolerant of empty/failed networks.
+    const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
+    const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
+    const [cy, cm] = reportMonth.split('-').map(Number);
+    const cLastDay = new Date(cy, cm, 0).getDate();
+    const from = encodeURIComponent(`${reportMonth}-01T00:00:00`);
+    const to   = encodeURIComponent(`${reportMonth}-${String(cLastDay).padStart(2,'0')}T23:59:59`);
+    const networks = [
+      { api:'instagram', ourFollowers:'instagram_followers', ourEngagementRate:'instagram_engagement_rate', ourLikesTotal:'instagram_likes', ourCommentsTotal:'instagram_comments' },
+      { api:'tiktok',    ourFollowers:null, ourEngagementRate:null, ourLikesTotal:null, ourCommentsTotal:null },
+      { api:'linkedin',  ourFollowers:'linkedin_followers', ourEngagementRate:null, ourLikesTotal:null, ourCommentsTotal:null },
+      { api:'twitter',   ourFollowers:'twitter_followers', ourEngagementRate:null, ourLikesTotal:null, ourCommentsTotal:null },
+    ];
+    for(const net of networks) {
+      try {
+        const curl = `${METRICOOL_API_BASE}/v2/analytics/competitors/${net.api}?userId=${userId}&blogId=${blogId}&from=${from}&to=${to}&timezone=Asia%2FRiyadh&limit=10`;
+        const cres = await fetch(curl, { headers: authHeaders });
+        if(!cres.ok) { dataGaps.push(`Competitor data for ${net.api} unavailable this run`); continue; }
+        const cbody = await cres.json();
+        const tracked = cbody.data || [];
+        if(!tracked.length) continue; // nothing tracked on this network in Metricool — not a gap, just not configured
+        competitors[net.api] = {
+          tracked: tracked.map(c => ({ name:c.displayName, followers:c.followers, avgLikes:c.likes, avgComments:c.comments, engagementRate:c.engagement })),
+          ours: {
+            followers: net.ourFollowers ? mv(net.ourFollowers, reportMonth) : null,
+            engagementRate: net.ourEngagementRate ? mv(net.ourEngagementRate, reportMonth) : null,
+            totalLikes: net.ourLikesTotal ? mv(net.ourLikesTotal, reportMonth) : null,
+            totalComments: net.ourCommentsTotal ? mv(net.ourCommentsTotal, reportMonth) : null,
+          },
+        };
+      } catch(e) { dataGaps.push(`Competitor data for ${net.api} unavailable this run`); }
+    }
+  } else {
+    dataGaps.push('Metricool not connected — no post images or competitor data in this report');
+  }
+
+  return { reportMonth, priorMonth, departmentData, kpiRows, spend, imageMap, competitors, dataGaps };
+}
+
+function buildAiReportPrompt(reportData, brief) {
+  const bv = BRAND_VOICE || {};
+  const systemPrompt = `You are a senior marketing strategist and analyst preparing a monthly executive report for the board of IMC (International Medical Center), a private healthcare group in Saudi Arabia. Your audience is board members, not the marketing team — write with that authority and brevity. Follow this exact brand voice for terminology, not tone (this is an analytical document, not a social caption):
+TONE & CULTURAL CONTEXT: ${bv.toneNotes || 'Respectful, family-oriented, non-alarmist.'}
+WORDS/PHRASES TO NEVER USE: ${bv.avoidWords || 'guaranteed, cure, miracle, best in Jeddah, #1'}
+
+CRITICAL RULES:
+- You are given pre-computed numbers. Never invent, recompute, or restate a number differently than given — only interpret and explain what's already provided.
+- When selecting content to highlight for a department, only use "initiativeId" values from that department's given "candidates" list — never invent an ID.
+- Prioritize genuinely strategic, specific insight over generic filler or restating the brief back. Ground every insight and recommendation in a specific number from the data.
+- The "outlook" section must be clearly qualitative/directional commentary based on the given trend, never framed as a statistical projection or guarantee.
+- Respond ONLY with valid JSON, no markdown formatting, no code fences, no preamble.`;
+
+  const userPrompt = `Board Brief (read carefully — reflect this in your insights and prioritize the board's stated priorities/questions):
+${brief.text}
+
+Report month: ${reportData.reportMonth} (compared against ${reportData.priorMonth})
+
+DEPARTMENT DATA:
+${JSON.stringify(reportData.departmentData.map(d => ({
+  department: d.department, leadsThisMonth: d.leadsThisMonth, leadsLastMonth: d.leadsLastMonth,
+  bookedThisMonth: d.bookedThisMonth, initiativeCount: d.initiatives.length,
+  candidates: d.candidates,
+})), null, 2)}
+
+KPI PERFORMANCE (thisMonth/lastMonth/ytd/target):
+${JSON.stringify(reportData.kpiRows, null, 2)}
+
+SPEND:
+${JSON.stringify(reportData.spend, null, 2)}
+
+COMPETITIVE POSITIONING (ours vs tracked competitors, per network — "ours.totalLikes/totalComments" are month totals, competitor "avgLikes/avgComments" are per-post averages, not directly comparable — treat as directional):
+${JSON.stringify(reportData.competitors, null, 2)}
+
+DATA GAPS THIS RUN (acknowledge briefly where relevant, don't dwell):
+${JSON.stringify(reportData.dataGaps)}
+
+Return JSON in exactly this shape:
+{
+  "executiveSummary": "3-5 sentences, quantified, compares this month vs last month overall",
+  "departmentHighlights": [
+    { "department": "string", "whatShipped": "2-4 sentences", "leadsNarrative": "1-2 sentences interpreting the MoM lead trend",
+      "notableContent": [ { "initiativeId": "must be a given candidate ID for this department", "note": "1 sentence" } ] }
+  ],
+  "kpiPerformance": [
+    { "metric": "Views|Impressions / Reach|Engagements|Website Visitors|Leads Generated|Bookings", "note": "1 sentence interpreting this KPI's trajectory" }
+  ],
+  "spend": { "narrative": "string" },
+  "competitivePositioning": { "narrative": "string" },
+  "strategicInsights": [
+    { "insight": "string", "whyItMatters": "string", "recommendedAction": "string", "priority": "high|medium|low" }
+  ],
+  "outlook": { "narrative": "string — explicitly directional/qualitative, not a statistical projection" }
+}`;
+
+  return { systemPrompt, userPrompt };
+}
+
+async function callClaudeForAiReport(reportData, brief) {
+  if(!ANTHROPIC_API_KEY) {
+    throw new Error('No API key configured — open "🔑 AI Setup" in the Content Generator tab first');
+  }
+  const { systemPrompt, userPrompt } = buildAiReportPrompt(reportData, brief);
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-5",
+      max_tokens: 8000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(()=> '');
+    if(response.status === 401) throw new Error('Invalid API key — check AI Setup in Content Generator tab');
+    if(response.status === 429) throw new Error('Rate limit reached — wait a moment and try again');
+    throw new Error(`API error ${response.status}: ${errBody.substring(0,150)}`);
+  }
+  const data = await response.json();
+  const textBlock = data.content?.find(b => b.type === 'text');
+  if (!textBlock) throw new Error('No text response from Claude');
+  const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
+  let parsed;
+  try { parsed = JSON.parse(cleaned); }
+  catch(e) { throw new Error('Could not parse AI response — try regenerating'); }
+  return parsed;
+}
+
+window.generateAiReport = async function() {
+  const month = document.getElementById('air-month').value;
+  const briefText = document.getElementById('air-brief-text').value.trim();
+  if(!month) { showToast('Pick a report month first', true); return; }
+  if(!briefText) { showToast('Write a board brief first', true); return; }
+  if(!ANTHROPIC_API_KEY) { showToast('No API key configured — open "🔑 AI Setup" in the Content Generator tab first', true); return; }
+
+  const departments = [...document.querySelectorAll('#air-departments .chip.active')].map(c=>c.dataset.val);
+  const brief = { month, text: briefText, departments };
+
+  const btn = document.getElementById('air-generate-btn');
+  const statusEl = document.getElementById('air-status');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  statusEl.style.display = 'block'; statusEl.style.color = 'var(--text-3)';
+  try {
+    statusEl.textContent = 'Gathering initiatives, leads & spend…';
+    const reportData = await assembleAiReportData(brief);
+    statusEl.textContent = 'Writing your report with Claude…';
+    const report = await callClaudeForAiReport(reportData, brief);
+    AIR_REPORT = report;
+    AIR_REPORT_DATA = reportData;
+    renderAiReport(report, reportData);
+    document.getElementById('air-brief-section').style.display = 'none';
+    document.getElementById('air-report-section').style.display = 'block';
+    statusEl.style.display = 'none';
+  } catch(e) {
+    statusEl.textContent = 'Generation failed: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate Report';
+  }
+}
+
+function renderAiReport(report, reportData) {
+  const monthLabel = new Date(reportData.reportMonth+'-01').toLocaleString('en',{month:'long',year:'numeric'});
+  const priorityColor = p => p==='high' ? 'var(--red)' : p==='medium' ? 'var(--orange)' : 'var(--green)';
+
+  let html = `<div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px">IMC Executive Report — ${monthLabel}</div>`;
+  html += `<div style="font-size:12px;color:var(--text-3);margin-bottom:20px">Generated ${new Date().toLocaleDateString('en',{day:'numeric',month:'long',year:'numeric'})}</div>`;
+
+  html += `<div class="cgen-section-label">Executive Summary</div>`;
+  html += `<p style="font-size:13px;line-height:1.7;color:var(--text-2)">${report.executiveSummary||''}</p>`;
+
+  html += `<div class="cgen-section-label">KPI Performance</div>`;
+  html += `<table class="air-kpi-table"><thead><tr><th>Metric</th><th>This Month</th><th>Last Month</th><th>YTD</th><th>Annual Goal</th><th>% to Goal</th></tr></thead><tbody>`;
+  reportData.kpiRows.forEach(row => {
+    const note = (report.kpiPerformance||[]).find(k=>k.metric===row.metric)?.note || '';
+    const pct = row.target ? Math.round(row.ytd/row.target*100) : null;
+    html += `<tr><td><strong>${row.metric}</strong>${note?`<div style="font-size:11px;color:var(--text-3);font-weight:400;margin-top:2px">${note}</div>`:''}</td>
+      <td>${fmtSAR(row.thisMonth)}</td><td>${fmtSAR(row.lastMonth)}</td><td>${fmtSAR(row.ytd)}</td>
+      <td>${row.target?fmtSAR(row.target):'—'}</td><td>${pct!==null?pct+'%':'—'}</td></tr>`;
+  });
+  html += `</tbody></table>`;
+
+  html += `<div class="cgen-section-label">Department Highlights</div>`;
+  (report.departmentHighlights||[]).forEach(dh => {
+    const deptData = reportData.departmentData.find(d=>d.department===dh.department);
+    html += `<div class="cgen-card" style="margin-bottom:14px">
+      <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px">${dh.department}</div>
+      <p style="font-size:12px;line-height:1.6;color:var(--text-2);margin-bottom:8px">${dh.whatShipped||''}</p>
+      <p style="font-size:12px;line-height:1.6;color:var(--text-2);margin-bottom:10px"><strong>Leads:</strong> ${deptData?deptData.leadsThisMonth:0} this month vs ${deptData?deptData.leadsLastMonth:0} last month — ${dh.leadsNarrative||''}</p>`;
+    if((dh.notableContent||[]).length) {
+      html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">`;
+      dh.notableContent.forEach(nc => {
+        const img = reportData.imageMap[nc.initiativeId];
+        html += `<div>${img?`<img src="${img}" style="width:100%;border-radius:8px;margin-bottom:4px;display:block" loading="lazy">`:''}<div style="font-size:11px;color:var(--text-3)">${nc.note||''}</div></div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  });
+
+  html += `<div class="cgen-section-label">Spend</div>`;
+  html += `<table class="air-kpi-table"><tbody>
+    <tr><td>This Month</td><td>${fmtSAR(reportData.spend.thisMonth)} SAR</td></tr>
+    <tr><td>Last Month</td><td>${fmtSAR(reportData.spend.lastMonth)} SAR</td></tr>
+  </tbody></table>`;
+  html += `<p style="font-size:13px;line-height:1.7;color:var(--text-2)">${report.spend?.narrative||''}</p>`;
+  html += `<div style="font-size:11px;color:var(--text-3);margin-bottom:16px">${reportData.spend.departmentCoverageNote}</div>`;
+
+  html += `<div class="cgen-section-label">Competitive Positioning</div>`;
+  const networksWithData = Object.keys(reportData.competitors);
+  if(!networksWithData.length) {
+    html += `<div style="font-size:12px;color:var(--text-3);margin-bottom:12px">No competitor data available this month.</div>`;
+  } else {
+    networksWithData.forEach(net => {
+      const c = reportData.competitors[net];
+      html += `<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin:12px 0 6px">${net}</div>`;
+      html += `<table class="air-kpi-table"><thead><tr><th>Account</th><th>Followers</th><th>Avg Likes/Post</th><th>Avg Comments/Post</th></tr></thead><tbody>`;
+      html += `<tr><td><strong>IMC (ours)</strong></td><td>${c.ours.followers!==null?fmtSAR(c.ours.followers):'—'}</td><td>${c.ours.totalLikes!==null?fmtSAR(c.ours.totalLikes)+' (month total)':'—'}</td><td>${c.ours.totalComments!==null?fmtSAR(c.ours.totalComments)+' (month total)':'—'}</td></tr>`;
+      c.tracked.forEach(t => {
+        html += `<tr><td>${t.name}</td><td>${fmtSAR(t.followers)}</td><td>${t.avgLikes!==null&&t.avgLikes!==undefined?t.avgLikes.toFixed(1):'—'}</td><td>${t.avgComments!==null&&t.avgComments!==undefined?t.avgComments.toFixed(1):'—'}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    });
+  }
+  html += `<p style="font-size:13px;line-height:1.7;color:var(--text-2)">${report.competitivePositioning?.narrative||''}</p>`;
+
+  html += `<div class="cgen-section-label">Strategic Insights & Recommended Actions</div>`;
+  (report.strategicInsights||[]).forEach(si => {
+    html += `<div class="air-insight-card" style="border-left-color:${priorityColor(si.priority)}">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">${si.insight||''}</div>
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">${si.whyItMatters||''}</div>
+      <div style="font-size:12px;color:var(--navy);font-weight:600">→ ${si.recommendedAction||''}</div>
+    </div>`;
+  });
+
+  html += `<div class="air-outlook-box">
+    <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--navy);margin-bottom:6px">Directional Outlook — Not a Statistical Forecast</div>
+    <p style="font-size:13px;line-height:1.7;color:var(--text-2)">${report.outlook?.narrative||''}</p>
+  </div>`;
+
+  if(reportData.dataGaps.length) {
+    html += `<div style="font-size:11px;color:var(--text-3);border-top:1px solid var(--border);padding-top:10px;margin-top:16px">
+      <strong>Data Completeness:</strong> ${reportData.dataGaps.join(' · ')}
+    </div>`;
+  }
+
+  document.getElementById('air-report-output').innerHTML = html;
+}
+
+window.backToAiReportBrief = function() {
+  document.getElementById('air-report-section').style.display = 'none';
+  document.getElementById('air-brief-section').style.display = 'block';
+}
+
+window.downloadAiReport = function() {
+  const prevTitle = document.title;
+  const monthLabel = AIR_REPORT_DATA ? new Date(AIR_REPORT_DATA.reportMonth+'-01').toLocaleString('en',{month:'long',year:'numeric'}) : '';
+  document.title = `IMC AI Report — ${monthLabel}`;
+  window.onafterprint = () => { document.title = prevTitle; window.onafterprint = null; };
+  window.print();
 }
 
 // ── SETTINGS TAB — Department Revenue Estimates ──────────────────────────

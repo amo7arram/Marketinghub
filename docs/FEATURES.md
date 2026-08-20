@@ -40,6 +40,13 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Review screen — every generated piece editable/removable before saving
 - On save: creates one parent Campaign + one child activity per approved piece, correctly linked via `parentCampaignId`
 
+### AI Reports
+- Generates a board-ready monthly executive report: admin picks a report month, an optional department focus (auto-selects the most active departments if left blank), and writes a free-text board brief (priorities, context the data can't infer, specific questions to address) — the brief steers the report's emphasis rather than a fixed template
+- One AI call (`claude-opus-5`, the one place in the app where output quality is prioritized over cost) turns real, pre-computed data into narrative: Executive Summary, per-department highlights (with real screenshots pulled from actual published social posts, matched to the department's own initiatives via `postLink`), KPI Performance vs. last month and vs. annual goal, Spend, Competitive Positioning (IMC vs. named competitors tracked in Metricool), Strategic Insights & Recommended Actions, and a Directional Outlook explicitly labeled as qualitative commentary, not a statistical forecast
+- **Every number is computed in JavaScript before the AI call and rendered straight from that data — never round-tripped through the model** — so the report's KPI table can never disagree with the live public BD KPI Progress tracker; Claude supplies narrative and judgment only (including which real post images to feature), never arithmetic
+- **Nothing is saved.** Purely ephemeral — the "🖨️ Download (Print to PDF)" button uses the browser's own print dialog against a dedicated print stylesheet; re-generating or navigating away discards the report
+- Degrades gracefully: a report still generates with no images/competitor section if Metricool isn't connected, and any individual failed sub-fetch (one competitor network, the post-media call) is noted in a "Data Completeness" footer rather than failing the whole report
+
 ### Business Development
 - BD card CRUD (partnerships, outreach activities)
 - Annual KPI targets (views, impressions, engagements, website visitors, leads, bookings) — actuals computed live: Views/Impressions/Engagements from `config/metricool_stats`, Leads/Bookings from the real `leads` collection via `config/lead_stats`, Website Visitors from a manual monthly entry (the only figure still without an automated source — see Dashboard Metrics below)
