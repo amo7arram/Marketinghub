@@ -1,0 +1,139 @@
+rules_version = '2';
+
+// Source of truth for this project's Firestore security rules — mirror any
+// change here into Firebase Console → Firestore Database → Rules (there's no
+// CLI deploy wired up for this repo, so this file and Console must be kept
+// in sync manually; see docs/ARCHITECTURE.md §4.2).
+//
+// Two patterns are used throughout (see CLAUDE.md):
+//   - Public read, authenticated write: anything the public portal (index.html)
+//     needs to display, or that must be readable *before* a user logs in
+//     (e.g. the Magic Word passcode hash, the public access gate password).
+//   - Authenticated read and write: PII or internal-only data.
+//
+// `config` is a single collection holding several unrelated documents
+// (see docs/DATA_MODEL.md's "config" section) — each one needs its own
+// explicit rule below. A blanket `match /config/{doc}` rule is exactly the
+// bug that exposed the Anthropic API key earlier: Firestore rules are OR'd
+// across every matching block, so a blanket public-read rule silently wins
+// over a more specific authenticated-only rule for the same path. Never
+// reintroduce a blanket config rule — add a new document below instead.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── PUBLIC READ, AUTHENTICATED WRITE ─────────────────────────────────
+    match /initiatives/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /metrics/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /resources/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /promotions/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /bd_cards/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /wellspan_packages/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /loyalty_cards/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /entities/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /health_days/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ── AUTHENTICATED READ AND WRITE (PII / internal-only) ───────────────
+    match /requests/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /expenses/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /leads/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /team_members/{doc} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // ── ROLES — write restricted to existing admins only ─────────────────
+    match /roles/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null &&
+        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ── CONFIG — one explicit rule per document, never a blanket rule ────
+    match /config/access_gate {
+      // Must be public-read: index.html checks this gate before login exists.
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config/admin_passcode {
+      // Must be public-read: the Magic Word login flow reads this hash
+      // BEFORE the visitor is authenticated — that's the entire point of a
+      // passcode-based pre-auth login path. Only a SHA-256 hash is stored
+      // here, never the plaintext, so public read is an acceptable tradeoff.
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config/lead_stats {
+      // Public-readable aggregate, zero PII by design (see DATA_MODEL.md).
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config/metricool_stats {
+      // Public-readable aggregate, zero PII by design (see DATA_MODEL.md).
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config/budget {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /config/bd_targets {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /config/brand_voice {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /config/ai_settings {
+      // Raw Anthropic API key — same sensitivity as metricool_settings below.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /config/metricool_settings {
+      // Raw Metricool API token — same sensitivity as ai_settings above.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /config/department_revenue_estimates {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}

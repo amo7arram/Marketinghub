@@ -75,6 +75,10 @@ Every collection follows one of two patterns:
 
 `roles` itself has a special rule: only an existing admin can write a new role document (checked via a Firestore rule that reads the requester's own role before allowing the write), preventing privilege escalation.
 
+The `config` collection is the one exception to "one rule per collection" — it holds several unrelated single documents (see `DATA_MODEL.md`), each needing its own explicit per-document rule rather than one blanket collection rule. A blanket `config` rule caused a real incident: it silently exposed `ai_settings` (the Anthropic API key) and `admin_passcode` publicly, because Firestore rules are OR'd across every matching block — a broad `allow read: if true` on the collection wins over a narrower authenticated-only rule on the same document path. `admin_passcode` also has to stay genuinely public-read (it only ever stores a SHA-256 hash) since the Magic Word login flow reads it before the visitor is authenticated — that's the entire point of a passcode-based pre-auth path.
+
+**Rules are now versioned in `firestore.rules` at the repo root**, with inline comments explaining each pattern and the reasoning above. This is the source of truth going forward — Firebase Console must be kept manually in sync with it (no CLI deploy is wired up for this repo), but at least changes are now diffable and reviewable instead of living invisibly in the Console only.
+
 ### 4.3 Team Member Account Creation
 
 Real Firebase Auth accounts are created **client-side**, using a secondary Firebase app instance (`initializeApp(config, "secondary-<timestamp>")`) so creating a new user doesn't sign out the admin performing the action. This is a legitimate, documented Firebase pattern for client-only apps without a backend — but it means the API key and this creation logic are visible to anyone with admin-level browser access. Acceptable for a small trusted internal team; **not** acceptable at SaaS scale, where this must move to a server-side Admin SDK call.

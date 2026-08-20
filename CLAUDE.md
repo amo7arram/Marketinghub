@@ -49,7 +49,7 @@ There is no CI/CD. Changes are deployed by pushing to the `main` branch (or whic
 
 ## Firestore security rules
 
-Rules live in the Firebase Console, not in this repo (consider migrating them into a `firestore.rules` file in this repo for version control — currently a gap). Two patterns are used throughout:
+Rules are versioned in `firestore.rules` at the repo root — that file is the source of truth. Firebase Console must be kept manually in sync with it (no CLI deploy is wired up for this repo), but changes are now diffable and reviewable instead of living invisibly in the Console only. Two patterns are used throughout:
 - Public-readable collections: `allow read: if true; allow write: if request.auth != null;`
 - Fully authenticated collections (PII, internal data): `allow read: if request.auth != null; allow write: if request.auth != null;`
 
