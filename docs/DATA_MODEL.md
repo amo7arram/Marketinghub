@@ -180,9 +180,9 @@ Standalone budget line items (distinct from `initiatives.cost`, which tracks cos
 
 ---
 
-## `metrics` — ⚠️ legacy, retired
+## `metrics` — ⚠️ legacy, one field still actively written
 
-Monthly social media / website performance snapshots, formerly entered manually in admin.
+Monthly social media / website performance snapshots, formerly entered manually in admin for every metric.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -191,7 +191,11 @@ Monthly social media / website performance snapshots, formerly entered manually 
 | `value` | number | |
 | `createdAt` | Timestamp | |
 
-**Superseded by `config/metricool_stats` (below).** As of the Metricool integration, `admin.html`'s Dashboard Metrics tab and `index.html`'s Social Media Performance / SM Analytics sections no longer read or write this collection — social metrics are now synced automatically from Metricool instead of typed in by hand. Existing documents are left in place untouched (same treatment as the legacy `hdCategory` field above) rather than deleted. **One exception:** `index.html`'s Business Development KPI Progress tracker (`renderBdKpiProgress()`, tracks actuals against `config/bd_targets`) still reads this collection — it was out of scope for the Metricool redesign, so those numbers are now frozen at whatever was last manually entered before the switchover, since there is no longer any admin UI that writes here. This needs a follow-up decision (migrate it to Metricool series too, where the metric exists, or restore a small manual-entry path for `Website Visits` and other non-Metricool figures it depends on).
+**Superseded by `config/metricool_stats` for everything Metricool can supply.** As of the Metricool integration, `admin.html`'s Dashboard Metrics tab and `index.html`'s Social Media Performance / SM Analytics sections no longer read or write most of this collection — social metrics are synced automatically from Metricool instead of typed in by hand. Existing documents for retired metric names are left in place untouched (same treatment as the legacy `hdCategory` field above) rather than deleted.
+
+**One metric name is still actively written: `Website Visits`.** Metricool has no web-analytics equivalent (it's a social scheduling/analytics tool, not a site-analytics one), so this is the one BD KPI target with no automated source anywhere. `admin.html`'s Dashboard Metrics tab has a small dedicated "Website Visitors" input, separate from the Metricool grid, that writes only this metric name here via the existing `saveMonthMetrics()`/deterministic-ID pattern — nothing else in current code reads or writes any other `metricName` in this collection.
+
+`index.html`'s Business Development KPI Progress tracker (`renderBdKpiProgress()`, tracks actuals against `config/bd_targets`) was previously frozen because it read this whole collection, which had stopped being written to except by nothing. It's now been fixed to source each KPI from the appropriate live place: Views/Impressions/Engagements from `config/metricool_stats` (see the series structure below), Leads/Bookings from `config/lead_stats` (the real `leads` collection — replacing the old manually-typed `leadsGenerated`/`estimatedBookings` fields on `initiatives`/`promotions`/`bd_cards`, which nobody had kept updated), and Website Visitors from this collection's one remaining live field. This did narrow two KPIs' real-world coverage versus their old (but frozen) numbers: "Impressions/Reach" no longer includes X Reach, and "Engagements" no longer includes TikTok engagement — neither is available from Metricool's API at all (confirmed via live testing, not assumed from docs). A real, narrower number was judged better than a broader one that silently never changes.
 
 ---
 
@@ -264,7 +268,7 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 
 ## `config/lead_stats` — aggregate structure
 
-Computed by `computeAndPublishLeadStats()` in `admin.html` (debounced, re-runs whenever `leads`/`department_revenue_estimates` change) from the real `leads` collection — never from the manually-entered `initiatives.leadsGenerated`/`promotions.leadsGenerated` fields, which are a separate, easily-stale figure used only by the Business Development KPI Progress tracker.
+Computed by `computeAndPublishLeadStats()` in `admin.html` (debounced, re-runs whenever `leads`/`department_revenue_estimates` change) from the real `leads` collection — never from the manually-entered `initiatives.leadsGenerated`/`estimatedBookings` (or the equivalent fields on `promotions`/`bd_cards`), which are a separate, easily-stale figure. Those manual fields are still shown per-item on the public Business Development activity feed (`renderBdGrid()` in `index.html`) as small self-reported stats on each card, but the site-wide Business Development KPI Progress tracker now reads `byMonth` here instead of summing them — see the `metrics` collection section above.
 
 ```
 config/lead_stats = {

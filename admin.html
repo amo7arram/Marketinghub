@@ -303,27 +303,27 @@ tr.row-done:hover td{background:#DCF2E5}
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px">
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Views Target</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Views Target <span style="font-weight:400;color:var(--text-3)" title="Actual = Instagram Reel Views + TikTok Views, from Metricool">ⓘ</span></label>
             <input class="filter-input" type="number" id="bdt-views" placeholder="e.g. 500000" style="width:100%;padding:8px 10px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Impressions / Reach Target</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Impressions / Reach Target <span style="font-weight:400;color:var(--text-3)" title="Actual = Instagram Reach + LinkedIn Impressions, from Metricool. X Reach isn't available via Metricool's API, so it's not included.">ⓘ</span></label>
             <input class="filter-input" type="number" id="bdt-impressions" placeholder="e.g. 1000000" style="width:100%;padding:8px 10px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Engagements Target</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Engagements Target <span style="font-weight:400;color:var(--text-3)" title="Actual = Instagram Likes + Comments, from Metricool. TikTok engagement isn't available via Metricool's API, so it's not included.">ⓘ</span></label>
             <input class="filter-input" type="number" id="bdt-engagements" placeholder="e.g. 50000" style="width:100%;padding:8px 10px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Website Visitors Target</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Website Visitors Target <span style="font-weight:400;color:var(--text-3)" title="No automated source — actual comes from the manual monthly entry in Dashboard Metrics">ⓘ</span></label>
             <input class="filter-input" type="number" id="bdt-website" placeholder="e.g. 120000" style="width:100%;padding:8px 10px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Leads Generated Target</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Leads Generated Target <span style="font-weight:400;color:var(--text-3)" title="Actual = real leads collection total, via config/lead_stats">ⓘ</span></label>
             <input class="filter-input" type="number" id="bdt-leads" placeholder="e.g. 5000" style="width:100%;padding:8px 10px">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Estimated Bookings Target</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Bookings Target <span style="font-weight:400;color:var(--text-3)" title="Actual = real count of leads with Outcome = Booked, via config/lead_stats">ⓘ</span></label>
             <input class="filter-input" type="number" id="bdt-bookings" placeholder="e.g. 2000" style="width:100%;padding:8px 10px">
           </div>
         </div>
@@ -1465,6 +1465,7 @@ import {
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
   getMetricoolSettings, setMetricoolSettings, watchMetricoolSettings,
   getMetricoolStats, setMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
+  saveMonthMetrics as saveLegacyMonthMetrics, getMetricsForPeriod as getLegacyMetricsForPeriod,
   getAccessGate, setAccessGate, hashPassword,
   getAdminPasscode, setAdminPasscode,
   watchTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember, createTeamMemberWithLogin,
@@ -2835,7 +2836,9 @@ async function loadMetricsForPeriod() {
 
   const valueMap = {};
   Object.keys(METRICOOL_SERIES).forEach(key => { valueMap[key] = metricoolMonthlyValue(METRICOOL_STATS, key, period); });
-  loadedMetricValues = { ...valueMap }; // snapshot for change detection on save
+  const legacyMetrics = await getLegacyMetricsForPeriod(period);
+  const websiteVisitsDoc = legacyMetrics.find(m => m.metricName === 'Website Visits');
+  loadedMetricValues = { ...valueMap, websiteVisits: websiteVisitsDoc ? websiteVisitsDoc.value : null }; // snapshot for change detection on save
 
   const byNetwork = {};
   Object.entries(METRICOOL_SERIES).forEach(([key, def]) => {
@@ -2863,6 +2866,18 @@ async function loadMetricsForPeriod() {
       </div>
     </div>`;
   });
+  html += `<div style="padding:12px 20px">
+    <div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">🌐 Website <span style="text-transform:none;font-weight:400;letter-spacing:0">— manual entry, no automated source</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px">Website Visitors</label>
+        <input class="filter-input" type="number" min="0" step="any"
+          id="metric-input-websiteVisits"
+          value="${websiteVisitsDoc ? websiteVisitsDoc.value : ''}" placeholder="—"
+          style="width:100%;padding:7px 10px;font-size:13px;font-weight:600">
+      </div>
+    </div>
+  </div>`;
   document.getElementById('metrics-grid-wrap').innerHTML = html;
   // Reset save status indicators when loading new month
   ['metrics-save-status','metrics-save-error','metrics-saving-indicator'].forEach(id=>{
@@ -2887,6 +2902,13 @@ window.saveMonthMetrics = async function() {
     series[key] = [...withoutThisMonth, { date: lastDay, value: val, source: 'manual' }]
       .sort((a,b) => a.date.localeCompare(b.date));
   });
+
+  const wvEl = document.getElementById('metric-input-websiteVisits');
+  const wvVal = (wvEl && wvEl.value !== '') ? parseFloat(wvEl.value) : null;
+  const wvPrev = loadedMetricValues.websiteVisits;
+  const wvChanged = wvVal !== null && !(wvPrev !== null && wvPrev !== undefined && Number(wvPrev) === wvVal);
+  if(wvChanged) changedCount++;
+
   if(changedCount === 0) { showToast('No changes to save — values match what\'s already shown', true); return; }
 
   const statusEl  = document.getElementById('metrics-save-status');
@@ -2899,6 +2921,7 @@ window.saveMonthMetrics = async function() {
   try {
     METRICOOL_STATS = { ...(METRICOOL_STATS||{}), series };
     await setMetricoolStats(METRICOOL_STATS);
+    if(wvChanged) await saveLegacyMonthMetrics(period, { 'Website Visits': wvVal });
     savingEl.style.display = 'none';
     statusEl.style.display = 'inline';
     setTimeout(() => { statusEl.style.display='none'; }, 5000);

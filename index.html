@@ -1910,31 +1910,44 @@ function renderBdKpiProgress() {
     return;
   }
 
-  // YTD actuals from METRICS — sum all 2026 periods
+  // Social KPIs — live from Metricool (config/metricool_stats), summed across YTD months.
+  // Narrower than the old metrics-collection numbers on purpose: X Reach and TikTok
+  // Engagement aren't available from Metricool's API at all (confirmed via live testing,
+  // see docs/DATA_MODEL.md), so they're dropped rather than silently left frozen.
   const year = new Date().getFullYear();
-  const ytdMetrics = METRICS.filter(m=>(m.period||'').startsWith(String(year)));
-  function ytdSum(name) {
-    return ytdMetrics.filter(m=>m.metricName===name).reduce((s,m)=>s+(m.value||m.currentValue||0),0);
+  function ytdMetricoolSum(seriesKey) {
+    let sum = 0;
+    for (let m = 1; m <= 12; m++) {
+      const period = `${year}-${String(m).padStart(2,'0')}`;
+      const val = metricoolMonthlyValue(METRICOOL_STATS, seriesKey, period);
+      if (val !== null && val !== undefined) sum += val;
+    }
+    return sum;
   }
 
-  // Leads and bookings — sum from ALL sources: BD cards, ALL initiatives
-  // (any type, not just BD-featured), and promotions. This must match the
-  // dashboard's leads chart total exactly, or the two pages disagree.
-  const allLeadSources = [
-    ...BD_CARDS,
-    ...ALL,        // every initiative type: Campaign, Event, SM Content, Print, Health Day
-    ...PROMOTIONS,
-  ];
-  const totalLeads    = allLeadSources.reduce((s,i)=>s+(i.leadsGenerated||0),0);
-  const totalBookings = allLeadSources.reduce((s,i)=>s+(i.estimatedBookings||0),0);
+  // Website Visitors — Metricool has no web-analytics equivalent, so this is still a
+  // manual monthly figure (admin.html Dashboard Metrics tab writes it to the legacy
+  // `metrics` collection — the only metric that collection still receives).
+  const ytdMetrics = METRICS.filter(m=>(m.period||'').startsWith(String(year)));
+  const websiteVisitorsYTD = ytdMetrics.filter(m=>m.metricName==='Website Visits').reduce((s,m)=>s+(m.value||0),0);
+
+  // Leads and bookings — live from the real leads collection via config/lead_stats,
+  // not the manually-typed leadsGenerated/estimatedBookings fields on initiatives/
+  // promotions/bd_cards, which nobody has kept updated since real lead tracking moved
+  // to the Leads CRM (see docs/DATA_MODEL.md's config/lead_stats note).
+  const byMonth = (LEAD_STATS && LEAD_STATS.byMonth) || {};
+  let totalLeads = 0, totalBookings = 0;
+  Object.entries(byMonth).forEach(([period, m]) => {
+    if (period.startsWith(String(year))) { totalLeads += m.total||0; totalBookings += m.booked||0; }
+  });
 
   const kpis = [
-    { label:'Views',              actual: ytdSum('Instagram Views')+ytdSum('TikTok Views'),                       target: BD_TARGETS.views            ||0 },
-    { label:'Impressions / Reach',actual: ytdSum('Instagram Reach')+ytdSum('X Reach')+ytdSum('LinkedIn Reach'),  target: BD_TARGETS.impressions       ||0 },
-    { label:'Engagements',        actual: ytdSum('Instagram Engagements')+ytdSum('TikTok Engagements'),          target: BD_TARGETS.engagements       ||0 },
-    { label:'Website Visitors',   actual: ytdSum('Website Visits'),                                              target: BD_TARGETS.websiteVisitors   ||0 },
-    { label:'Leads Generated',    actual: totalLeads,                                                            target: BD_TARGETS.leadsGenerated    ||0 },
-    { label:'Estimated Bookings', actual: totalBookings,                                                         target: BD_TARGETS.estimatedBookings ||0 },
+    { label:'Views',              actual: ytdMetricoolSum('instagram_reel_views')+ytdMetricoolSum('tiktok_video_views'), target: BD_TARGETS.views            ||0 },
+    { label:'Impressions / Reach',actual: ytdMetricoolSum('instagram_reach')+ytdMetricoolSum('linkedin_impressions'),    target: BD_TARGETS.impressions       ||0 },
+    { label:'Engagements',        actual: ytdMetricoolSum('instagram_likes')+ytdMetricoolSum('instagram_comments'),      target: BD_TARGETS.engagements       ||0 },
+    { label:'Website Visitors',   actual: websiteVisitorsYTD,                                                            target: BD_TARGETS.websiteVisitors   ||0 },
+    { label:'Leads Generated',    actual: totalLeads,                                                                    target: BD_TARGETS.leadsGenerated    ||0 },
+    { label:'Bookings',           actual: totalBookings,                                                                 target: BD_TARGETS.estimatedBookings ||0 },
   ];
 
   el.innerHTML = kpis.map(kpi=>{

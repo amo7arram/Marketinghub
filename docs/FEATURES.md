@@ -42,7 +42,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 ### Business Development
 - BD card CRUD (partnerships, outreach activities)
-- Annual KPI targets (views, impressions, engagements, website visitors, leads, bookings) — actuals computed automatically from `metrics` + `leads` + `initiatives`
+- Annual KPI targets (views, impressions, engagements, website visitors, leads, bookings) — actuals computed live: Views/Impressions/Engagements from `config/metricool_stats`, Leads/Bookings from the real `leads` collection via `config/lead_stats`, Website Visitors from a manual monthly entry (the only figure still without an automated source — see Dashboard Metrics below)
 
 ### Well-span / Loyalty
 - Package and loyalty card CRUD, shown on the corresponding public pages
@@ -80,7 +80,8 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Social/performance numbers sync automatically from Metricool ("🔄 Sync Now") — Instagram reach/engagement rate/likes/comments/reel views/followers, TikTok views, LinkedIn impressions/followers, X followers
 - Per-month manual override still available — edit any field and Save Month; that value is tagged and skipped by future syncs until cleared
 - **Not covered by Metricool** (confirmed unavailable via their API, not just unconfigured): Instagram Conversations, X Reach/Impressions, TikTok engagement, SM Messages Received, PR Mentions, Website Visits — these no longer have any entry point in this tab
-- ⚠️ The public Business Development KPI Progress tracker (index.html) still depends on the old manually-entered `metrics` collection for some of its numbers and currently has no update path — see `docs/DATA_MODEL.md`'s `metrics` section
+- **Website Visitors — manual monthly entry**, its own small section below the Metricool grid, saved together with the rest via the same "Save Month" button. Writes only the `Website Visits` metric to the legacy `metrics` collection (nothing else uses that collection anymore) — this is the one BD KPI target with no automated source anywhere, since Metricool doesn't do web analytics
+- The public Business Development KPI Progress tracker (`index.html`) now sources every KPI from a live source except Website Visitors: Views/Impressions/Engagements from `config/metricool_stats`, Leads/Bookings from `config/lead_stats` (the real `leads` collection, not the old manually-typed `leadsGenerated`/`estimatedBookings` fields on initiatives/promotions/BD cards). See `docs/DATA_MODEL.md`'s `metrics` section for the coverage trade-offs this involved.
 
 ### Settings
 - **Entities** — add/remove business entities (blocked from deletion if still referenced anywhere)
