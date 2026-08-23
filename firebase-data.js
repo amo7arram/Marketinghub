@@ -908,6 +908,24 @@ export async function normalizeAllLeadPhones() {
   return { migrated: updates.length };
 }
 
+// One-time correction for a real incident: parseExcelDate() (admin.html)
+// used to silently misread 2-digit-year dates (e.g. "8/19/01") as year 2001
+// instead of 2026 — corrupting 241 leads' dateCreated on an Excel import.
+// Fixed at the source (parseExcelDate now rejects ambiguous 2-digit years
+// instead of guessing), but existing corrupted records still need fixing.
+// Only ever shifts a "2001-" year prefix to "2026-", preserving month/day —
+// safe to run more than once, a no-op once nothing matches.
+export async function fixCorruptedLeadYears() {
+  const snap = await getDocs(collection(db, LEADS));
+  const updates = snap.docs
+    .map(d => ({ id: d.id, dateCreated: d.data().dateCreated }))
+    .filter(l => l.dateCreated && l.dateCreated.startsWith('2001-'));
+  await Promise.all(updates.map(l =>
+    updateDoc(doc(db, LEADS, l.id), { dateCreated: l.dateCreated.replace(/^2001-/, '2026-') })
+  ));
+  return { migrated: updates.length };
+}
+
 // ── LEADS ↔ GOOGLE SHEETS (live-read, on-demand sync) ─────────────────────
 // Extracts the sheet ID from any normal Google Sheets share URL.
 export function parseGoogleSheetId(url) {

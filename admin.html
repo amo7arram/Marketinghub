@@ -419,6 +419,7 @@ tr.row-done:hover td{background:#DCF2E5}
           <a class="btn" href="docs/lead-management-process.html" target="_blank" title="Reference: the end-to-end lead management process, from lead generation to revenue attribution">📋 Process Reference</a>
           <button class="btn" onclick="openMigrateLeadsPrompt()" title="One-time: converts old-style lead statuses to the new model">↻ Migrate Old Statuses</button>
           <button class="btn" onclick="openNormalizePhonesPrompt()" title="One-time: unifies phone number formatting across all leads">☎ Normalize Phone Numbers</button>
+          <button class="btn" onclick="openFixLeadYearsPrompt()" title="One-time: corrects leads whose Date Created was misread as year 2001 by a since-fixed Excel import bug">🗓 Fix Corrupted Dates</button>
           <label class="btn" style="cursor:pointer">
             📁 Upload Excel
             <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleExcelUpload(this)">
@@ -1519,7 +1520,7 @@ import {
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
-  normalizePhone, normalizeAllLeadPhones,
+  normalizePhone, normalizeAllLeadPhones, fixCorruptedLeadYears,
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
@@ -5230,6 +5231,18 @@ window.openNormalizePhonesPrompt = async function() {
   } catch(e) { showToast('Normalization failed: '+e.message, true); }
 }
 
+window.openFixLeadYearsPrompt = async function() {
+  const changing = ALL_LEADS.filter(l => l.dateCreated && l.dateCreated.startsWith('2001-'));
+  if(!changing.length) { showToast('No leads with the corrupted 2001 date found — nothing to fix ✓'); return; }
+  const examples = changing.slice(0,5).map(l => `${l.name||'(unnamed)'}: ${l.dateCreated}  →  ${l.dateCreated.replace(/^2001-/,'2026-')}`).join('\n');
+  const more = changing.length > 5 ? `\n...and ${changing.length-5} more` : '';
+  if(!confirm(`This will correct ${changing.length} lead(s) whose Date Created was misread as year 2001 (an Excel import bug, now fixed) — shifting the year to 2026 and keeping the month/day exactly as-is. Examples:\n\n${examples}${more}\n\nSafe to run more than once. Proceed?`)) return;
+  try {
+    const result = await fixCorruptedLeadYears();
+    showToast(`✓ Corrected ${result.migrated} lead date(s) — the dashboard will update automatically`);
+  } catch(e) { showToast('Correction failed: '+e.message, true); }
+}
+
 // ── Excel upload ──────────────────────────────────────────────────────────
 // Robust Excel date parser — handles ISO strings, DD/MM/YYYY, MM/DD/YYYY,
 // JS Date objects, and raw Excel serial numbers (the common causes of a
@@ -5237,19 +5250,24 @@ window.openNormalizePhonesPrompt = async function() {
 function parseExcelDate(raw) {
   if (!raw) return '';
   if (raw instanceof Date && !isNaN(raw)) {
-    return raw.toISOString().split('T')[0];
+    // Use local date components, not toISOString() — toISOString() converts
+    // to UTC first, which silently shifts the date back a day for anyone in
+    // a timezone ahead of UTC (e.g. Asia/Riyadh, UTC+3).
+    return `${raw.getFullYear()}-${String(raw.getMonth()+1).padStart(2,'0')}-${String(raw.getDate()).padStart(2,'0')}`;
   }
   const s = String(raw).trim();
   if (!s) return '';
   // Already ISO: YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
-  // Raw Excel serial number (days since 1899-12-30)
+  // Raw Excel serial number (days since 1899-12-30) — this Date is
+  // constructed directly from a computed UTC timestamp, so UTC getters are
+  // correct here (no local-timezone shift risk, unlike the branches above/below).
   if (/^\d{4,6}(\.\d+)?$/.test(s)) {
     const serial = parseFloat(s);
     const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
-    if (!isNaN(date)) return date.toISOString().split('T')[0];
+    if (!isNaN(date)) return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}`;
   }
-  // DD/MM/YYYY or DD-MM-YYYY
+  // DD/MM/YYYY or DD-MM-YYYY — 4-digit year only, deliberately.
   let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (m) {
     const [, d, mo, y] = m;
@@ -5257,9 +5275,15 @@ function parseExcelDate(raw) {
       return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
     }
   }
-  // Fallback: let the browser try
+  // A 2-digit-year date (e.g. "8/19/01") is genuinely ambiguous — never guess
+  // a century. Real incident: this silently fell through to the browser's
+  // native Date parser below, which read "01" as 2001 instead of 2026,
+  // corrupting 241 leads' dates by 25 years. Flag as unparsed instead so it's
+  // caught in the import preview ("not parsed", shown in red) before import.
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2}$/.test(s)) return '';
+  // Fallback: let the browser try, for any remaining genuinely date-like text
   const parsed = new Date(s);
-  if (!isNaN(parsed)) return parsed.toISOString().split('T')[0];
+  if (!isNaN(parsed)) return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
   return '';
 }
 
