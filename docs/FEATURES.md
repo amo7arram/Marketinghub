@@ -10,7 +10,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 *unless the Public Access Gate is enabled in admin Settings.
 
-- **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance (synced from Metricool, with month-over-month trend arrows), department activity mix, leads-by-department breakdown, this-month campaign/health-day list (shows a real thumbnail of the published post where Metricool has a match — see `initiatives.socialImageUrl` in `docs/DATA_MODEL.md` — falling back to a plain department-colored dot otherwise), featured initiatives
+- **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance (synced from Metricool, with month-over-month trend arrows), department activity mix, leads-by-department breakdown, this-month campaign/health-day list (shows a real thumbnail of the published post where Metricool has a match — see `initiatives.socialImageUrl` in `docs/DATA_MODEL.md` — falling back to a plain department-colored dot otherwise; click any campaign/event row to open the shared detail panel, which shows the same image full-size at the top when present), featured initiatives
 - **SM Analytics** — per-network (Instagram/TikTok/LinkedIn/X) stat tiles with trend deltas, plus a full-history trend chart per network, all synced from Metricool
 - **SM Calendar** — grid and full table view of scheduled social content and physician videos, filterable by department/entity/channel, click-through to full detail (captions, headline, assets)
 - **Promotions Calendar** — active/upcoming promotions with pricing and discount %

@@ -1020,7 +1020,11 @@ function renderCampMonthList() {
     const thumb = i.socialImageUrl
       ? `<img src="${i.socialImageUrl}" loading="lazy" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0" alt="">`
       : `<div class="camp-dot" style="background:${ds.t}"></div>`;
-    return `<div class="camp-month-row">
+    // Health Day items are lightweight placeholder objects (no id, no brief,
+    // no captions) — not worth opening the full detail panel for those.
+    const clickable = i.type !== 'Health Day';
+    const onclickAttr = clickable ? ` onclick='openDetail(${JSON.stringify(i).replace(/'/g,"&apos;")})' style="cursor:pointer"` : '';
+    return `<div class="camp-month-row"${onclickAttr}>
       <span style="font-size:12px;color:var(--text-3);width:16px;text-align:center">${typeIcon}</span>
       ${thumb}
       <span style="flex:1;font-weight:600;color:var(--text)">${i.title||''}</span>
@@ -1572,6 +1576,9 @@ window.openDetail = function(c) {
   const ds = deptStyle(c.department);
   document.getElementById('dp-badges').innerHTML = statusBadge(c.status)+' '+entityBadge(c.entity)+` <span class="badge" style="background:${ds.bg};color:${ds.t}">${c.department||''}</span>`;
   document.getElementById('dp-body').innerHTML = `
+    ${c.socialImageUrl?`<div class="dp-section">
+      <img src="${c.socialImageUrl}" alt="" style="width:100%;max-height:420px;object-fit:cover;border-radius:10px;display:block">
+    </div>`:''}
     <div class="dp-section">
       <div class="dp-section-title">Campaign Brief</div>
       <div class="dp-row"><span class="dp-label">Objective</span><span class="dp-val">${c.objective||'—'}</span></div>
