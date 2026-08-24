@@ -10,7 +10,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 *unless the Public Access Gate is enabled in admin Settings.
 
-- **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance (synced from Metricool, with month-over-month trend arrows), department activity mix, leads-by-department breakdown, this-month campaign/health-day list, featured initiatives
+- **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance (synced from Metricool, with month-over-month trend arrows), department activity mix, leads-by-department breakdown, this-month campaign/health-day list (shows a real thumbnail of the published post where Metricool has a match — see `initiatives.socialImageUrl` in `docs/DATA_MODEL.md` — falling back to a plain department-colored dot otherwise), featured initiatives
 - **SM Analytics** — per-network (Instagram/TikTok/LinkedIn/X) stat tiles with trend deltas, plus a full-history trend chart per network, all synced from Metricool
 - **SM Calendar** — grid and full table view of scheduled social content and physician videos, filterable by department/entity/channel, click-through to full detail (captions, headline, assets)
 - **Promotions Calendar** — active/upcoming promotions with pricing and discount %
@@ -65,7 +65,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **WhatsApp / click-to-call** — icon links per lead (`wa.me`/`tel:`), using the lead's normalized phone number
 - **Excel export** — Export Selected (from a bulk selection) or Export Filtered (whatever the current filters produce), reusing the same XLSX library used for import
 - **Phone number normalization** — all phone writes (manual entry, Excel import, Sheet import) unify to bare-digits international format; a one-time "☎ Normalize Phone Numbers" migration button (with a before/after preview) backfills existing records
-- Excel upload with automatic column detection (name/phone/department/entity/source/campaign/date/status/notes), department fuzzy-matching, and a campaign-attribution picker
+- Excel upload with automatic column detection (name/phone/department/entity/source/campaign/date/status/notes), department fuzzy-matching, and a campaign-attribution picker. Deduplicates by phone+campaign combination (not phone alone) against existing leads — recomputed live as the campaign dropdown changes, since that's the only input the dedupe key depends on that isn't fixed at parse time; duplicate rows are shown dimmed in the preview and skipped on import, with the skip count called out
 - **Google Sheet live import** — paste a link (or auto-fill from a campaign's saved sheet URL), fetch, preview, import. Deduplicates by phone+campaign combination (not phone alone), so the same person can correctly appear under multiple campaigns as separate interactions
 - Contact History — opening any lead shows every other lead record sharing that phone number (date, campaign, status, outcome)
 - Revenue Value field per lead, feeding campaign ROI
@@ -89,6 +89,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Not covered by Metricool** (confirmed unavailable via their API, not just unconfigured): Instagram Conversations, X Reach/Impressions, TikTok engagement, SM Messages Received, PR Mentions, Website Visits — these no longer have any entry point in this tab
 - **Website Visitors — manual monthly entry**, its own small section below the Metricool grid, saved together with the rest via the same "Save Month" button. Writes only the `Website Visits` metric to the legacy `metrics` collection (nothing else uses that collection anymore) — this is the one BD KPI target with no automated source anywhere, since Metricool doesn't do web analytics
 - The public Business Development KPI Progress tracker (`index.html`) now sources every KPI from a live source except Website Visitors: Views/Impressions/Engagements from `config/metricool_stats`, Leads/Bookings from `config/lead_stats` (the real `leads` collection, not the old manually-typed `leadsGenerated`/`estimatedBookings` fields on initiatives/promotions/BD cards). See `docs/DATA_MODEL.md`'s `metrics` section for the coverage trade-offs this involved.
+- Same "🔄 Sync Now" also matches every `Published` initiative's `postLink` against Metricool's own scheduled posts and writes a real matched image to `initiatives.socialImageUrl` where found (see `docs/DATA_MODEL.md`) — powers the public Dashboard's "this month" campaign thumbnails. Partial coverage by nature (only Metricool-scheduled content can match), never surfaced as an error.
 
 ### Settings
 - **Entities** — add/remove business entities (blocked from deletion if still referenced anywhere)

@@ -1346,7 +1346,7 @@ tr.row-done:hover td{background:#DCF2E5}
         </div>
         <div>
           <label class="field-label">Attribute to Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">(optional — enables cost-per-lead tracking)</span></label>
-          <select class="field-select" id="import-campaign"><option value="">— No campaign —</option></select>
+          <select class="field-select" id="import-campaign" onchange="renderExcelImportPreview()"><option value="">— No campaign —</option></select>
         </div>
       </div>
       <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius);font-size:12px;color:var(--text-3);margin-bottom:14px">
@@ -2824,6 +2824,37 @@ window.syncMetricool = async function() {
         }
       } else { failures++; }
     } catch(e) { failures++; console.error('Metricool follower snapshot failed:', e); }
+
+    // Match published initiatives' postLink to Metricool's own scheduled
+    // posts, pulling the real published image (or video, skipped — a
+    // dashboard can't usefully show a raw .mp4) for use on the public
+    // dashboard. Coverage is partial by nature, not a bug: only content
+    // actually scheduled/published THROUGH Metricool can match at all, and
+    // LinkedIn posts specifically almost never will, since the postLink
+    // pasted from LinkedIn's own "Share" link (urn:li:activity:...) uses a
+    // different URL scheme than the one Metricool records (urn:li:ugcPost:...)
+    // for the same post. Unmatched initiatives simply keep no socialImageUrl
+    // — no error, no dataGaps entry, this is expected steady-state behavior.
+    try {
+      const schedStart = encodeURIComponent(`${METRICOOL_BACKFILL_START}T00:00:00`);
+      const schedEnd   = encodeURIComponent(`${new Date().toISOString().slice(0,10)}T23:59:59`);
+      const postsRes = await fetch(`${METRICOOL_API_BASE}/v2/scheduler/posts?userId=${userId}&blogId=${blogId}&start=${schedStart}&end=${schedEnd}&timezone=Asia%2FRiyadh`, { headers: authHeaders });
+      if(postsRes.ok) {
+        const postsBody = await postsRes.json();
+        const postsByUrl = {};
+        (postsBody.data||[]).forEach(post => {
+          (post.providers||[]).forEach(p => { if(p.publicUrl) postsByUrl[airNormalizeUrl(p.publicUrl)] = post; });
+        });
+        const imageUpdates = [];
+        ALL_INITIATIVES.filter(i => i.status==='Published' && i.postLink).forEach(init => {
+          const match = postsByUrl[airNormalizeUrl(init.postLink)];
+          if(!match) return;
+          const imageUrl = (match.media||[]).find(u => !u.toLowerCase().endsWith('.mp4')) || null;
+          if(imageUrl && imageUrl !== init.socialImageUrl) imageUpdates.push(updateInitiative(init.id, { socialImageUrl: imageUrl }));
+        });
+        if(imageUpdates.length) await Promise.all(imageUpdates);
+      } else { failures++; console.error('Metricool post-image sync failed: HTTP', postsRes.status); }
+    } catch(e) { failures++; console.error('Metricool post-image sync failed:', e); }
 
     METRICOOL_STATS = { ...(METRICOOL_STATS||{}), series };
     await setMetricoolStats(METRICOOL_STATS);
@@ -4752,6 +4783,7 @@ window.seedLoyaltyCards = async function(){
 // ── LEADS CRM ─────────────────────────────────────────────────────────────
 let editingLeadId = null;
 let pendingImportRows = [];
+let importColInfoText = '';
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 window.renderLeadsStats = function() {
@@ -5345,32 +5377,15 @@ window.handleExcelUpload = function(input) {
 
       const matchedCount   = pendingImportRows.filter(r=>r.department).length;
       const unmatchedCount = pendingImportRows.length - matchedCount;
-
-      const previewRows = pendingImportRows.slice(0,10);
-      const thCols = ['Name','Phone','Department','Source','Campaign','Date','Contact Status'];
-      document.getElementById('excel-preview-table').innerHTML =
-        `<thead style="background:var(--navy);color:#fff"><tr>${thCols.map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
-        <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}</td>
-          <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
-          <td style="padding:5px 10px;font-size:11px">${r.department?`<span style="color:var(--navy);font-weight:600">${r.department}</span>`:`<span style="color:var(--orange)">${r._rawDept?'No match: "'+r._rawDept+'"':'Not in sheet'} → uses default</span>`}</td>
-          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
-          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
-          <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'<span style="color:var(--red)">not parsed</span>'}</td>
-          <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
-        </tr>`).join('')}
-        ${pendingImportRows.length>10?`<tr><td colspan="7" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${pendingImportRows.length-10} more rows</td></tr>`:''}</tbody>`;
-
-      document.getElementById('import-count').textContent = pendingImportRows.length;
       const deptStatus = deptCol
         ? `${matchedCount} matched to a department${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`
         : `No department column found — all rows will use the default below`;
-      document.getElementById('import-col-info').innerHTML =
-        `Detected: ${[nameCol,phoneCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}`;
+      importColInfoText = `Detected: ${[nameCol,phoneCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}`;
+
       document.getElementById('import-dept').value = DEPARTMENTS[0];
       document.getElementById('import-campaign').value = '';
       document.getElementById('import-progress').style.display='none';
-      document.getElementById('confirm-import-btn').disabled=false;
+      renderExcelImportPreview();
       document.getElementById('excel-overlay').classList.add('open');
     } catch(err) {
       showToast('Failed to read file: '+err.message, true);
@@ -5393,22 +5408,69 @@ function mapLeadStatus(raw) {
 
 window.closeExcelPreview = function(){document.getElementById('excel-overlay').classList.remove('open');}
 
+// Attaches campaign attribution + duplicate flags to the raw parsed rows for
+// the CURRENTLY selected campaign, and re-renders the preview table + count.
+// Dedupes by phone+campaign together (not phone alone) — the same person can
+// legitimately appear in multiple campaigns as separate real interactions;
+// this only blocks re-importing the exact same person into the exact same
+// campaign twice (e.g. re-uploading the same file, or an overlapping range).
+// Re-run every time the campaign dropdown changes, since that's the only
+// input the dedupe key depends on that isn't already fixed at parse time.
+function computeExcelImportRows() {
+  const campaignId = document.getElementById('import-campaign').value;
+  const campaignName = campaignId ? campaignTitleFor(campaignId) : '';
+  const existingPhoneCampaignPairs = new Set(
+    ALL_LEADS.map(l => `${String(l.phone||'').replace(/\D/g,'')}__${l.campaignId||''}`)
+  );
+  return pendingImportRows.map(r => {
+    const pairKey = `${r.phone}__${campaignId||''}`;
+    return {
+      ...r,
+      campaignId: campaignId || null,
+      campaign: campaignId ? campaignName : (r.campaign || ''),
+      _isDuplicate: existingPhoneCampaignPairs.has(pairKey),
+    };
+  });
+}
+
+window.renderExcelImportPreview = function() {
+  const computed = computeExcelImportRows();
+  const newRows = computed.filter(r => !r._isDuplicate);
+  const dupCount = computed.length - newRows.length;
+
+  const previewRows = computed.slice(0,10);
+  const thCols = ['Name','Phone','Department','Source','Campaign','Date','Contact Status'];
+  document.getElementById('excel-preview-table').innerHTML =
+    `<thead style="background:var(--navy);color:#fff"><tr>${thCols.map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
+    <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border);${r._isDuplicate?'opacity:0.5':''}">
+      <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}${r._isDuplicate?' <span style="color:var(--orange);font-weight:700">(duplicate)</span>':''}</td>
+      <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
+      <td style="padding:5px 10px;font-size:11px">${r.department?`<span style="color:var(--navy);font-weight:600">${r.department}</span>`:`<span style="color:var(--orange)">${r._rawDept?'No match: "'+r._rawDept+'"':'Not in sheet'} → uses default</span>`}</td>
+      <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
+      <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
+      <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'<span style="color:var(--red)">not parsed</span>'}</td>
+      <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
+    </tr>`).join('')}
+    ${computed.length>10?`<tr><td colspan="7" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${computed.length-10} more rows</td></tr>`:''}</tbody>`;
+
+  document.getElementById('import-count').textContent = newRows.length;
+  document.getElementById('import-col-info').innerHTML =
+    `${importColInfoText}${dupCount?`<br><span style="color:var(--orange)">${dupCount} row(s) already imported for this campaign — will be skipped</span>`:''}`;
+  document.getElementById('confirm-import-btn').disabled = newRows.length === 0;
+}
+
 window.confirmImport = async function() {
   if(!pendingImportRows.length) return;
   const fallbackDept = document.getElementById('import-dept').value;
-  const campaignId = document.getElementById('import-campaign').value;
-  const campaignName = campaignId ? campaignTitleFor(campaignId) : '';
   // Use each row's matched department from the sheet; only fall back to the
   // selected default for rows where the sheet had no department or no match.
-  const leadsToImport = pendingImportRows.map(r=>{
-    const { _rawDept, ...clean } = r;
-    return {
-      ...clean,
-      department: r.department || fallbackDept,
-      campaignId: campaignId || null,
-      campaign:   campaignId ? campaignName : (clean.campaign || ''),
-    };
-  });
+  const leadsToImport = computeExcelImportRows()
+    .filter(r => !r._isDuplicate)
+    .map(r => {
+      const { _rawDept, _isDuplicate, ...clean } = r;
+      return { ...clean, department: r.department || fallbackDept };
+    });
+  if(!leadsToImport.length) { showToast('Nothing to import — every row is already in this campaign', true); return; }
   const btn = document.getElementById('confirm-import-btn');
   const progress = document.getElementById('import-progress');
   btn.disabled=true;

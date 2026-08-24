@@ -1013,9 +1013,16 @@ function renderCampMonthList() {
   listEl.innerHTML = items.map(i=>{
     const ds = deptStyle(i.department);
     const typeIcon = i.type==='Health Day'?'♡':i.type==='Event'?'◆':'◈';
+    // Real published-post image, synced from Metricool in admin.html (see
+    // syncMetricool()) — only present for content actually scheduled through
+    // Metricool, so most rows fall back to the plain dot, not every row gets
+    // a thumbnail. That's expected, not a bug.
+    const thumb = i.socialImageUrl
+      ? `<img src="${i.socialImageUrl}" loading="lazy" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0" alt="">`
+      : `<div class="camp-dot" style="background:${ds.t}"></div>`;
     return `<div class="camp-month-row">
       <span style="font-size:12px;color:var(--text-3);width:16px;text-align:center">${typeIcon}</span>
-      <div class="camp-dot" style="background:${ds.t}"></div>
+      ${thumb}
       <span style="flex:1;font-weight:600;color:var(--text)">${i.title||''}</span>
       <span style="font-size:10px;color:var(--text-3);margin-right:8px">${i.department||''}</span>
       ${entityBadge(i.entity)}
