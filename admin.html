@@ -5313,6 +5313,12 @@ function parseExcelDate(raw) {
   // corrupting 241 leads' dates by 25 years. Flag as unparsed instead so it's
   // caught in the import preview ("not parsed", shown in red) before import.
   if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2}$/.test(s)) return '';
+  // No 4-digit year anywhere in the string at all (e.g. "19-Aug", a real
+  // incident caused by a source cell formatted with Excel's "d-mmm" style,
+  // which drops the year from the displayed text entirely). new Date() below
+  // would silently default a missing year to 2001 rather than erroring —
+  // reject instead of guessing, same reasoning as the 2-digit-year case above.
+  if (!/\d{4}/.test(s)) return '';
   // Fallback: let the browser try, for any remaining genuinely date-like text
   const parsed = new Date(s);
   if (!isNaN(parsed)) return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
@@ -5337,9 +5343,23 @@ window.handleExcelUpload = function(input) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const wb   = XLSX.read(e.target.result, {type:'binary', cellDates:true});
+      // Deliberately NOT passing cellDates:true. Real incident: raw:false
+      // returns each cell's own FORMATTED DISPLAY STRING, not its real value
+      // — if a source date column is styled with a year-less Excel format
+      // (e.g. "d-mmm", displaying "19-Aug"), the year is gone from that
+      // string before parseExcelDate ever sees it (dateNF's override doesn't
+      // reliably win over the cell's own format). The fix pulls the date
+      // column's true value from a parallel raw:true pass instead — but
+      // cellDates:true would make that value a JS Date object converted by
+      // SheetJS's own date1900 logic, which turned out to be environment/
+      // timezone-ambiguous in testing (its Date objects aren't anchored to a
+      // clean UTC or local midnight, so neither getter is reliably correct).
+      // Without cellDates, date cells stay as plain numeric Excel serials —
+      // fully unambiguous, deterministic math (see parseExcelDate below).
+      const wb   = XLSX.read(e.target.result, {type:'binary'});
       const ws   = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false, dateNF:'yyyy-mm-dd'});
+      const rawRows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:true});
       if(!rows.length){showToast('No data found in the file',true);return;}
 
       const headers = Object.keys(rows[0]);
@@ -5356,7 +5376,7 @@ window.handleExcelUpload = function(input) {
 
       if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
 
-      pendingImportRows = rows.map(r=>{
+      pendingImportRows = rows.map((r,idx)=>{
         const rawDept = deptCol ? r[deptCol] : '';
         const matchedDept = matchDepartment(rawDept);
         const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
@@ -5366,7 +5386,7 @@ window.handleExcelUpload = function(input) {
           source:        sourceCol ? r[sourceCol]||'' : '',
           campaign:      campaignCol ? r[campaignCol]||'' : '',
           entity:        entityCol ? r[entityCol]||'' : '',
-          dateCreated:   dateCol ? parseExcelDate(r[dateCol]) : '',
+          dateCreated:   dateCol ? parseExcelDate(rawRows[idx][dateCol]) : '',
           contactStatus: mappedStatus.contactStatus,
           outcome:       mappedStatus.outcome,
           notes:         notesCol ? r[notesCol]||'' : '',
