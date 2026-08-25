@@ -60,6 +60,8 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Booked lock** — once Outcome is Booked, changing Contact Status/Outcome (inline, the edit modal, or bulk edit) requires confirming first, since it can affect reported revenue numbers elsewhere in the app
 - Inline status editing directly in the table
 - **Lead assignment** — assign a lead to any team member with real login access, via a row-level "Assign" button or in bulk via Bulk Edit; assigned agent shown in its own column. Drives Contact Center Control's default "My Leads" filter for that agent.
+- **Agent filter** — filter the leads table (and thus "Select All") to one agent's leads, or to unassigned leads — the direct way to bulk-act on a specific agent's queue.
+- **Agent Performance panel** — collapsible breakdown, one row per team member with login access (plus an Unassigned row when relevant): total assigned, Untouched/Reached/Unreached/Missed counts, Booked count, and a "% Contacted" figure. Click a row to jump straight to that agent's filtered leads table.
 - **Bulk Edit** — Department/Entity/Contact Status/Outcome/Date, plus Campaign (bulk-attach leads to a campaign) and Assign to Agent, applied only to fields explicitly set
 - **Campaign script popover** — clicking a lead's Campaign cell (when linked) shows that campaign's Agent Script (calling context, edited on the campaign record) and Post Link, if set
 - **WhatsApp / click-to-call** — icon links per lead (`wa.me`/`tel:`), using the lead's normalized phone number

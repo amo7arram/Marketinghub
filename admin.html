@@ -398,6 +398,18 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div class="budget-stat" style="border-left:3px solid var(--green)"><div class="budget-stat-label">Booked</div><div class="budget-stat-val" id="ls-booked" style="color:var(--green)">—</div></div>
         <div class="budget-stat" style="border-left:3px solid var(--text-3)"><div class="budget-stat-label">Untouched</div><div class="budget-stat-val" id="ls-untouched" style="color:var(--text-3)">—</div></div>
       </div>
+      <!-- Agent Performance — collapsible -->
+      <div style="margin-bottom:16px">
+        <div onclick="toggleAgentPerformancePanel()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;user-select:none">
+          <span id="agent-perf-toggle-icon">▸</span> 📊 Agent Performance
+        </div>
+        <div id="agent-performance-panel" style="display:none">
+          <table>
+            <thead><tr><th>Agent</th><th>Assigned</th><th>Untouched</th><th>Reached</th><th>Unreached</th><th>Missed</th><th>Booked</th><th>% Contacted</th></tr></thead>
+            <tbody id="agent-performance-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
       <!-- Toolbar -->
       <div class="toolbar">
         <div class="filters">
@@ -416,6 +428,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
           </select>
           <select class="filter-select" id="lead-filter-campaign" onchange="resetLeadsPageAndRender()">
             <option value="">All Campaigns</option>
+          </select>
+          <select class="filter-select" id="lead-filter-agent" onchange="resetLeadsPageAndRender()">
+            <option value="">All Agents</option>
           </select>
         </div>
         <div style="display:flex;gap:8px">
@@ -1799,7 +1814,7 @@ function initData() {
   populateStaticSelects();
   unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderMarketingActionsTable(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
-  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); });
+  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
@@ -1939,6 +1954,8 @@ function populateAssignLeadSelect() {
   if(single) single.innerHTML = '<option value="">— Unassigned —</option>' + optionsHtml;
   const bulk = document.getElementById('bulk-assign');
   if(bulk) bulk.innerHTML = '<option value="">— No change —</option>' + optionsHtml;
+  const filter = document.getElementById('lead-filter-agent');
+  if(filter) filter.innerHTML = '<option value="">All Agents</option>' + optionsHtml + '<option value="__unassigned__">— Unassigned —</option>';
 }
 
 
@@ -5113,6 +5130,63 @@ window.renderLeadsStats = function() {
   document.getElementById('ls-untouched').textContent = counts.Untouched;
   // Keep the public-facing aggregate snapshot in sync any time stats render
   computeAndPublishLeadStats();
+  renderAgentPerformance();
+}
+
+window.toggleAgentPerformancePanel = function() {
+  const panel = document.getElementById('agent-performance-panel');
+  const icon = document.getElementById('agent-perf-toggle-icon');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  icon.textContent = opening ? '▾' : '▸';
+}
+
+// Per-agent workload/response breakdown — every team member with login
+// access gets a row (even 0 leads, so managers can see who's idle), plus
+// an "Unassigned" row only when there's actually unassigned work.
+function renderAgentPerformance() {
+  const tbody = document.getElementById('agent-performance-body');
+  if(!tbody) return;
+  const assignable = ALL_TEAM_MEMBERS.filter(m => m.hasLoginAccount && m.authUid && m.active !== false);
+
+  const makeBucket = name => ({ name, total:0, Untouched:0, Reached:0, Unreached:0, Missed:0, booked:0 });
+  const buckets = {};
+  assignable.forEach(m => { buckets[m.authUid] = makeBucket(m.name); });
+  const unassigned = makeBucket('— Unassigned —');
+
+  ALL_LEADS.forEach(l => {
+    const b = (l.assignedAgentUid && buckets[l.assignedAgentUid]) ? buckets[l.assignedAgentUid] : unassigned;
+    b.total++;
+    const cs = l.contactStatus || 'Untouched';
+    if(b[cs] !== undefined) b[cs]++;
+    if(l.outcome === 'Booked') b.booked++;
+  });
+
+  const rows = assignable.map(m => ({ uid: m.authUid, ...buckets[m.authUid] }));
+  if(unassigned.total > 0) rows.push({ uid: '__unassigned__', ...unassigned });
+  rows.sort((a,b) => b.total - a.total);
+
+  tbody.innerHTML = rows.length ? rows.map(r => {
+    const contactedPct = r.total ? Math.round((r.total - r.Untouched) / r.total * 100) : 0;
+    return `<tr style="cursor:pointer" onclick="filterLeadsByAgent('${r.uid}')" title="Click to filter the leads table to this agent">
+      <td style="font-weight:600">${r.name}</td>
+      <td>${r.total}</td>
+      <td style="color:var(--text-3)">${r.Untouched}</td>
+      <td style="color:#0D6E44">${r.Reached}</td>
+      <td style="color:#9B5800">${r.Unreached}</td>
+      <td style="color:#B0234A">${r.Missed}</td>
+      <td style="color:var(--green);font-weight:600">${r.booked}</td>
+      <td>${contactedPct}%</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">No agents with login access yet — see Settings → Team Members</td></tr>';
+}
+
+window.filterLeadsByAgent = function(uid) {
+  const filter = document.getElementById('lead-filter-agent');
+  if(!filter) return;
+  filter.value = uid;
+  resetLeadsPageAndRender();
+  document.getElementById('page-leads').scrollIntoView({behavior:'smooth'});
 }
 
 // ── Table ──────────────────────────────────────────────────────────────────
@@ -5176,6 +5250,7 @@ function getFilteredLeads() {
   const deptF    = document.getElementById('lead-filter-dept')?.value||'';
   const entityF  = document.getElementById('lead-filter-entity')?.value||'';
   const campaignF= document.getElementById('lead-filter-campaign')?.value||'';
+  const agentF   = document.getElementById('lead-filter-agent')?.value||'';
 
   return ALL_LEADS.filter(l=>{
     if(contactF && (l.contactStatus||'Untouched')!==contactF) return false;
@@ -5183,6 +5258,7 @@ function getFilteredLeads() {
     if(deptF && l.department!==deptF) return false;
     if(entityF && l.entity!==entityF) return false;
     if(campaignF && l.campaignId!==campaignF) return false;
+    if(agentF==='__unassigned__' ? l.assignedAgentUid : (agentF && l.assignedAgentUid!==agentF)) return false;
     if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source}`.toLowerCase().includes(q)) return false;
     return true;
   });
