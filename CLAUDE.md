@@ -21,7 +21,7 @@ IMC Marketing & Business Development Hub — an internal marketing operations pl
 
 - **No backend.** Static files on GitHub Pages, talking directly to Firebase Firestore + Firebase Auth. No build step, no bundler. `<script type="module">` loads ES modules natively in the browser.
 - **`firebase-data.js` is the single shared data layer.** Every other file imports from it. Never duplicate a Firestore query or write elsewhere — add it to `firebase-data.js` and import it.
-- **Four separate HTML entry points, each its own login gate:** `admin.html` (role: admin), `call-center.html` (role: agent or admin), `request.html` (role: coordinator or admin), `index.html` (public, no login by default). This separation is deliberate — don't merge them.
+- **Four separate HTML entry points, each its own login gate:** `admin.html` (role: admin), `call-center.html` (role: agent or admin), `request.html` (role: coordinator or admin), `index.html` (public, no login by default). This separation is deliberate — don't merge them. **`actions.html` is a fifth, documented exception**: a read-only Marketing Actions view for executive leadership that deliberately reuses `admin.html`'s exact role="admin" session (Magic Word included) rather than getting its own role — see `docs/ARCHITECTURE.md` §4.4 for the access-model tradeoff this accepts.
 - **`admin.html` and `index.html` are large single files** (~4,700 and ~2,000+ lines respectively). An ES module split is planned (`docs/ROADMAP.md` §Priority 2) but not yet started — treat this as the standing context for why edits need extra care until that's done.
 
 ---

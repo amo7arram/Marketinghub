@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC — Marketing Actions</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--gold:#C8A96E;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;--green:#1DB87A;--red:#E0392B;
+  --radius:6px;--radius-lg:10px;--shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+}
+html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+/* LOGIN — same shell as request.html, same dual-mode markup as admin.html */
+.login-wrap{height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--navy),#003766)}
+.login-card{background:var(--surface);border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center}
+.login-logo-img{width:130px;margin-bottom:10px}
+.login-sub{font-size:12px;color:var(--text-3);margin-bottom:24px}
+.login-field{margin-bottom:14px;text-align:left}
+.login-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.login-input{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.login-input:focus{outline:none;border-color:var(--navy)}
+.login-btn{width:100%;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:600;font-size:14px;cursor:pointer;margin-top:6px;font-family:inherit}
+.login-btn:hover{background:#003f7a}
+.login-error{background:#FFE8E8;color:#9B2020;padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:14px;display:none;text-align:left}
+
+/* PAGE */
+.page-wrap{display:none;min-height:100vh}
+.page-wrap.active{display:block}
+.topbar{position:fixed;top:0;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:58px;z-index:10}
+.topbar-logo{display:flex;align-items:center;gap:10px}
+.topbar-logo-img{height:30px}
+.topbar-logo-text{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--text-2)}
+.btn{font-size:12px;padding:7px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;background:var(--surface);color:var(--text-2);font-family:inherit;font-weight:500}
+.btn:hover{background:var(--bg)}
+
+.content-wrap{padding:86px 28px 40px;max-width:1100px;margin:0 auto}
+.field-group{margin-bottom:0}
+.field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;display:block}
+.field-input,.field-select{padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.field-input:focus,.field-select:focus{outline:none;border-color:var(--navy)}
+
+.summary-strip{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:16px;box-shadow:var(--shadow);display:flex;gap:32px}
+.summary-strip.has-overdue{border-color:var(--red);background:#FFF5F5}
+.summary-num{font-family:'Syne',sans-serif;font-size:22px;font-weight:800}
+.summary-label{font-size:11px;color:var(--text-3);margin-top:2px}
+
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+th{background:var(--navy);color:#fff;padding:10px 12px;text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr.row-overdue td{background:#FFF5F5}
+
+.badge{display:inline-flex;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.b-planned{background:#E4EDFF;color:#1649A3}
+.b-production{background:#FFF0D4;color:#9B5800}
+.b-ready{background:#E4F8F0;color:#0E7A55}
+.b-published{background:#D4F0E2;color:#0D6E44}
+.b-cancelled{background:#FFE8E8;color:#9B2020}
+
+.empty-row{text-align:center;padding:40px;color:var(--text-3)}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
+.toast.show{display:block}
+.toast.error{background:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN — dual-mode, identical to admin.html's gate ── -->
+<div class="login-wrap" id="login-wrap">
+  <div class="login-card">
+    <img class="login-logo-img" src="logo.jpg" alt="IMC">
+    <div class="login-sub">Marketing Actions — Leadership View</div>
+    <div class="login-error" id="login-error"></div>
+
+    <div style="display:flex;background:var(--bg);border-radius:8px;padding:3px;gap:2px;margin-bottom:18px">
+      <button type="button" class="login-mode-btn active" id="mode-btn-password" onclick="switchLoginMode('password')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">Password</button>
+      <button type="button" class="login-mode-btn" id="mode-btn-magic" onclick="switchLoginMode('magic')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:inherit;background:transparent;color:var(--text-3)">✨ Magic Word</button>
+    </div>
+
+    <div id="login-mode-password">
+      <div class="login-field">
+        <label class="login-label">Email</label>
+        <input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa">
+      </div>
+      <div class="login-field">
+        <label class="login-label">Password</label>
+        <input class="login-input" type="password" id="login-password" placeholder="••••••••">
+      </div>
+      <button class="login-btn" id="password-login-btn" onclick="doLogin()">Sign In</button>
+    </div>
+
+    <div id="login-mode-magic" style="display:none">
+      <div class="login-field">
+        <label class="login-label">What's the magic word?</label>
+        <input class="login-input" type="password" id="login-magicword" placeholder="Enter passcode" onkeydown="if(event.key==='Enter')doMagicWordLogin()">
+      </div>
+      <button class="login-btn" id="magic-login-btn" onclick="doMagicWordLogin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAGE (read-only) ── -->
+<div class="page-wrap" id="page-wrap">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <img class="topbar-logo-img" src="logo.jpg" alt="IMC">
+      <span class="topbar-logo-text">Marketing Hub · Actions</span>
+    </div>
+    <button class="btn" onclick="doLogout()">Sign Out</button>
+  </div>
+
+  <div class="content-wrap">
+    <div class="summary-strip" id="summary-strip"></div>
+
+    <div class="toolbar">
+      <select class="field-select" id="f-status" onchange="render()"><option value="">All Status</option></select>
+      <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2)">
+        <input type="checkbox" id="f-overdue" onchange="render()"> Overdue only
+      </label>
+      <input class="field-input" type="text" id="f-search" placeholder="Search..." oninput="render()" style="flex:1;min-width:160px">
+    </div>
+
+    <table>
+      <thead><tr><th>Title</th><th>Accountable</th><th>Deadline</th><th>Status</th><th>Linked Initiative</th><th>Notes</th></tr></thead>
+      <tbody id="table-body"><tr><td colspan="6" class="empty-row">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import {
+  login, logout, watchAuth, getUserRole, getAdminPasscode, hashPassword,
+  watchMarketingActions, watchInitiatives, ACTION_STATUSES
+} from './firebase-data.js';
+// Deliberately NOT imported: addMarketingAction/updateMarketingAction/
+// deleteMarketingAction/addInitiative/etc. — this page is read-only at the
+// code level, not just via hidden buttons.
+
+const ACTION_STATUS_CLASS = {'Not Started':'b-planned','In Progress':'b-production','Blocked':'b-cancelled','Completed':'b-published'};
+
+// The one account used for the silent background login when someone signs
+// in via the Magic Word passcode instead of email/password — identical
+// mechanism to admin.html's own Magic Word (same account, same passcode).
+// Real Firebase Auth still runs underneath; this is a parallel front door,
+// not a bypass. See docs/ARCHITECTURE.md §4.4 for the wider-reach tradeoff
+// this deliberately accepts (this page shares admin.html's exact session).
+const MAGIC_WORD_ACCOUNT_EMAIL = 'anaggar@imc.med.sa';
+const MAGIC_WORD_ACCOUNT_PASSWORD = 'openIMC@123admin';
+
+let ALL_ACTIONS = [];
+let ALL_INITIATIVES = [];
+let unsubActions = null, unsubInitiatives = null;
+
+window.switchLoginMode = function(mode) {
+  const isPassword = mode === 'password';
+  document.getElementById('login-mode-password').style.display = isPassword ? 'block' : 'none';
+  document.getElementById('login-mode-magic').style.display = isPassword ? 'none' : 'block';
+  const pwBtn = document.getElementById('mode-btn-password');
+  const mgBtn = document.getElementById('mode-btn-magic');
+  pwBtn.style.background = isPassword ? 'var(--navy)' : 'transparent';
+  pwBtn.style.color = isPassword ? '#fff' : 'var(--text-3)';
+  mgBtn.style.background = isPassword ? 'transparent' : 'var(--navy)';
+  mgBtn.style.color = isPassword ? 'var(--text-3)' : '#fff';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+function resetLoginButtons() {
+  const pwBtn = document.getElementById('password-login-btn');
+  const mgBtn = document.getElementById('magic-login-btn');
+  if(pwBtn) { pwBtn.textContent = 'Sign In'; pwBtn.disabled = false; }
+  if(mgBtn) { mgBtn.textContent = 'Unlock'; mgBtn.disabled = false; }
+}
+
+window.doMagicWordLogin = async function() {
+  const entered = document.getElementById('login-magicword').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('magic-login-btn');
+  errEl.style.display = 'none';
+  if(!entered) return;
+  btn.textContent = 'Checking...';
+  btn.disabled = true;
+  try {
+    const storedHash = await getAdminPasscode();
+    const enteredHash = await hashPassword(entered);
+    if(enteredHash !== storedHash) {
+      errEl.textContent = 'Incorrect passcode — try again.';
+      errEl.style.display = 'block';
+      document.getElementById('login-magicword').value = '';
+      btn.textContent = 'Unlock';
+      btn.disabled = false;
+      return;
+    }
+    await login(MAGIC_WORD_ACCOUNT_EMAIL, MAGIC_WORD_ACCOUNT_PASSWORD);
+    // watchAuth's callback below handles everything from here.
+  } catch(e) {
+    errEl.textContent = 'Sign-in failed: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Unlock';
+    btn.disabled = false;
+  }
+}
+
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('password-login-btn');
+  errEl.style.display = 'none';
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+  try { await login(email, password); }
+  catch(e) {
+    errEl.textContent = 'Sign-in failed — check your email and password.';
+    errEl.style.display = 'block';
+    btn.textContent = 'Sign In';
+    btn.disabled = false;
+  }
+}
+window.doLogout = async function() { await logout(); }
+
+watchAuth(async user => {
+  if(user) {
+    try {
+      const role = await getUserRole(user.uid);
+      if(role !== 'admin') {
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = role
+          ? 'This account does not have access to this view.'
+          : 'No role assigned to this account — contact your administrator.';
+        errEl.style.display = 'block';
+        resetLoginButtons();
+        await logout();
+        return;
+      }
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('page-wrap').classList.add('active');
+      document.getElementById('f-status').innerHTML = '<option value="">All Status</option>' + ACTION_STATUSES.map(s=>`<option>${s}</option>`).join('');
+      // Only start watchers after the role check passes — marketing_actions
+      // requires auth, so calling before login would just be permission-denied.
+      unsubActions = watchMarketingActions(data => { ALL_ACTIONS = data; render(); });
+      unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; render(); });
+    } catch(e) {
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = 'Could not verify access: ' + e.message;
+      errEl.style.display = 'block';
+      resetLoginButtons();
+      await logout();
+    }
+  } else {
+    document.getElementById('login-wrap').style.display = 'flex';
+    document.getElementById('page-wrap').classList.remove('active');
+    if(unsubActions) unsubActions();
+    if(unsubInitiatives) unsubInitiatives();
+  }
+});
+
+function isOverdue(a) {
+  if (a.status === 'Completed' || !a.deadline) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return new Date(a.deadline) < today;
+}
+function initiativeInfoFor(id) {
+  if (!id) return null;
+  const i = ALL_INITIATIVES.find(x => x.id === id);
+  return i ? { title: i.title, status: i.status } : null;
+}
+
+window.render = function() {
+  const statusF = document.getElementById('f-status').value;
+  const overdueOnly = document.getElementById('f-overdue').checked;
+  const q = (document.getElementById('f-search').value||'').toLowerCase();
+
+  let filtered = ALL_ACTIONS.filter(a => {
+    if (statusF && a.status !== statusF) return false;
+    if (overdueOnly && !isOverdue(a)) return false;
+    if (q && !JSON.stringify(a).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // Overdue-first, then ascending deadline — leadership never has to filter
+  // to see what's late; it's always at the top.
+  filtered = [...filtered].sort((a,b) => {
+    const oa = isOverdue(a) ? 0 : 1, ob = isOverdue(b) ? 0 : 1;
+    if (oa !== ob) return oa - ob;
+    return (a.deadline||'').localeCompare(b.deadline||'');
+  });
+
+  const overdueCount = ALL_ACTIONS.filter(isOverdue).length;
+  const strip = document.getElementById('summary-strip');
+  strip.className = 'summary-strip' + (overdueCount ? ' has-overdue' : '');
+  strip.innerHTML = `
+    <div><div class="summary-num">${ALL_ACTIONS.length}</div><div class="summary-label">Total Actions</div></div>
+    <div><div class="summary-num" style="color:${overdueCount?'var(--red)':'inherit'}">${overdueCount}</div><div class="summary-label">⚠ Overdue</div></div>`;
+
+  document.getElementById('table-body').innerHTML = filtered.length ? filtered.map(a => {
+    const overdue = isOverdue(a);
+    const info = a.linkedInitiativeId ? initiativeInfoFor(a.linkedInitiativeId) : null;
+    const linkCell = !a.linkedInitiativeId ? '—'
+      : info ? `${info.title} <span class="badge ${ACTION_STATUS_CLASS[info.status]||'b-planned'}">${info.status}</span>`
+      : `<s>${a.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3);font-size:10px">(deleted)</span>`;
+    return `<tr class="${overdue?'row-overdue':''}">
+      <td style="font-weight:600">${a.title||''}</td>
+      <td>${a.accountablePerson||'—'}</td>
+      <td>${a.deadline||'—'} ${overdue?'<span class="badge b-cancelled">⚠ Overdue</span>':''}</td>
+      <td><span class="badge ${ACTION_STATUS_CLASS[a.status]||'b-planned'}">${a.status||''}</span></td>
+      <td>${linkCell}</td>
+      <td style="color:var(--text-3);max-width:240px" title="${(a.description||'').replace(/"/g,'&quot;')}">${a.description||''}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty-row">No actions found</td></tr>';
+}
+</script>
+</body>
+</html>

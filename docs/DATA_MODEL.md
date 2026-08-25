@@ -167,6 +167,25 @@ Marketing requests submitted by coordinators via `request.html`.
 
 ---
 
+## `marketing_actions`
+
+Action items agreed between executive leadership and marketing in meetings, managed entirely from `admin.html`'s "Marketing Actions" tab. Read-only for leadership via the separate `actions.html` page (see `ARCHITECTURE.md` §4.4 for its access model — it deliberately reuses `admin.html`'s exact Magic Word session rather than getting its own role).
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | string | Required — only hard requirement |
+| `description` | string | Free text |
+| `accountablePerson` | string | Plain free-text, not a `team_members` lookup — action items are often assigned to a role/department ("CEO Office") rather than a directory-listed person. Unrelated to `initiatives.assignedTo`, which *is* a `team_members`-sourced select for a narrower question ("who's producing this content"). |
+| `dateAgreed` | string (YYYY-MM-DD) | When leadership agreed to it |
+| `meetingContext` | string | Optional, e.g. "Q3 Leadership Sync" |
+| `deadline` | string (YYYY-MM-DD) | Drives the "Overdue" treatment — computed client-side (`status !== 'Completed' && deadline < today`), never stored, so it can never go stale |
+| `status` | string | One of `ACTION_STATUSES` (`firebase-data.js`): `Not Started`, `In Progress`, `Blocked`, `Completed` |
+| `linkedInitiativeId` | string \| null | Raw `initiatives` doc id, or `null` — same convention as `initiatives.parentCampaignId`/`leads.campaignId`. Set either by auto-creating a new initiative at action-creation time, or by linking to an existing one. **No referential integrity** (same already-accepted gap as `leads.campaignId`) — deleting the linked initiative leaves this dangling; both `admin.html` and `actions.html` render an explicit "(deleted)" label rather than silently going blank. |
+| `linkedInitiativeTitle` | string \| null | Denormalized display title, same convention as `leads.campaign` next to `campaignId`. The *live* status shown anywhere is always a fresh lookup against `initiatives`, never a stored/denormalized status field, since status changes independently and often. |
+| `createdAt` / `updatedAt` | Timestamp | |
+
+---
+
 ## `expenses`
 
 Standalone budget line items (distinct from `initiatives.cost`, which tracks cost per campaign/activity — `expenses` is for costs not tied to a specific initiative). **No `department` field** — only initiative-linked costs can be attributed to a department; anything relying on a department-scoped spend breakdown (e.g. the AI Reports feature below) must say so explicitly rather than presenting an incomplete picture as complete.
@@ -314,6 +333,9 @@ entities.name
   ├── referenced by initiatives.entity[]
   ├── referenced by bd_cards.entity
   └── referenced by promotions.entity[]
+
+marketing_actions
+  └── initiatives (linkedInitiativeId → initiative)   [optional, admin-managed]
 ```
 
 None of these relationships are enforced by Firestore itself — every "reference" is just a string ID or name stored on the child document, validated only by application code at write time. A real relational (or rigorously-validated document) database would be a meaningful reliability improvement in any SaaS rebuild.

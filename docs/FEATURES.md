@@ -80,6 +80,12 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 ### Requests
 - View/manage requests submitted via `request.html`
 
+### Marketing Actions
+- CRUD for action items agreed between executive leadership and marketing in meetings — title, description, accountable person (free text, not a team-member lookup), date agreed, meeting context, deadline, status (`Not Started`/`In Progress`/`Blocked`/`Completed`)
+- **Overdue is computed live** (past deadline + not Completed), never stored — shown as a red row + "⚠ Overdue" badge
+- **Link to a real Activity** — either check "Create a new linked initiative now" (a small sub-form: title/type/department/status/start date — creates a real `initiatives` document immediately, findable right away in the normal Activities tab) or link to an initiative that already exists, via a searchable dropdown. Mutually exclusive with each other; an already-linked action shows its live title+status with an Unlink option
+- Read-only, live view for executive leadership at **`actions.html`** (see below) — reuses the exact same login gate as `admin.html`, including the Magic Word
+
 ### Brand Resources
 - CRUD for the public resource library
 
@@ -133,6 +139,18 @@ Tab-based: **Leads** and **Promotions**. (A third Inbox tab — social media mes
 
 ### Both tabs
 - **"📋 Process Reference"** link (topbar) to `docs/lead-management-process.html`
+
+---
+
+## Marketing Actions — Leadership View (`actions.html`) — `role: admin` only, read-only
+
+A live, read-only dashboard for executive leadership to track marketing action items agreed in meetings — no add/edit/delete controls anywhere on this page, enforced both in the UI and by which functions the page imports from `firebase-data.js` at all.
+
+- Login gate is a byte-for-byte copy of `admin.html`'s own dual-mode gate (password or the same Magic Word passcode) — this page shares `admin.html`'s exact `role==='admin'` session rather than getting a new, narrower role. See `ARCHITECTURE.md` §4.4 for the access-model tradeoff this accepts.
+- Summary strip up top: total actions, and an overdue count that turns the whole strip red the moment anything is late — meant to answer "are we on track" in the first second, before reading the table.
+- Table sorted **overdue-first, then by ascending deadline** — nothing needs filtering to surface what's late.
+- Each row's linked initiative (if any) shows its **live** current title + status, not a stale snapshot — both this page and `admin.html` read the same real-time `initiatives` data, so a status change made in `admin.html` appears here immediately, no refresh needed.
+- Filters: status, "Overdue only," free-text search — same as the admin-side management tab, for visual/behavioral consistency between the two views.
 
 ---
 

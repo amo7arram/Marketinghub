@@ -40,13 +40,15 @@ An internal marketing operations platform for International Medical Center (IMC)
 ├── index.html             Public-facing portal — no login required (unless Access Gate is enabled)
 ├── request.html           Minimal request-submission form — role="coordinator" or "admin"
 ├── call-center.html       Minimal leads-only view — role="agent" or "admin"
-├── inject-promotions.html One-time seed script for the 2026 promotions plan (should be deleted
-│                          from the live repo after use — it's a dev tool, not a product surface)
+├── actions.html           Read-only Marketing Actions view for executive leadership — reuses
+│                          admin.html's exact role="admin" session (Magic Word included), not a
+│                          new role; the one deliberate exception to the isolation described below
+│                          (see §4.4)
 ├── logo.jpg               Shared logo asset
 └── docs/                  This documentation set
 ```
 
-**Why this file split exists:** rather than one giant app with client-side routing and permission checks, each *role* gets its own physically separate HTML file with its own login gate. A coordinator or agent literally cannot load code for features they shouldn't see — the browser never downloads `admin.html`'s JavaScript for them. This is a deliberate, low-tech security boundary that's more robust than a single-page app with hidden UI, precisely because there's no backend to enforce anything else.
+**Why this file split exists:** rather than one giant app with client-side routing and permission checks, each *role* gets its own physically separate HTML file with its own login gate. A coordinator or agent literally cannot load code for features they shouldn't see — the browser never downloads `admin.html`'s JavaScript for them. This is a deliberate, low-tech security boundary that's more robust than a single-page app with hidden UI, precisely because there's no backend to enforce anything else. `actions.html` is a documented exception to this isolation, not an oversight — see §4.4.
 
 **The cost of this approach:** significant code duplication. Login screens, toast notifications, and Firestore query patterns are re-implemented per file rather than shared as components. `admin.html` alone has grown to roughly 4,700+ lines. This is the primary driver behind the ES module split proposed in `ROADMAP.md`.
 
@@ -60,7 +62,7 @@ Stored in the `roles` Firestore collection, keyed by Firebase Auth UID:
 
 | Role | Access |
 |---|---|
-| `admin` | Full access — `admin.html`, `call-center.html`, `request.html` |
+| `admin` | Full access — `admin.html`, `call-center.html`, `request.html`, and `actions.html` (same login gate, same session — see §4.4) |
 | `agent` | `call-center.html` only — view/update leads, no delete, no reassignment |
 | `coordinator` | `request.html` only — submit marketing requests, nothing else |
 
@@ -86,6 +88,8 @@ Real Firebase Auth accounts are created **client-side**, using a secondary Fireb
 ### 4.4 The "Magic Word" Passcode
 
 A parallel, temporary login path on `admin.html` — entering a shared passcode triggers a **real** Firebase Auth login behind the scenes using one designated account's credentials. This does not weaken Firestore security (the same real auth session is established either way), but it does mean anyone who knows the passcode effectively logs in *as* that one account. This was built as a convenience for a transitional period and should be revisited (or removed) before broader team rollout.
+
+**Its reach widened deliberately with `actions.html`.** That page reuses this exact mechanism — same hardcoded account, same passcode, same code — so executive leadership can view the Marketing Actions tracker without a dedicated account. This was a conscious tradeoff, not an oversight: it means (a) anyone given the passcode "just for the leadership view" can, once logged in, also browse to `admin.html` directly and get full admin access (leads, budget, settings — everything), since the resulting Firebase Auth session isn't scoped to one page, and (b) the hardcoded credential constants now live in two files instead of one, so a future rotation has to touch both. Revisiting this (e.g. a second designated account with a narrower role, once role-based scoping is worth the added complexity) is a reasonable future improvement, not an urgent one.
 
 ### 4.5 Public Access Gate
 

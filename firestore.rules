@@ -77,6 +77,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
+    match /marketing_actions/{doc} {
+      // Executive/marketing action-item tracker — both admin.html's tab and
+      // the read-only actions.html leadership view sit behind a real
+      // Firebase Auth login (password or Magic Word), so authenticated
+      // read/write is correct here — no public-read needed, unlike initiatives.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
 
     // ── ROLES — write restricted to existing admins only ─────────────────
     match /roles/{uid} {

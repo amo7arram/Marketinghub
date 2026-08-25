@@ -39,6 +39,7 @@ const LOYALTY_CARDS     = "loyalty_cards";
 const ENTITIES_COLLECTION = "entities";
 const HEALTH_DAYS = "health_days";
 const TEAM_MEMBERS = "team_members";
+const MARKETING_ACTIONS = "marketing_actions";
 
 // ── AUTH HELPERS ────────────────────────────────────────────────────────
 export function login(email, password) {
@@ -639,6 +640,30 @@ export const REQUEST_TYPES = [
   "Seasonal / Occasion Campaign","Patient Education Content","Internal Communication","Other"
 ];
 export const PRIORITIES = ["Normal","High","Urgent"];
+
+// ── MARKETING ACTIONS (executive/marketing action-item tracker) ──────────
+// Action items agreed between executive leadership and marketing in meetings.
+// Optionally linked to a real `initiatives` document once the action becomes
+// actual campaign work — see admin.html's "auto-create linked initiative"
+// checkbox and linkedInitiativeId/linkedInitiativeTitle in docs/DATA_MODEL.md.
+export const ACTION_STATUSES = ["Not Started", "In Progress", "Blocked", "Completed"];
+
+export function watchMarketingActions(callback) {
+  return onSnapshot(collection(db, MARKETING_ACTIONS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (a.deadline||'').localeCompare(b.deadline||''));
+    callback(data);
+  }, err => { console.error('watchMarketingActions:', err.code, '— add Firestore rules for marketing_actions'); callback([]); });
+}
+export function addMarketingAction(data) {
+  return addDoc(collection(db, MARKETING_ACTIONS), { ...data, createdAt: Timestamp.now() });
+}
+export function updateMarketingAction(id, data) {
+  return updateDoc(doc(db, MARKETING_ACTIONS, id), { ...data, updatedAt: Timestamp.now() });
+}
+export function deleteMarketingAction(id) {
+  return deleteDoc(doc(db, MARKETING_ACTIONS, id));
+}
 
 // ── SHARED CONSTANTS (used by both admin + portal for consistency) ──────
 export const DEPARTMENTS = [

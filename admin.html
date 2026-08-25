@@ -76,6 +76,8 @@ td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;vertic
 tr:hover td{background:var(--bg)}
 tr.row-done td{background:#EAF8F0}
 tr.row-done:hover td{background:#DCF2E5}
+tr.row-overdue td{background:#FFE8E8}
+tr.row-overdue:hover td{background:#FFD6D6}
 
 /* BUDGET */
 .budget-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
@@ -219,6 +221,7 @@ tr.row-done:hover td{background:#DCF2E5}
         <div class="tab-dropdown-item active" onclick="switchTab('initiatives',this,'group-initiatives')">Activities</div>
         <div class="tab-dropdown-item" onclick="switchTab('healthdays',this,'group-initiatives')">Health Days</div>
         <div class="tab-dropdown-item" onclick="switchTab('requests',this,'group-initiatives')">Requests</div>
+        <div class="tab-dropdown-item" onclick="switchTab('marketingactions',this,'group-initiatives')">Marketing Actions</div>
       </div>
     </div>
     <div class="tab-group" id="group-bd">
@@ -551,6 +554,28 @@ tr.row-done:hover td{background:#DCF2E5}
           <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th></th>
         </tr></thead>
         <tbody id="requests-table-body"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- MARKETING ACTIONS PAGE -->
+    <div class="page" id="page-marketingactions">
+      <div class="toolbar">
+        <div class="filters">
+          <select class="filter-select" id="ma-status-filter" onchange="renderMarketingActionsTable()"><option value="">All Status</option></select>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2)">
+            <input type="checkbox" id="ma-overdue-filter" onchange="renderMarketingActionsTable()"> Overdue only
+          </label>
+          <input class="filter-input" type="text" placeholder="Search..." id="ma-search" oninput="renderMarketingActionsTable()">
+        </div>
+        <button class="btn btn-primary" onclick="openActionForm()">+ New Action</button>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Title</th><th>Accountable</th><th>Agreed</th>
+          <th onclick="toggleMaSort()" style="cursor:pointer;user-select:none">Deadline <span id="ma-sort-arrow">↑</span></th>
+          <th>Status</th><th>Linked Initiative</th><th></th>
+        </tr></thead>
+        <tbody id="marketing-actions-table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -1020,6 +1045,61 @@ tr.row-done:hover td{background:#DCF2E5}
     <div class="modal-footer">
       <button class="btn" onclick="closeForm()">Cancel</button>
       <button class="btn btn-primary" onclick="saveInitiative()">Save Activity</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MARKETING ACTION FORM MODAL ── -->
+<div class="modal-overlay" id="action-form-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="action-form-title">New Marketing Action</div>
+      <button class="modal-close" onclick="closeActionForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="fld-ma-title"></div>
+      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" id="fld-ma-description"></textarea></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Accountable Person</label><input class="field-input" id="fld-ma-accountable" placeholder="e.g. Ahmed — Digital Marketing"></div>
+        <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-ma-status"></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Date Agreed</label><input class="field-input" type="date" id="fld-ma-dateAgreed"></div>
+        <div class="field-group"><label class="field-label">Deadline</label><input class="field-input" type="date" id="fld-ma-deadline"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Meeting Context <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label><input class="field-input" id="fld-ma-meetingContext"></div>
+
+      <div class="field-section-title">Linked Initiative</div>
+      <div id="ma-link-status-wrap" style="display:none;font-size:12px;color:var(--text-2);margin-bottom:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius)">
+        Linked to <strong id="ma-link-status-title"></strong> (<span id="ma-link-status-badge"></span>)
+        <button type="button" class="btn btn-sm" style="float:right" onclick="unlinkMarketingActionInitiative()">Unlink</button>
+      </div>
+      <div id="ma-link-controls-wrap">
+        <div class="field-group">
+          <label class="field-label">Link to an existing initiative</label>
+          <select class="field-select" id="fld-ma-linkExisting" onchange="onMaLinkExistingChange()"><option value="">— None —</option></select>
+        </div>
+        <div class="field-group">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-2)">
+            <input type="checkbox" id="fld-ma-autocreate" onchange="toggleMaAutocreateSubform()"> Create a new linked initiative now
+          </label>
+        </div>
+        <div id="ma-autocreate-subform" style="display:none;background:var(--bg);border-radius:var(--radius);padding:14px;margin-top:6px">
+          <div class="field-group"><label class="field-label">Initiative Title</label><input class="field-input" id="fld-ma-init-title"></div>
+          <div class="field-row">
+            <div class="field-group"><label class="field-label">Type</label><select class="field-select" id="fld-ma-init-type"></select></div>
+            <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="fld-ma-init-dept"></select></div>
+          </div>
+          <div class="field-row">
+            <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-ma-init-status"></select></div>
+            <div class="field-group"><label class="field-label">Start Date</label><input class="field-input" type="date" id="fld-ma-init-startDate"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeActionForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMarketingAction()">Save Action</button>
     </div>
   </div>
 </div>
@@ -1521,6 +1601,7 @@ import {
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
   normalizePhone, normalizeAllLeadPhones, fixCorruptedLeadYears,
+  watchMarketingActions, addMarketingAction, updateMarketingAction, deleteMarketingAction, ACTION_STATUSES,
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
@@ -1530,6 +1611,10 @@ import {
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
+let ALL_MARKETING_ACTIONS = [];
+let editingActionId = null;
+let maSortDir = 'asc';
+let unsubMarketingActions = null;
 let ALL_HEALTH_DAYS = [];
 let ALL_TEAM_MEMBERS = [];
 let DEPT_REVENUE_ESTIMATES = {};
@@ -1706,12 +1791,13 @@ watchAuth(async user => {
     if(unsubAnthropicKey) unsubAnthropicKey();
     if(unsubMetricoolSettings) unsubMetricoolSettings();
     if(unsubLeads) unsubLeads();
+    if(unsubMarketingActions) unsubMarketingActions();
   }
 });
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderMarketingActionsTable(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); });
@@ -1728,6 +1814,7 @@ function initData() {
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
   unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); });
+  unsubMarketingActions = watchMarketingActions(data => { ALL_MARKETING_ACTIONS = data; renderMarketingActionsTable(); });
   initMetricsTab();
   initBudgetTab();
 }
@@ -1892,6 +1979,13 @@ function populateStaticSelects() {
   document.getElementById('bulk-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
+
+  // Marketing Actions
+  document.getElementById('ma-status-filter').innerHTML += ACTION_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('fld-ma-status').innerHTML = ACTION_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('fld-ma-init-type').innerHTML = TYPES.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('fld-ma-init-dept').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('fld-ma-init-status').innerHTML = STATUSES.map(s=>`<option>${s}</option>`).join('');
 
   // Expense form
   document.getElementById('exp-type').innerHTML = EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
@@ -2360,6 +2454,222 @@ window.renderTable = function() {
         </td>
       </tr>`;}).join('')
     : '<tr><td colspan="7" class="empty">No activities found</td></tr>';
+}
+
+// ── MARKETING ACTIONS ─────────────────────────────────────────────────
+const ACTION_STATUS_CLASS = {'Not Started':'b-planned','In Progress':'b-production','Blocked':'b-cancelled','Completed':'b-published'};
+let pendingUnlink = false;
+
+function isActionOverdue(a) {
+  if (a.status === 'Completed' || !a.deadline) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return new Date(a.deadline) < today;
+}
+
+// Live lookup — returns the linked initiative's CURRENT title+status, not
+// the possibly-stale denormalized linkedInitiativeTitle. Mirrors
+// campaignTitleFor() but returns both fields, and returns null (not just a
+// falsy title) if the linked doc was deleted, so callers can distinguish
+// "never linked" from "linked to something now gone."
+function initiativeInfoFor(id) {
+  if (!id) return null;
+  const i = ALL_INITIATIVES.find(x => x.id === id);
+  return i ? { title: i.title, status: i.status } : null;
+}
+
+// Mirrors populateParentCampaignSelect() but lists every initiative type,
+// not just Campaigns — an action can reasonably link to an Event, SM Content
+// piece, etc., not only a Campaign container.
+function populateLinkExistingSelect(excludeId) {
+  const sel = document.getElementById('fld-ma-linkExisting');
+  if (!sel) return;
+  const opts = ALL_INITIATIVES.filter(i => i.id !== excludeId);
+  sel.innerHTML = '<option value="">— None —</option>' +
+    opts.map(i => `<option value="${i.id}">${i.title||'Untitled'}</option>`).join('');
+}
+
+window.toggleMaAutocreateSubform = function() {
+  const checked = document.getElementById('fld-ma-autocreate').checked;
+  document.getElementById('ma-autocreate-subform').style.display = checked ? 'block' : 'none';
+  const linkSel = document.getElementById('fld-ma-linkExisting');
+  if (checked) { linkSel.value = ''; linkSel.disabled = true; }
+  else { linkSel.disabled = false; }
+  if (checked && !document.getElementById('fld-ma-init-title').value) {
+    document.getElementById('fld-ma-init-title').value = document.getElementById('fld-ma-title').value;
+  }
+}
+window.onMaLinkExistingChange = function() {
+  const hasVal = !!document.getElementById('fld-ma-linkExisting').value;
+  const autocreateBox = document.getElementById('fld-ma-autocreate');
+  if (hasVal) { autocreateBox.checked = false; autocreateBox.disabled = true; document.getElementById('ma-autocreate-subform').style.display = 'none'; }
+  else { autocreateBox.disabled = false; }
+}
+window.unlinkMarketingActionInitiative = function() {
+  // Staged, not written immediately — commits on Save, consistent with
+  // every other field in this modal.
+  pendingUnlink = true;
+  document.getElementById('ma-link-status-wrap').style.display = 'none';
+  document.getElementById('ma-link-controls-wrap').style.display = 'block';
+}
+
+window.openActionForm = function(action = null) {
+  editingActionId = action ? action.id : null;
+  pendingUnlink = false;
+  document.getElementById('action-form-title').textContent = action ? 'Edit Marketing Action' : 'New Marketing Action';
+  document.getElementById('fld-ma-title').value = action?.title || '';
+  document.getElementById('fld-ma-description').value = action?.description || '';
+  document.getElementById('fld-ma-accountable').value = action?.accountablePerson || '';
+  document.getElementById('fld-ma-status').value = action?.status || 'Not Started';
+  document.getElementById('fld-ma-dateAgreed').value = action?.dateAgreed || '';
+  document.getElementById('fld-ma-deadline').value = action?.deadline || '';
+  document.getElementById('fld-ma-meetingContext').value = action?.meetingContext || '';
+
+  document.getElementById('fld-ma-autocreate').checked = false;
+  document.getElementById('fld-ma-autocreate').disabled = false;
+  document.getElementById('ma-autocreate-subform').style.display = 'none';
+  document.getElementById('fld-ma-init-title').value = '';
+  populateLinkExistingSelect(action ? action.id : null);
+  document.getElementById('fld-ma-linkExisting').value = '';
+  document.getElementById('fld-ma-linkExisting').disabled = false;
+
+  if (action?.linkedInitiativeId) {
+    const info = initiativeInfoFor(action.linkedInitiativeId);
+    document.getElementById('ma-link-status-wrap').style.display = 'block';
+    document.getElementById('ma-link-controls-wrap').style.display = 'none';
+    document.getElementById('ma-link-status-title').textContent = info ? info.title : ((action.linkedInitiativeTitle || 'Untitled') + ' (deleted)');
+    document.getElementById('ma-link-status-badge').textContent = info ? info.status : 'unknown';
+  } else {
+    document.getElementById('ma-link-status-wrap').style.display = 'none';
+    document.getElementById('ma-link-controls-wrap').style.display = 'block';
+  }
+
+  document.getElementById('action-form-overlay').classList.add('open');
+}
+window.closeActionForm = function() {
+  document.getElementById('action-form-overlay').classList.remove('open');
+}
+window.editMarketingAction = function(id) {
+  const a = ALL_MARKETING_ACTIONS.find(x => x.id === id);
+  if (a) openActionForm(a);
+}
+window.removeMarketingAction = async function(id, title) {
+  if (!confirm(`Delete marketing action "${title}"? This does NOT delete its linked initiative, if any.`)) return;
+  try { await deleteMarketingAction(id); showToast('Marketing action deleted'); }
+  catch (e) { showToast('Delete failed: ' + e.message, true); }
+}
+window.toggleMaSort = function() {
+  maSortDir = maSortDir === 'asc' ? 'desc' : 'asc';
+  document.getElementById('ma-sort-arrow').textContent = maSortDir === 'asc' ? '↑' : '↓';
+  renderMarketingActionsTable();
+}
+
+window.saveMarketingAction = async function() {
+  const title = document.getElementById('fld-ma-title').value.trim();
+  if (!title) { showToast('Title is required', true); return; }
+
+  const baseData = {
+    title,
+    description: document.getElementById('fld-ma-description').value.trim(),
+    accountablePerson: document.getElementById('fld-ma-accountable').value.trim(),
+    status: document.getElementById('fld-ma-status').value,
+    dateAgreed: document.getElementById('fld-ma-dateAgreed').value,
+    deadline: document.getElementById('fld-ma-deadline').value,
+    meetingContext: document.getElementById('fld-ma-meetingContext').value.trim(),
+  };
+
+  const autocreate = document.getElementById('fld-ma-autocreate').checked;
+  const linkExistingId = document.getElementById('fld-ma-linkExisting').value || null;
+
+  try {
+    let linkedInitiativeId = null, linkedInitiativeTitle = null;
+
+    if (autocreate) {
+      // Create the initiative FIRST. If this throws, bail out entirely — the
+      // action is never left half-linked.
+      const initTitle = document.getElementById('fld-ma-init-title').value.trim() || title;
+      const initData = {
+        title: initTitle,
+        type: document.getElementById('fld-ma-init-type').value,
+        department: document.getElementById('fld-ma-init-dept').value,
+        status: document.getElementById('fld-ma-init-status').value,
+        startDate: document.getElementById('fld-ma-init-startDate').value,
+        entity: [],
+      };
+      const docRef = await addInitiative(initData);
+      linkedInitiativeId = docRef.id;
+      linkedInitiativeTitle = initTitle;
+    } else if (linkExistingId) {
+      const info = initiativeInfoFor(linkExistingId);
+      linkedInitiativeId = linkExistingId;
+      linkedInitiativeTitle = info ? info.title : null;
+    } else if (editingActionId && !pendingUnlink) {
+      // Editing an action that already has a link, and the admin didn't
+      // touch the link controls or click Unlink — preserve the existing link.
+      const existing = ALL_MARKETING_ACTIONS.find(a => a.id === editingActionId);
+      linkedInitiativeId = existing?.linkedInitiativeId || null;
+      linkedInitiativeTitle = existing?.linkedInitiativeTitle || null;
+    }
+    // else: no link, or an explicit Unlink — both stay null.
+
+    const data = { ...baseData, linkedInitiativeId, linkedInitiativeTitle };
+
+    if (editingActionId) {
+      await updateMarketingAction(editingActionId, data);
+      showToast('Marketing action updated');
+    } else {
+      await addMarketingAction(data);
+      showToast('Marketing action created');
+    }
+    closeActionForm();
+  } catch (e) {
+    // If the initiative write already succeeded and it's the action write
+    // that failed, say so explicitly — an orphan initiative sitting visibly
+    // in Activities is an acceptable failure mode; never auto-delete it on
+    // a network blip.
+    showToast('Save failed: ' + e.message + ' — if a new initiative was already created, check the Activities tab.', true);
+  }
+}
+
+window.renderMarketingActionsTable = function() {
+  const tbody = document.getElementById('marketing-actions-table-body');
+  if (!tbody) return;
+  const statusF = document.getElementById('ma-status-filter').value;
+  const overdueOnly = document.getElementById('ma-overdue-filter').checked;
+  const q = (document.getElementById('ma-search').value || '').toLowerCase();
+
+  let filtered = ALL_MARKETING_ACTIONS.filter(a => {
+    if (statusF && a.status !== statusF) return false;
+    if (overdueOnly && !isActionOverdue(a)) return false;
+    if (q && !JSON.stringify(a).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  filtered = [...filtered].sort((a,b) => {
+    const da = a.deadline || '', db = b.deadline || '';
+    return maSortDir === 'asc' ? da.localeCompare(db) : db.localeCompare(da);
+  });
+
+  tbody.innerHTML = filtered.length
+    ? filtered.map(a => {
+        const overdue = isActionOverdue(a);
+        const info = a.linkedInitiativeId ? initiativeInfoFor(a.linkedInitiativeId) : null;
+        const linkCell = !a.linkedInitiativeId ? '—'
+          : info ? `${info.title} <span class="badge ${ACTION_STATUS_CLASS[info.status]||'b-planned'}">${info.status}</span>`
+          : `<s>${a.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3);font-size:10px">(deleted)</span>`;
+        return `
+      <tr class="${overdue?'row-overdue':''}">
+        <td style="font-weight:600">${a.title||''}</td>
+        <td>${a.accountablePerson||'—'}</td>
+        <td style="font-size:11px;color:var(--text-3)">${a.dateAgreed||'—'}</td>
+        <td style="font-size:11px;color:var(--text-3)">${a.deadline||'—'} ${overdue?'<span class="badge b-cancelled">⚠ Overdue</span>':''}</td>
+        <td><span class="badge ${ACTION_STATUS_CLASS[a.status]||'b-planned'}">${a.status||''}</span></td>
+        <td style="font-size:11px">${linkCell}</td>
+        <td class="row-actions">
+          <button class="btn btn-sm" onclick="editMarketingAction('${a.id}')">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="removeMarketingAction('${a.id}','${(a.title||'').replace(/'/g,"\\'")}')">Delete</button>
+        </td>
+      </tr>`;}).join('')
+    : '<tr><td colspan="7" class="empty">No marketing actions found</td></tr>';
 }
 
 // ── PROMOTIONS ────────────────────────────────────────────────────────────
