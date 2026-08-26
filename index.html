@@ -445,7 +445,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="period-nav-label" id="period-nav-label">Loading...</div>
           <button class="period-nav-btn" id="period-next" onclick="shiftPeriod(1)">→</button>
         </div>
-        <div style="font-size:10px;color:var(--text-3);margin-top:-14px;margin-bottom:20px">Applies to Social Media Performance, Department Activity, and Leads by Department below</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:-14px;margin-bottom:20px">Applies to Social Media Performance, Marketing Output, Leads by Department, and Department Activity below</div>
 
         <!-- Social Media Performance — synced from Metricool -->
         <div class="dash-section-title">Social Media Performance</div>
@@ -464,6 +464,19 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="chart-container"><canvas id="webChart"></canvas></div>
         </div>
 
+        <!-- Marketing Output — quantified deliverables, not just social metrics.
+             Counts real work only: excludes Cancelled items and Campaign
+             container records (their children are counted individually by
+             their own type, so a campaign isn't double-counted). -->
+        <div class="dash-section-title">Marketing Output</div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px">
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-videos">—</div><div class="sm-kpi-label">🎬 Videos</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-posts">—</div><div class="sm-kpi-label">📱 Social Posts</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-events">—</div><div class="sm-kpi-label">🎪 Events</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-print">—</div><div class="sm-kpi-label">🖨 Print Pieces</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-web">—</div><div class="sm-kpi-label">🌐 Website Updates</div></div>
+        </div>
+
         <!-- Leads by Department + Department Activity -->
         <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:24px">
           <div class="card">
@@ -474,10 +487,20 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
             </div>
           </div>
           <div class="card">
-            <div class="card-header"><div class="card-title">Department Activity — <span id="dept-activity-month-label">This Month</span></div><span style="font-size:11px;color:var(--text-3)">Share of marketing activity per department</span></div>
+            <div class="card-header">
+              <div class="card-title">Activity by Department — <span id="dept-activity-month-label">This Month</span></div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:11px;color:var(--text-3)">Group by</span>
+                <select id="dept-activity-groupby" onchange="renderDeptActivityBar()" style="font-size:11px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:4px;font-family:inherit">
+                  <option value="department">Department</option>
+                  <option value="entity">Entity</option>
+                </select>
+              </div>
+            </div>
             <div id="dept-activity-bar-wrap">
               <div id="dept-activity-bar" style="display:flex;height:36px;border-radius:8px;overflow:hidden;margin-top:8px"></div>
               <div id="dept-activity-legend" style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px"></div>
+              <div style="font-size:10px;color:var(--text-3);margin-top:10px">Click a segment or a legend entry for a breakdown by deliverable type</div>
             </div>
           </div>
         </div>
@@ -971,6 +994,7 @@ window.shiftPeriod = function(dir) {
   // periods[0] = most recent. ← (dir=-1) goes older = increase index. → (dir=+1) goes newer = decrease index
   dashPeriodIdx = Math.max(0, Math.min(periods.length-1, dashPeriodIdx - dir));
   renderDashboardKPIs();
+  renderMarketingOutput();
   renderDeptActivityBar();
   renderLeadsCharts();
 }
@@ -1067,6 +1091,7 @@ function renderFeatured() {
 window.renderDashboard = function() {
   renderDashboardKPIs();
   renderWebChart();
+  renderMarketingOutput();
   renderLeadsCharts();
   renderDeptActivityBar();
   renderCampMonthList();
@@ -1171,6 +1196,47 @@ function renderLeadsCharts() {
 // ── DEPARTMENT ACTIVITY BAR (this month) ────────────────────────────────────
 // Shows which departments marketing supported most this month, as a single
 // horizontal bar segmented by % share of total activity (initiatives count).
+// Classifies one initiative into a "Marketing Output" deliverable bucket, or
+// null if it shouldn't be counted as a produced deliverable at all.
+// Deliberately excludes Cancelled (per explicit product decision — Planned/
+// In Production/Ready/Published all still consumed real time and cost, so
+// they count) and Campaign-type container records (a campaign is an
+// organizing wrapper, not itself a video/post/event — its real children
+// already have their own type/contentType and get counted individually;
+// counting the container too would double-count the same real-world work).
+function deliverableTypeFor(i) {
+  if(i.status === 'Cancelled') return null;
+  if(i.type === 'Campaign') return null;
+  if(i.type === 'Physician Video') return 'Videos';
+  if(i.type === 'SM Content') return ['Video','Reel'].includes(i.contentType) ? 'Videos' : 'Social Posts';
+  if(i.type === 'Event') return 'Events';
+  if(i.type === 'Print') return 'Print';
+  if(i.type === 'Website Update') return 'Website Updates';
+  return null;
+}
+
+function renderMarketingOutput() {
+  try {
+    const periods = getAvailablePeriods();
+    const selectedPeriod = periods[dashPeriodIdx] || periods[0];
+    const counts = { Videos:0, 'Social Posts':0, Events:0, Print:0, 'Website Updates':0 };
+    ALL.filter(i => i.startDate?.startsWith(selectedPeriod)).forEach(i => {
+      const t = deliverableTypeFor(i);
+      if(t) counts[t]++;
+    });
+    document.getElementById('mo-videos').textContent = counts['Videos'];
+    document.getElementById('mo-posts').textContent  = counts['Social Posts'];
+    document.getElementById('mo-events').textContent = counts['Events'];
+    document.getElementById('mo-print').textContent  = counts['Print'];
+    document.getElementById('mo-web').textContent    = counts['Website Updates'];
+  } catch(e) { console.error('Marketing output error:', e); }
+}
+
+// Last-rendered groups (name -> array of matching initiatives), stashed so
+// openGroupBreakdown() can compute a per-type breakdown from the exact same
+// filtered set the chart itself just drew from — the two can never disagree.
+let DEPT_ACTIVITY_GROUPS = {};
+
 function renderDeptActivityBar() {
   try {
     const periods = getAvailablePeriods();
@@ -1179,14 +1245,24 @@ function renderDeptActivityBar() {
     document.getElementById('dept-activity-month-label').textContent =
       new Date(y, m-1, 1).toLocaleString('en',{month:'long',year:'numeric'});
 
-    const counts = {};
-    ALL.filter(i=>i.department && i.startDate?.startsWith(selectedPeriod)).forEach(i=>{
-      counts[i.department] = (counts[i.department]||0) + 1;
+    const groupBy = document.getElementById('dept-activity-groupby')?.value || 'department';
+    // Same inclusion rule as Marketing Output above (exclude Cancelled and
+    // Campaign containers) — this chart and those tiles must always agree.
+    const items = ALL.filter(i => i.startDate?.startsWith(selectedPeriod) && deliverableTypeFor(i));
+
+    const groups = {};
+    items.forEach(i => {
+      if(groupBy === 'entity') {
+        (i.entity||[]).forEach(e => { (groups[e] = groups[e] || []).push(i); });
+      } else if(i.department) {
+        (groups[i.department] = groups[i.department] || []).push(i);
+      }
     });
+    DEPT_ACTIVITY_GROUPS = groups;
 
     const barEl = document.getElementById('dept-activity-bar');
     const legendEl = document.getElementById('dept-activity-legend');
-    const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+    const entries = Object.entries(groups).map(([name,list])=>[name,list.length]).sort((a,b)=>b[1]-a[1]);
     const total = entries.reduce((s,[,c])=>s+c,0);
 
     if(!total) {
@@ -1196,22 +1272,59 @@ function renderDeptActivityBar() {
       return;
     }
 
-    barEl.innerHTML = entries.map(([dept,count])=>{
+    barEl.innerHTML = entries.map(([name,count])=>{
       const pct = (count/total*100);
-      const color = getDeptColor(dept).t;
-      return `<div title="${dept}: ${count} activities (${pct.toFixed(0)}%)" style="width:${pct}%;background:${color};transition:width 0.5s ease"></div>`;
+      const color = getDeptColor(name).t;
+      return `<div title="${name}: ${count} deliverables (${pct.toFixed(0)}%) — click for a breakdown" onclick="openGroupBreakdown('${name.replace(/'/g,"\\'")}')" style="cursor:pointer;width:${pct}%;background:${color};transition:width 0.5s ease"></div>`;
     }).join('');
 
-    legendEl.innerHTML = entries.map(([dept,count])=>{
+    legendEl.innerHTML = entries.map(([name,count])=>{
       const pct = (count/total*100).toFixed(0);
-      const color = getDeptColor(dept).t;
-      return `<div style="display:flex;align-items:center;gap:6px;font-size:11px">
+      const color = getDeptColor(name).t;
+      return `<div onclick="openGroupBreakdown('${name.replace(/'/g,"\\'")}')" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:11px">
         <span style="width:9px;height:9px;border-radius:2px;background:${color};flex-shrink:0"></span>
-        <span style="color:var(--text-2);font-weight:500">${dept}</span>
+        <span style="color:var(--text-2);font-weight:500">${name}</span>
         <span style="color:var(--text-3)">${pct}% · ${count}</span>
       </div>`;
     }).join('');
   } catch(e) { console.error('Dept activity bar error:', e); }
+}
+
+// Reuses the shared detail side-panel (#detail-overlay/#detail-panel) —
+// same DOM slots openDetail() uses, just filled with an aggregated
+// breakdown instead of a single initiative's fields.
+window.openGroupBreakdown = function(name) {
+  const items = DEPT_ACTIVITY_GROUPS[name] || [];
+  const counts = { Videos:0, 'Social Posts':0, Events:0, Print:0, 'Website Updates':0 };
+  items.forEach(i => { const t = deliverableTypeFor(i); if(t) counts[t]++; });
+
+  const periods = getAvailablePeriods();
+  const selectedPeriod = periods[dashPeriodIdx] || periods[0];
+  const [y,m] = selectedPeriod.split('-').map(Number);
+  const monthLabel = new Date(y,m-1,1).toLocaleString('en',{month:'long',year:'numeric'});
+
+  document.getElementById('dp-title').textContent = name;
+  document.getElementById('dp-badges').innerHTML =
+    `<span class="badge" style="background:var(--bg);color:var(--text-2)">${monthLabel}</span>` +
+    `<span class="badge" style="background:var(--bg);color:var(--text-2)">${items.length} total</span>`;
+  document.getElementById('dp-body').innerHTML = `
+    <div class="dp-section">
+      <div class="dp-section-title">Deliverables Breakdown</div>
+      <div class="dp-metrics">
+        ${Object.entries(counts).map(([type,count]) =>
+          `<div class="dp-metric"><div class="dp-metric-val">${count}</div><div class="dp-metric-label">${type}</div></div>`
+        ).join('')}
+      </div>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">Items</div>
+      ${items.length ? items.map(i =>
+        `<div class="dp-row"><span class="dp-label">${i.type}${i.contentType?' · '+i.contentType:''}</span><span class="dp-val">${i.title||''}</span></div>`
+      ).join('') : '<div style="font-size:12px;color:var(--text-3)">No items</div>'}
+    </div>
+  `;
+  document.getElementById('detail-overlay').classList.add('open');
+  document.getElementById('detail-panel').classList.add('open');
 }
 
 // ── SM ANALYTICS PAGE — synced from Metricool ────────────────────────────
