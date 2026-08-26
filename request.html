@@ -124,7 +124,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { login, logout, watchAuth, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS } from './firebase-data.js';
+import { login, logout, watchAuth, getUserRole, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS } from './firebase-data.js';
 
 let currentUserEmail = null;
 
@@ -138,10 +138,37 @@ window.doLogin = async function() {
 }
 window.doLogout = async function() { await logout(); }
 
-watchAuth(user => {
-  document.getElementById('login-wrap').style.display = user ? 'none' : 'flex';
-  document.getElementById('page-wrap').classList.toggle('active', !!user);
-  if(user) { currentUserEmail = user.email; populateSelects(); }
+// Real incident: this gate used to accept ANY authenticated Firebase account
+// with no role check at all — an agent, or even an account with no role
+// document, could sign in here and submit requests. Now matches the same
+// role-checked pattern used by admin.html/call-center.html.
+watchAuth(async user => {
+  if(user) {
+    try {
+      const role = await getUserRole(user.uid);
+      if(role !== 'coordinator' && role !== 'admin') {
+        const errEl = document.getElementById('login-error');
+        errEl.textContent = role
+          ? 'This account does not have access to submit requests.'
+          : 'No role assigned to this account — contact your administrator.';
+        errEl.style.display = 'block';
+        await logout();
+        return;
+      }
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('page-wrap').classList.add('active');
+      currentUserEmail = user.email;
+      populateSelects();
+    } catch(e) {
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = 'Could not verify access: ' + e.message;
+      errEl.style.display = 'block';
+      await logout();
+    }
+  } else {
+    document.getElementById('login-wrap').style.display = 'flex';
+    document.getElementById('page-wrap').classList.remove('active');
+  }
 });
 
 function populateSelects() {

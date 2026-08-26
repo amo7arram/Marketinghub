@@ -17,9 +17,10 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Well-span Program** — wellness packages plus any promotion flagged `isWellspan`
 - **Loyalty Program** — loyalty card tiers and benefits
 - **Business Development** — BD activity feed plus initiatives flagged `featuredBD`, with YTD KPI progress against BD targets
-- **Leads & Attribution** — aggregated (no-PII) lead funnel: total/reached/unreached/missed/booked, monthly trend, department & entity breakdowns, per-campaign CPL/CPA/ROI table
+- **Leads & Attribution** — aggregated (no-PII) lead funnel: total/reached/unreached/missed/booked, monthly trend, department & entity breakdowns, per-campaign CPL/CPA/ROI table. A "🔒 View Individual Leads (Agent Access)" link at the top opens `call-center.html` in a new tab — this page never reads raw lead records itself (see the PII boundary in `docs/ARCHITECTURE.md` §4), the link only points to where they're actually protected by that page's own agent/admin login gate
 - **All Campaigns / Events / Dept Campaigns / Health Days / Content Library / Print Materials** — browsable, filterable views of the initiatives collection sliced different ways
 - **Brand Resources** — downloadable brand assets
+- **Team Tools (sidebar)** — a "📝 Submit a Request ↗" link to `request.html`, opened in a new tab
 
 ---
 
@@ -118,6 +119,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Minimal single-purpose form: submit a marketing request (title, description, department, type, deadline, priority)
 - Daily submission limit enforced per requester
 - No access to any other part of the system
+- **Role-checked login gate** (fixed during the pre-rollout permissions review — this page previously accepted *any* authenticated Firebase account with no role check at all): rejects and signs back out any account that isn't `coordinator` or `admin`, matching the same pattern already used by `admin.html`/`call-center.html`/`actions.html`. See `docs/ARCHITECTURE.md` §4.1.
 
 ---
 

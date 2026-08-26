@@ -73,6 +73,8 @@ Stored in the `roles` Firestore collection, keyed by Firebase Auth UID:
 
 A user with **no** role document is treated as unauthorized everywhere, even if they have a valid Firebase Auth login. Creating a Firebase Auth account does not grant any access by itself — the `roles` document is the actual gate.
 
+**This was only true in principle until a pre-rollout access review caught the gap:** `request.html`'s login gate checked `if(user)` only — no `getUserRole()` call at all — so any authenticated Firebase account (an agent, or one with no role document whatsoever) could sign in and submit requests, contradicting the "no role = unauthorized everywhere" rule stated above. Fixed to match `admin.html`/`call-center.html`'s pattern exactly (reject and sign back out unless `role === 'coordinator' || role === 'admin'`). Worth this specific callout since it's the kind of gap that's invisible until someone actually reads the login-gate code file by file — a good justification for the same review before every future rollout of a login-gated page, not just this one.
+
 ### 4.2 Firestore Rules Pattern
 
 Every collection follows one of two patterns:
