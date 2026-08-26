@@ -25,8 +25,13 @@ An internal marketing operations platform for International Medical Center (IMC)
 | Charts | Chart.js (CDN) |
 | Excel parsing | SheetJS/XLSX (CDN) |
 | AI generation | Anthropic API, called directly from the browser |
+| Metricool CORS proxy | One Cloudflare Worker — the sole exception to "no backend," see below |
 
-**No backend server exists.** Every piece of logic — validation, permissions, aggregation, AI calls — runs client-side in the browser or is enforced by Firestore Security Rules. This is the single most important architectural fact about the system and the primary thing that would change in a SaaS rebuild.
+**No backend server exists**, with one narrow exception. Every piece of logic — validation, permissions, aggregation, AI calls — runs client-side in the browser or is enforced by Firestore Security Rules. This is the single most important architectural fact about the system and the primary thing that would change in a SaaS rebuild.
+
+**The one exception: a Cloudflare Worker CORS proxy for Metricool.** Metricool's API sends no `Access-Control-Allow-*` headers at all (confirmed live, not assumed), so `admin.html`'s browser-side `fetch()` calls to it are blocked by CORS with no workaround possible from a pure static site. A minimal, stateless Worker forwards the request to Metricool with the same headers and adds CORS headers to the response — it never stores the API token, which flows through exactly as supplied. Chosen over a public CORS proxy (token would transit a third party) or a Firebase Cloud Function (requires the paid Blaze plan). Source is versioned at [`cloudflare-worker-metricool-proxy.js`](../cloudflare-worker-metricool-proxy.js) in the repo root — **not auto-deployed**, same manual-sync caveat as `firestore.rules` (§4.2): whenever that file changes, the updated code must be pasted into the live Worker by hand via the Cloudflare dashboard. `admin.html`'s `METRICOOL_API_BASE` constant points at the Worker's URL.
+
+The Worker only forwards requests whose `Origin` (or, as a fallback, `Referer`) matches the live site's origin — real incident: a user on a restricted corporate network had every single Metricool sync call fail identically, traced to that network stripping the `Origin` header from outgoing requests before Cloudflare ever saw it. The `Referer` fallback exists specifically for that case.
 
 ---
 
