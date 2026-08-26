@@ -15,6 +15,11 @@
 
 const ALLOWED_ORIGINS = new Set([
   'https://amo7arram.github.io',
+  'https://marketing.imcprojects.app', // internal-domain mirror of the same site — Netlify transparently
+                                        // proxies GitHub Pages content under this domain (confirmed via
+                                        // response headers: zero redirects, Server: Netlify, X-Github-*
+                                        // headers present), so the browser's real Origin becomes this
+                                        // domain, not amo7arram.github.io, when accessed this way.
 ]);
 
 // Real incident: a user on a restricted corporate/hospital network had
