@@ -81,7 +81,11 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Annual budget vs. spend tracking, combining `expenses` and `initiatives.cost`
 
 ### Requests
-- View/manage requests submitted via `request.html`
+- Review requests submitted via `request.html`: filter by department/type/status, sort by submission date
+- **Accept** — optionally link the request to a real Activity: either auto-create one now (title/department pre-filled from the request) or link to an existing one, via the exact same mechanism as Marketing Actions below. Linking is optional at Accept time — an admin can accept first and link later via "Edit Link"
+- **Reject** — requires a reason (from a fixed list: Insufficient Detail, Outside Marketing Scope, Duplicate Request, Budget Not Available, Lower Priority, Already Covered by Existing Campaign, Other) plus an optional note. Both are shown back to the coordinator
+- A rejected request can later be Accepted (and vice versa) if the decision changes
+- **"↻ Migrate Legacy Request Status"** — one-time button converting requests created before this workflow existed (which only had a boolean "done") into the new Pending/Accepted status
 
 ### Marketing Actions
 - CRUD for action items agreed between executive leadership and marketing in meetings — title, description, accountable person (free text, not a team-member lookup), date agreed, meeting context, deadline, status (`Not Started`/`In Progress`/`Blocked`/`Completed`)
@@ -116,8 +120,9 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 ## Coordinator Request Form (`request.html`) — `role: coordinator` or `admin`
 
-- Minimal single-purpose form: submit a marketing request (title, description, department, type, deadline, priority)
+- Submit a marketing request: title, description, department, entity (multi-select), target audience, type, deadline, priority, and an optional reference link (a Drive link/brand asset in lieu of emailing an attachment)
 - Daily submission limit enforced per requester
+- **"My Requests"** — a second view (toggle at the top, no separate page/login) showing every request this coordinator has ever submitted and its live status: Pending, Accepted (with the linked Activity's live title+status, if one was created or linked), or Rejected (with the reason and any note the admin gave). Read-only — imports no write-capable functions, same discipline as `actions.html`
 - No access to any other part of the system
 - **Role-checked login gate** (fixed during the pre-rollout permissions review — this page previously accepted *any* authenticated Firebase account with no role check at all): rejects and signs back out any account that isn't `coordinator` or `admin`, matching the same pattern already used by `admin.html`/`call-center.html`/`actions.html`. See `docs/ARCHITECTURE.md` §4.1.
 

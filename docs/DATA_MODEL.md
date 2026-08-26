@@ -153,17 +153,30 @@ Keyed by Firebase Auth UID (not an auto-generated ID). One field:
 
 ## `requests`
 
-Marketing requests submitted by coordinators via `request.html`.
+Marketing requests submitted by coordinators via `request.html`, reviewed (accepted/rejected) by an admin in `admin.html`'s Requests tab, and optionally linked to a real `initiatives` document — same accept-and-link mechanism as `marketing_actions` below, reusing its `initiativeInfoFor()`/`populateLinkExistingSelect()` helpers.
 
 | Field | Type | Notes |
 |---|---|---|
 | `requesterName`, `email` | string | |
 | `title`, `description` | string | |
 | `department` | string | |
+| `entity` | string[] | Which business entities this relates to — same convention as `initiatives.entity` |
+| `targetAudience` | string | Who the request is for |
+| `referenceLink` | string | Optional — a Drive link, brand asset, or example, in lieu of emailing an attachment separately |
 | `type` | string | From `REQUEST_TYPES` constant |
 | `deadline` | string | |
-| `priority` | string | `Low`/`Normal`/`High`/`Urgent` |
+| `priority` | string | From `PRIORITIES` constant — `Normal`/`High`/`Urgent` (previously documented here as including `Low`, which doesn't exist in the actual constant) |
+| `status` | string | One of `REQUEST_STATUSES` (`firebase-data.js`): `Pending`, `Accepted`, `Rejected` |
+| `rejectionReason` | string \| null | From `REQUEST_REJECTION_REASONS`, only meaningful when `status === "Rejected"` |
+| `rejectionNote` | string | Optional free-text elaboration alongside `rejectionReason` |
+| `linkedInitiativeId` | string \| null | Raw `initiatives` doc id, or `null` — same convention as `marketing_actions.linkedInitiativeId`. Set either by auto-creating a new initiative at Accept time, or by linking to an existing one. **No referential integrity** (same accepted gap as `marketing_actions`/`leads.campaignId`) — deleting the linked initiative leaves this dangling; both `admin.html` and `request.html`'s "My Requests" view render an explicit "(deleted)" label rather than going silently blank. |
+| `linkedInitiativeTitle` | string \| null | Denormalized display title. The *live* status shown anywhere is always a fresh lookup against `initiatives`, never a stored/denormalized status field. |
+| `reviewedAt` | Timestamp | Set when an admin accepts or rejects |
+| `reviewedBy` | string | Admin's email |
 | `createdAt` | Timestamp | Used to enforce `DAILY_REQUEST_LIMIT` per submitter |
+| `done` | boolean | ⚠️ Legacy — predates `status`. Requests created before the accept/reject workflow existed only ever had this boolean. `migrateLegacyRequestStatuses()` converts them one time (`done:true`→`Accepted`, `done:false`/missing→`Pending`); until migrated, `requestStatusOf()` in `admin.html` interprets `done` on the fly so old rows still render correctly. |
+
+The submitting coordinator can see their own requests and their live status/outcome via `request.html`'s "My Requests" panel (`watchMyRequests(email, ...)`, scoped client-side by `submittedBy` — the Firestore rule itself is the same blanket authenticated-read as every other internal collection, not a per-document restriction; see `docs/ARCHITECTURE.md` §4.2).
 
 ---
 

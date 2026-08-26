@@ -618,6 +618,13 @@ export function updateRequest(id, data) {
   return updateDoc(doc(db, REQUESTS, id), data);
 }
 
+// Accept/Reject writes go through here instead of updateRequest() so
+// reviewedAt is always stamped automatically — mirrors updateMarketingAction's
+// auto-stamped updatedAt, keeps admin.html from having to import Timestamp.
+export function reviewRequest(id, data) {
+  return updateDoc(doc(db, REQUESTS, id), { ...data, reviewedAt: Timestamp.now() });
+}
+
 export const DAILY_REQUEST_LIMIT = 5;
 
 // Returns how many requests this email has submitted since midnight today
@@ -640,6 +647,37 @@ export const REQUEST_TYPES = [
   "Seasonal / Occasion Campaign","Patient Education Content","Internal Communication","Other"
 ];
 export const PRIORITIES = ["Normal","High","Urgent"];
+
+export const REQUEST_STATUSES = ["Pending", "Accepted", "Rejected"];
+export const REQUEST_REJECTION_REASONS = [
+  "Insufficient Detail / Needs Clarification", "Outside Marketing Scope", "Duplicate Request",
+  "Budget Not Available", "Lower Priority Than Current Workload",
+  "Already Covered by Existing Campaign", "Other"
+];
+
+// Live view scoped to the submitting coordinator only — used by request.html's
+// "My Requests" panel so a coordinator can see what happened to what they
+// submitted. Client-side sort, no orderBy() (CLAUDE.md rule 5).
+export function watchMyRequests(email, callback) {
+  const q = query(collection(db, REQUESTS), where("submittedBy", "==", email));
+  return onSnapshot(q, snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
+    callback(data);
+  });
+}
+
+// One-time migration for requests created before the accept/reject workflow
+// existed: they only ever had a boolean `done`. A fulfilled legacy request is
+// assumed to have been accepted and executed; mirrors migrateLegacyLeadStatuses().
+export async function migrateLegacyRequestStatuses() {
+  const snap = await getDocs(collection(db, REQUESTS));
+  const targets = snap.docs.filter(d => d.data().status === undefined);
+  await Promise.all(targets.map(d =>
+    updateDoc(doc(db, REQUESTS, d.id), { status: d.data().done ? "Accepted" : "Pending" })
+  ));
+  return { migrated: targets.length };
+}
 
 // ── MARKETING ACTIONS (executive/marketing action-item tracker) ──────────
 // Action items agreed between executive leadership and marketing in meetings.

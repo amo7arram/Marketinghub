@@ -559,16 +559,19 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div class="filters">
           <select class="filter-select" id="req-dept-filter" onchange="renderRequestsTable()"><option value="">All Departments</option></select>
           <select class="filter-select" id="req-type-filter" onchange="renderRequestsTable()"><option value="">All Request Types</option></select>
-          <select class="filter-select" id="req-status-filter" onchange="renderRequestsTable()"><option value="">All</option><option value="pending">Pending</option><option value="done">Done</option></select>
+          <select class="filter-select" id="req-status-filter" onchange="renderRequestsTable()"><option value="">All Status</option></select>
         </div>
-        <div style="font-size:12px;color:var(--text-3)">Submitted via the coordinator request form</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn btn-sm" onclick="runMigrateLegacyRequestStatuses()">↻ Migrate Legacy Request Status</button>
+          <div style="font-size:12px;color:var(--text-3)">Submitted via the coordinator request form</div>
+        </div>
       </div>
       <table>
         <thead><tr>
           <th onclick="toggleReqSort()" style="cursor:pointer;user-select:none">Submitted <span id="req-sort-arrow">↓</span></th>
-          <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th></th>
+          <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Entity</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th>Status</th><th>Linked Initiative</th><th></th>
         </tr></thead>
-        <tbody id="requests-table-body"><tr><td colspan="10" class="empty">Loading...</td></tr></tbody>
+        <tbody id="requests-table-body"><tr><td colspan="13" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -1119,6 +1122,69 @@ tr.row-overdue:hover td{background:#FFD6D6}
   </div>
 </div>
 
+<!-- ── REQUEST ACCEPT FORM MODAL ── -->
+<div class="modal-overlay" id="request-accept-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Accept Request</div>
+      <button class="modal-close" onclick="closeRequestAcceptForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="req-accept-summary" style="font-size:12px;color:var(--text-2);background:var(--bg);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px"></div>
+
+      <div class="field-section-title">Linked Initiative</div>
+      <div id="req-link-status-wrap" style="display:none;font-size:12px;color:var(--text-2);margin-bottom:10px;padding:10px 12px;background:var(--bg);border-radius:var(--radius)">
+        Linked to <strong id="req-link-status-title"></strong> (<span id="req-link-status-badge"></span>)
+        <button type="button" class="btn btn-sm" style="float:right" onclick="unlinkRequestInitiative()">Unlink</button>
+      </div>
+      <div id="req-link-controls-wrap">
+        <div class="field-group">
+          <label class="field-label">Link to an existing initiative</label>
+          <select class="field-select" id="fld-req-linkExisting" onchange="onReqLinkExistingChange()"><option value="">— None —</option></select>
+        </div>
+        <div class="field-group">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-2)">
+            <input type="checkbox" id="fld-req-autocreate" onchange="toggleReqAutocreateSubform()"> Create a new linked initiative now
+          </label>
+        </div>
+        <div id="req-autocreate-subform" style="display:none;background:var(--bg);border-radius:var(--radius);padding:14px;margin-top:6px">
+          <div class="field-group"><label class="field-label">Initiative Title</label><input class="field-input" id="fld-req-init-title"></div>
+          <div class="field-row">
+            <div class="field-group"><label class="field-label">Type</label><select class="field-select" id="fld-req-init-type"></select></div>
+            <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="fld-req-init-dept"></select></div>
+          </div>
+          <div class="field-row">
+            <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-req-init-status"></select></div>
+            <div class="field-group"><label class="field-label">Start Date</label><input class="field-input" type="date" id="fld-req-init-startDate"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeRequestAcceptForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRequestAccept()">Accept Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── REQUEST REJECT FORM MODAL ── -->
+<div class="modal-overlay" id="request-reject-overlay">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Reject Request</div>
+      <button class="modal-close" onclick="closeRequestRejectForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Reason<span style="color:var(--red)">*</span></label><select class="field-select" id="fld-req-rejectReason"></select></div>
+      <div class="field-group"><label class="field-label">Note <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label><textarea class="field-textarea" id="fld-req-rejectNote" placeholder="Any extra context for the coordinator"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeRequestRejectForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRequestReject()">Reject Request</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── PROMOTION FORM MODAL ── -->
 <div class="modal-overlay" id="promo-overlay">
   <div class="modal" style="width:540px">
@@ -1596,7 +1662,8 @@ import {
   login, logout, watchAuth, getUserRole,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
-  watchRequests, deleteRequest, updateRequest, REQUEST_TYPES,
+  watchRequests, deleteRequest, reviewRequest, REQUEST_TYPES,
+  REQUEST_STATUSES, REQUEST_REJECTION_REASONS, migrateLegacyRequestStatuses,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
   getAnnualBudget, setAnnualBudget,
   watchPromotions, addPromotion, updatePromotion, deletePromotion, promoStatus,
@@ -1635,6 +1702,8 @@ let ALL_TEAM_MEMBERS = [];
 let DEPT_REVENUE_ESTIMATES = {};
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
+let currentAdminEmail = '';
+let editingRequestAcceptId = null, pendingRequestUnlink = false;
 let ALL_EXPENSES = [];
 let ALL_PROMOTIONS = [];
 let ALL_BD_CARDS = [];
@@ -1776,6 +1845,7 @@ watchAuth(async user => {
       document.getElementById('login-wrap').style.display = 'none';
       document.getElementById('app').classList.add('active');
       document.getElementById('user-email').textContent = user.email;
+      currentAdminEmail = user.email;
       initData();
     } catch(e) {
       console.error('Role check failed:', e);
@@ -1996,6 +2066,11 @@ function populateStaticSelects() {
   document.getElementById('bulk-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('req-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('req-type-filter').innerHTML += REQUEST_TYPES.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('req-status-filter').innerHTML += REQUEST_STATUSES.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('fld-req-rejectReason').innerHTML = REQUEST_REJECTION_REASONS.map(r=>`<option>${r}</option>`).join('');
+  document.getElementById('fld-req-init-type').innerHTML = TYPES.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('fld-req-init-dept').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('fld-req-init-status').innerHTML = STATUSES.map(s=>`<option>${s}</option>`).join('');
 
   // Marketing Actions
   document.getElementById('ma-status-filter').innerHTML += ACTION_STATUSES.map(s=>`<option>${s}</option>`).join('');
@@ -2495,38 +2570,56 @@ function initiativeInfoFor(id) {
 }
 
 // Mirrors populateParentCampaignSelect() but lists every initiative type,
-// not just Campaigns — an action can reasonably link to an Event, SM Content
-// piece, etc., not only a Campaign container.
-function populateLinkExistingSelect(excludeId) {
-  const sel = document.getElementById('fld-ma-linkExisting');
+// not just Campaigns — an action/request can reasonably link to an Event, SM
+// Content piece, etc., not only a Campaign container. Shared by both the
+// Marketing Actions modal and the Request Accept modal — takes the target
+// select's id so it isn't hardcoded to one feature.
+function populateLinkExistingSelect(selectId, excludeId) {
+  const sel = document.getElementById(selectId);
   if (!sel) return;
   const opts = ALL_INITIATIVES.filter(i => i.id !== excludeId);
   sel.innerHTML = '<option value="">— None —</option>' +
     opts.map(i => `<option value="${i.id}">${i.title||'Untitled'}</option>`).join('');
 }
 
-window.toggleMaAutocreateSubform = function() {
-  const checked = document.getElementById('fld-ma-autocreate').checked;
-  document.getElementById('ma-autocreate-subform').style.display = checked ? 'block' : 'none';
-  const linkSel = document.getElementById('fld-ma-linkExisting');
+// Shared "link to existing / create new now" toggle logic, parameterized by
+// an id prefix (`ma` or `req`) — both features name their fields
+// fld-{prefix}-autocreate / {prefix}-autocreate-subform / fld-{prefix}-linkExisting.
+function toggleAutocreateSubform(prefix) {
+  const checked = document.getElementById(`fld-${prefix}-autocreate`).checked;
+  document.getElementById(`${prefix}-autocreate-subform`).style.display = checked ? 'block' : 'none';
+  const linkSel = document.getElementById(`fld-${prefix}-linkExisting`);
   if (checked) { linkSel.value = ''; linkSel.disabled = true; }
   else { linkSel.disabled = false; }
-  if (checked && !document.getElementById('fld-ma-init-title').value) {
+}
+function onLinkExistingChange(prefix) {
+  const hasVal = !!document.getElementById(`fld-${prefix}-linkExisting`).value;
+  const autocreateBox = document.getElementById(`fld-${prefix}-autocreate`);
+  if (hasVal) { autocreateBox.checked = false; autocreateBox.disabled = true; document.getElementById(`${prefix}-autocreate-subform`).style.display = 'none'; }
+  else { autocreateBox.disabled = false; }
+}
+
+window.toggleMaAutocreateSubform = function() {
+  toggleAutocreateSubform('ma');
+  if (document.getElementById('fld-ma-autocreate').checked && !document.getElementById('fld-ma-init-title').value) {
     document.getElementById('fld-ma-init-title').value = document.getElementById('fld-ma-title').value;
   }
 }
-window.onMaLinkExistingChange = function() {
-  const hasVal = !!document.getElementById('fld-ma-linkExisting').value;
-  const autocreateBox = document.getElementById('fld-ma-autocreate');
-  if (hasVal) { autocreateBox.checked = false; autocreateBox.disabled = true; document.getElementById('ma-autocreate-subform').style.display = 'none'; }
-  else { autocreateBox.disabled = false; }
-}
+window.onMaLinkExistingChange = function() { onLinkExistingChange('ma'); }
 window.unlinkMarketingActionInitiative = function() {
   // Staged, not written immediately — commits on Save, consistent with
   // every other field in this modal.
   pendingUnlink = true;
   document.getElementById('ma-link-status-wrap').style.display = 'none';
   document.getElementById('ma-link-controls-wrap').style.display = 'block';
+}
+
+window.toggleReqAutocreateSubform = function() { toggleAutocreateSubform('req'); }
+window.onReqLinkExistingChange = function() { onLinkExistingChange('req'); }
+window.unlinkRequestInitiative = function() {
+  pendingRequestUnlink = true;
+  document.getElementById('req-link-status-wrap').style.display = 'none';
+  document.getElementById('req-link-controls-wrap').style.display = 'block';
 }
 
 window.openActionForm = function(action = null) {
@@ -2545,7 +2638,7 @@ window.openActionForm = function(action = null) {
   document.getElementById('fld-ma-autocreate').disabled = false;
   document.getElementById('ma-autocreate-subform').style.display = 'none';
   document.getElementById('fld-ma-init-title').value = '';
-  populateLinkExistingSelect(action ? action.id : null);
+  populateLinkExistingSelect('fld-ma-linkExisting', action ? action.id : null);
   document.getElementById('fld-ma-linkExisting').value = '';
   document.getElementById('fld-ma-linkExisting').disabled = false;
 
@@ -2671,7 +2764,7 @@ window.renderMarketingActionsTable = function() {
         const overdue = isActionOverdue(a);
         const info = a.linkedInitiativeId ? initiativeInfoFor(a.linkedInitiativeId) : null;
         const linkCell = !a.linkedInitiativeId ? '—'
-          : info ? `${info.title} <span class="badge ${ACTION_STATUS_CLASS[info.status]||'b-planned'}">${info.status}</span>`
+          : info ? `${info.title} <span class="badge ${STATUS_CLASS[info.status]||'b-planned'}">${info.status}</span>`
           : `<s>${a.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3);font-size:10px">(deleted)</span>`;
         return `
       <tr class="${overdue?'row-overdue':''}">
@@ -3420,8 +3513,13 @@ window.renderResourcesTable = function() {
     : '<tr><td colspan="5" class="empty">No resources found</td></tr>';
 }
 
-// ── REQUESTS (filters, sort, mark done, delete) ─────────────────────────
+// ── REQUESTS (filters, sort, accept/reject + initiative link, delete) ────
 const PRIORITY_CLASS = {'Urgent':'b-cancelled','High':'b-production','Normal':'b-ready'};
+const REQUEST_STATUS_CLASS = {'Pending':'b-planned','Accepted':'b-published','Rejected':'b-cancelled'};
+
+// Legacy requests created before the accept/reject workflow only ever had a
+// boolean `done` — treat as Pending until migrated (see the migration button).
+function requestStatusOf(r) { return r.status || (r.done ? 'Accepted' : 'Pending'); }
 
 window.toggleReqSort = function() {
   reqSortDir = reqSortDir==='asc' ? 'desc' : 'asc';
@@ -3430,18 +3528,128 @@ window.toggleReqSort = function() {
 }
 
 window.removeRequest = async function(id, title) {
-  if(!confirm(`Delete request "${title}" from the log?`)) return;
+  if(!confirm(`Delete request "${title}" from the log? This does NOT delete its linked initiative, if any.`)) return;
   try { await deleteRequest(id); showToast('Request removed'); }
   catch(e) { showToast('Delete failed: ' + e.message, true); }
 }
 
-window.markRequestDone = async function(id) {
-  try { await updateRequest(id, { done: true }); showToast('Marked as done'); }
-  catch(e) { showToast('Update failed: ' + e.message, true); }
+window.runMigrateLegacyRequestStatuses = async function() {
+  if(!confirm('Convert every legacy request (done:true/false only, no status field) to the new Pending/Accepted status? This only touches requests that predate the accept/reject workflow.')) return;
+  try {
+    const result = await migrateLegacyRequestStatuses();
+    showToast(`Migrated ${result.migrated} request(s)`);
+  } catch(e) { showToast('Migration failed: ' + e.message, true); }
 }
-window.markRequestPending = async function(id) {
-  try { await updateRequest(id, { done: false }); showToast('Marked as pending'); }
-  catch(e) { showToast('Update failed: ' + e.message, true); }
+
+// ── Accept modal ──
+window.openRequestAcceptForm = function(id) {
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  if (!r) return;
+  editingRequestAcceptId = id;
+  pendingRequestUnlink = false;
+
+  document.getElementById('req-accept-summary').innerHTML =
+    `<strong>${r.title||''}</strong><br>${r.requesterName||'—'}${r.email?` (${r.email})`:''} — ${r.department||''} / ${r.type||''}` +
+    (r.description ? `<br><span style="color:var(--text-3)">${r.description}</span>` : '');
+
+  document.getElementById('fld-req-autocreate').checked = false;
+  document.getElementById('fld-req-autocreate').disabled = false;
+  document.getElementById('req-autocreate-subform').style.display = 'none';
+  document.getElementById('fld-req-init-title').value = r.title || '';
+  document.getElementById('fld-req-init-dept').value = r.department || '';
+  document.getElementById('fld-req-init-status').value = 'Planned';
+  document.getElementById('fld-req-init-startDate').value = '';
+
+  populateLinkExistingSelect('fld-req-linkExisting', null);
+  document.getElementById('fld-req-linkExisting').value = '';
+  document.getElementById('fld-req-linkExisting').disabled = false;
+
+  if (r.linkedInitiativeId) {
+    const info = initiativeInfoFor(r.linkedInitiativeId);
+    document.getElementById('req-link-status-wrap').style.display = 'block';
+    document.getElementById('req-link-controls-wrap').style.display = 'none';
+    document.getElementById('req-link-status-title').textContent = info ? info.title : ((r.linkedInitiativeTitle || 'Untitled') + ' (deleted)');
+    document.getElementById('req-link-status-badge').textContent = info ? info.status : 'unknown';
+  } else {
+    document.getElementById('req-link-status-wrap').style.display = 'none';
+    document.getElementById('req-link-controls-wrap').style.display = 'block';
+  }
+
+  document.getElementById('request-accept-overlay').classList.add('open');
+}
+window.closeRequestAcceptForm = function() {
+  document.getElementById('request-accept-overlay').classList.remove('open');
+}
+
+window.saveRequestAccept = async function() {
+  const id = editingRequestAcceptId;
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  if (!r) return;
+  const autocreate = document.getElementById('fld-req-autocreate').checked;
+  const linkExistingId = document.getElementById('fld-req-linkExisting').value || null;
+
+  try {
+    let linkedInitiativeId = null, linkedInitiativeTitle = null;
+
+    if (autocreate) {
+      // Create the initiative FIRST — if this throws, bail out entirely so
+      // the request is never left half-linked.
+      const initTitle = document.getElementById('fld-req-init-title').value.trim() || r.title;
+      const initData = {
+        title: initTitle,
+        type: document.getElementById('fld-req-init-type').value,
+        department: document.getElementById('fld-req-init-dept').value,
+        status: document.getElementById('fld-req-init-status').value,
+        startDate: document.getElementById('fld-req-init-startDate').value,
+        entity: r.entity || [],
+      };
+      const docRef = await addInitiative(initData);
+      linkedInitiativeId = docRef.id;
+      linkedInitiativeTitle = initTitle;
+    } else if (linkExistingId) {
+      const info = initiativeInfoFor(linkExistingId);
+      linkedInitiativeId = linkExistingId;
+      linkedInitiativeTitle = info ? info.title : null;
+    } else if (!pendingRequestUnlink) {
+      // Editing an already-accepted, already-linked request without touching
+      // the link controls or clicking Unlink — preserve the existing link.
+      linkedInitiativeId = r.linkedInitiativeId || null;
+      linkedInitiativeTitle = r.linkedInitiativeTitle || null;
+    }
+    // else: no link, or an explicit Unlink — both stay null.
+
+    await reviewRequest(id, { status: 'Accepted', linkedInitiativeId, linkedInitiativeTitle, reviewedBy: currentAdminEmail });
+    showToast('Request accepted');
+    closeRequestAcceptForm();
+  } catch (e) {
+    showToast('Save failed: ' + e.message + ' — if a new initiative was already created, check the Activities tab.', true);
+  }
+}
+
+// ── Reject modal ──
+let editingRequestRejectId = null;
+window.openRequestRejectForm = function(id) {
+  editingRequestRejectId = id;
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  document.getElementById('fld-req-rejectReason').value = r?.rejectionReason || REQUEST_REJECTION_REASONS[0];
+  document.getElementById('fld-req-rejectNote').value = r?.rejectionNote || '';
+  document.getElementById('request-reject-overlay').classList.add('open');
+}
+window.closeRequestRejectForm = function() {
+  document.getElementById('request-reject-overlay').classList.remove('open');
+}
+window.saveRequestReject = async function() {
+  const id = editingRequestRejectId;
+  if (!id) return;
+  const rejectionReason = document.getElementById('fld-req-rejectReason').value;
+  const rejectionNote = document.getElementById('fld-req-rejectNote').value.trim();
+  try {
+    await reviewRequest(id, { status: 'Rejected', rejectionReason, rejectionNote, reviewedBy: currentAdminEmail });
+    showToast('Request rejected');
+    closeRequestRejectForm();
+  } catch (e) {
+    showToast('Save failed: ' + e.message, true);
+  }
 }
 
 window.renderRequestsTable = function() {
@@ -3452,8 +3660,7 @@ window.renderRequestsTable = function() {
   let filtered = ALL_REQUESTS.filter(r=>{
     if(deptF && r.department!==deptF) return false;
     if(typeF && r.type!==typeF) return false;
-    if(statusF==='done' && !r.done) return false;
-    if(statusF==='pending' && r.done) return false;
+    if(statusF && requestStatusOf(r)!==statusF) return false;
     return true;
   });
 
@@ -3466,25 +3673,41 @@ window.renderRequestsTable = function() {
   document.getElementById('requests-table-body').innerHTML = filtered.length
     ? filtered.map(r=>{
         const submitted = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-GB') : '—';
-        return `<tr class="${r.done?'row-done':''}">
+        const status = requestStatusOf(r);
+        const info = r.linkedInitiativeId ? initiativeInfoFor(r.linkedInitiativeId) : null;
+        const linkCell = !r.linkedInitiativeId ? '—'
+          : info ? `${info.title} <span class="badge ${STATUS_CLASS[info.status]||'b-planned'}">${info.status}</span>`
+          : `<s>${r.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3);font-size:10px">(deleted)</span>`;
+        let actions = `<button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button>`;
+        if (status === 'Pending') {
+          actions = `<button class="btn btn-sm" style="color:var(--green);border-color:var(--green)" onclick="openRequestAcceptForm('${r.id}')">✓ Accept</button>
+            <button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openRequestRejectForm('${r.id}')">✕ Reject</button>` + actions;
+        } else if (status === 'Accepted') {
+          actions = `<button class="btn btn-sm" onclick="openRequestAcceptForm('${r.id}')">✏️ Edit Link</button>
+            <button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openRequestRejectForm('${r.id}')">✕ Reject</button>` + actions;
+        } else if (status === 'Rejected') {
+          actions = `<button class="btn btn-sm" style="color:var(--green);border-color:var(--green)" onclick="openRequestAcceptForm('${r.id}')">✓ Accept</button>` + actions;
+        }
+        const statusCell = status === 'Rejected' && r.rejectionReason
+          ? `<span class="badge ${REQUEST_STATUS_CLASS[status]}">${status}</span><br><span style="font-size:10px;color:var(--text-3)">${r.rejectionReason}${r.rejectionNote?': '+r.rejectionNote:''}</span>`
+          : `<span class="badge ${REQUEST_STATUS_CLASS[status]||'b-planned'}">${status}</span>`;
+        return `<tr>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${submitted}</td>
           <td style="font-size:11px;color:var(--text-3)">${r.submittedBy||'—'}</td>
           <td style="font-size:11px">${r.requesterName||'—'}${r.email?`<br><span style="color:var(--text-3)">${r.email}</span>`:''}</td>
           <td style="font-weight:600">${r.title||''}</td>
           <td>${r.department||''}</td>
+          <td style="font-size:11px">${(r.entity||[]).join(', ')||'—'}</td>
           <td style="font-size:11px">${r.type||''}</td>
           <td><span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${r.priority||'Normal'}</span></td>
           <td style="font-size:11px;color:var(--text-3)">${r.deadline||'—'}</td>
           <td style="font-size:11px;color:var(--text-3);max-width:200px">${r.description||''}</td>
-          <td class="row-actions">
-            ${r.done
-              ? `<button class="btn btn-sm" onclick="markRequestPending('${r.id}')">Undo</button>`
-              : `<button class="btn btn-sm" style="color:var(--green);border-color:var(--green)" onclick="markRequestDone('${r.id}')">✓ Mark Done</button>`}
-            <button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button>
-          </td>
+          <td style="font-size:11px">${statusCell}</td>
+          <td style="font-size:11px">${linkCell}</td>
+          <td class="row-actions">${actions}</td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="10" class="empty">No requests found</td></tr>';
+    : '<tr><td colspan="13" class="empty">No requests found</td></tr>';
 }
 
 // ── AI CAPTION GENERATOR — shared logic used by both the initiative form ──

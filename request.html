@@ -58,6 +58,22 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .toast.error{background:var(--red)}
 #word-count.limit-near{color:var(--gold);font-weight:600}
 #word-count.limit-reached{color:var(--red);font-weight:600}
+
+/* NEW FIELDS + VIEW TOGGLE + MY REQUESTS */
+.chip-select{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 12px;border:1.5px solid var(--border-strong);border-radius:20px;font-size:11.5px;cursor:pointer;color:var(--text-2);user-select:none}
+.chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.view-toggle{display:flex;gap:6px}
+.view-toggle .btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.myreq-card{background:var(--surface);border-radius:14px;box-shadow:var(--shadow-lg);width:820px;max-width:100%;margin-top:70px;height:fit-content;padding:32px}
+.myreq-table{width:100%;border-collapse:collapse;font-size:12px}
+.myreq-table th{text-align:left;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.03em;padding:8px 10px;border-bottom:1px solid var(--border)}
+.myreq-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+.status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.status-Pending{background:#FFF3D6;color:#8A6100}
+.status-Accepted{background:#E8F8F0;color:#0E7A55}
+.status-Rejected{background:#FFE8E8;color:#9B2020}
+.myreq-empty{padding:30px;text-align:center;color:var(--text-3);font-size:12px}
 </style>
 </head>
 <body>
@@ -79,9 +95,16 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
       <img class="topbar-logo-img" src="logo.jpg" alt="IMC">
       <span class="topbar-logo-text">Marketing Hub · New Request</span>
     </div>
-    <button class="btn" onclick="doLogout()">Sign Out</button>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="view-toggle">
+        <button class="btn active" id="view-btn-submit" onclick="showView('submit')">📝 New Request</button>
+        <button class="btn" id="view-btn-myrequests" onclick="showView('myrequests')">📋 My Requests</button>
+      </div>
+      <button class="btn" onclick="doLogout()">Sign Out</button>
+    </div>
   </div>
-  <div class="form-card">
+
+  <div class="form-card" id="view-submit-el">
     <div class="form-title">New Marketing Request</div>
     <div class="form-sub">Submit a request to the marketing team — they'll follow up directly.</div>
 
@@ -102,14 +125,20 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
       <div class="field-group"><label class="field-label">Request Type<span class="req">*</span></label><select class="field-select" id="f-type"></select></div>
     </div>
 
+    <div class="field-group"><label class="field-label">Entity<span class="req">*</span> <span style="color:var(--text-3);font-weight:400;font-size:11px">— select all that apply</span></label><div class="chip-select" id="f-entity"></div></div>
+
+    <div class="field-group"><label class="field-label">Target Audience<span class="req">*</span></label><input class="field-input" id="f-audience" placeholder="e.g. New parents, existing cardiology patients, Makkah-area residents"></div>
+
     <div class="field-group">
       <label class="field-label">Description<span class="req">*</span></label>
-      <textarea class="field-textarea" id="f-description" placeholder="What exactly do you need? Who is the target audience?" oninput="onDescInput()"></textarea>
+      <textarea class="field-textarea" id="f-description" placeholder="What exactly do you need?" oninput="onDescInput()"></textarea>
       <div style="font-size:11px;color:var(--text-3);margin-top:5px;display:flex;justify-content:space-between">
-        <span>📧 Need to share more detail (files, links, longer brief)? Email the marketing team directly after submitting.</span>
+        <span>Need to share files? Paste a link below, or email the marketing team directly after submitting.</span>
         <span id="word-count" style="white-space:nowrap;margin-left:10px">0 / 200 words</span>
       </div>
     </div>
+
+    <div class="field-group"><label class="field-label">Reference Link <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, e.g. a Drive folder, brand asset, or example</span></label><input class="field-input" type="url" id="f-reference" placeholder="https://..."></div>
 
     <div class="field-row">
       <div class="field-group"><label class="field-label">Deadline<span class="req">*</span></label><input class="field-input" type="date" id="f-deadline"></div>
@@ -119,14 +148,28 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
     <button class="submit-btn" onclick="submitRequest()">Submit Request</button>
     <div class="success-msg" id="success-msg">✓ Request submitted successfully!<small>The marketing team will review it shortly.</small></div>
   </div>
+
+  <div class="myreq-card" id="view-myrequests-el" style="display:none">
+    <div class="form-title">My Requests</div>
+    <div class="form-sub">Every request you've submitted, and its current status.</div>
+    <table class="myreq-table">
+      <thead><tr><th>Submitted</th><th>Title</th><th>Type</th><th>Status</th><th>Details</th></tr></thead>
+      <tbody id="myreq-table-body"><tr><td colspan="5" class="myreq-empty">Loading...</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { login, logout, watchAuth, getUserRole, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS } from './firebase-data.js';
+import { login, logout, watchAuth, getUserRole, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS, watchEntities, watchInitiatives, watchMyRequests } from './firebase-data.js';
 
 let currentUserEmail = null;
+let selectedEntities = [];
+let ALL_ENTITIES = [];
+let ALL_INITIATIVES = [];
+let unsubMyRequests = null, unsubEntities = null, unsubInitiatives = null;
+let myRequestsData = [];
 
 window.doLogin = async function() {
   const email = document.getElementById('login-email').value.trim();
@@ -159,6 +202,12 @@ watchAuth(async user => {
       document.getElementById('page-wrap').classList.add('active');
       currentUserEmail = user.email;
       populateSelects();
+      // Only subscribed after the role check clears — same discipline as
+      // actions.html. watchInitiatives is read-only and initiatives are
+      // already public-read data, so this adds no new exposure.
+      unsubEntities = watchEntities(data => { ALL_ENTITIES = data; populateEntityChips(); });
+      unsubInitiatives = watchInitiatives(data => { ALL_INITIATIVES = data; renderMyRequests(); });
+      unsubMyRequests = watchMyRequests(currentUserEmail, data => { myRequestsData = data; renderMyRequests(); });
     } catch(e) {
       const errEl = document.getElementById('login-error');
       errEl.textContent = 'Could not verify access: ' + e.message;
@@ -168,6 +217,9 @@ watchAuth(async user => {
   } else {
     document.getElementById('login-wrap').style.display = 'flex';
     document.getElementById('page-wrap').classList.remove('active');
+    if(unsubEntities) { unsubEntities(); unsubEntities = null; }
+    if(unsubInitiatives) { unsubInitiatives(); unsubInitiatives = null; }
+    if(unsubMyRequests) { unsubMyRequests(); unsubMyRequests = null; }
   }
 });
 
@@ -177,6 +229,76 @@ function populateSelects() {
   document.getElementById('f-department').innerHTML = '<option value="">Select department</option>'
     + DEPARTMENTS.map(d=>`<option>${d}</option>`).join('')
     + '<option>Other</option>';
+}
+
+// Rebuilds the entity chip list from the live ALL_ENTITIES state — safe to
+// call repeatedly, always fully rebuilds rather than appending (same
+// convention as admin.html's populateEntitySelects()). Re-marks chips whose
+// value is still in selectedEntities as active, so a mid-typing entity sync
+// doesn't silently clear what the coordinator already picked.
+function populateEntityChips() {
+  const wrap = document.getElementById('f-entity');
+  if(!wrap) return;
+  wrap.innerHTML = ALL_ENTITIES.map(e =>
+    `<div class="chip${selectedEntities.includes(e.name)?' active':''}" data-val="${e.name}" onclick="toggleEntityChip(this)">${e.name}</div>`
+  ).join('');
+}
+window.toggleEntityChip = function(el) {
+  el.classList.toggle('active');
+  const val = el.dataset.val;
+  const idx = selectedEntities.indexOf(val);
+  if(el.classList.contains('active') && idx===-1) selectedEntities.push(val);
+  if(!el.classList.contains('active') && idx>-1) selectedEntities.splice(idx,1);
+}
+
+window.showView = function(view) {
+  document.getElementById('view-submit-el').style.display = view==='submit' ? 'block' : 'none';
+  document.getElementById('view-myrequests-el').style.display = view==='myrequests' ? 'block' : 'none';
+  document.getElementById('view-btn-submit').classList.toggle('active', view==='submit');
+  document.getElementById('view-btn-myrequests').classList.toggle('active', view==='myrequests');
+}
+
+const REQ_STATUS_CLASS = {'Pending':'status-Pending','Accepted':'status-Accepted','Rejected':'status-Rejected'};
+
+// Looks up the linked initiative's CURRENT title+status, never the possibly-
+// stale denormalized linkedInitiativeTitle — same convention as admin.html's
+// initiativeInfoFor(). Returns null if the linked doc was deleted, so the
+// caller can render an explicit "(deleted)" label instead of going blank.
+function myReqInitiativeInfo(id) {
+  if(!id) return null;
+  const i = ALL_INITIATIVES.find(x => x.id === id);
+  return i ? { title: i.title, status: i.status } : null;
+}
+
+function renderMyRequests() {
+  const tbody = document.getElementById('myreq-table-body');
+  if(!tbody) return;
+  if(!myRequestsData.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="myreq-empty">You haven\'t submitted any requests yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = myRequestsData.map(r => {
+    const submitted = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-GB') : '—';
+    const status = r.status || (r.done ? 'Accepted' : 'Pending'); // legacy done-only docs, pre-migration
+    let details = '—';
+    if(status === 'Rejected') {
+      details = `<strong>${r.rejectionReason||'No reason given'}</strong>${r.rejectionNote?`<br><span style="color:var(--text-3)">${r.rejectionNote}</span>`:''}`;
+    } else if(r.linkedInitiativeId) {
+      const info = myReqInitiativeInfo(r.linkedInitiativeId);
+      details = info
+        ? `Now: <strong>${info.title}</strong> <span style="color:var(--text-3)">(${info.status})</span>`
+        : `<s>${r.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3)">(deleted)</span>`;
+    } else if(status === 'Accepted') {
+      details = '<span style="color:var(--text-3)">Accepted — not yet linked to an activity</span>';
+    }
+    return `<tr>
+      <td style="white-space:nowrap;color:var(--text-3)">${submitted}</td>
+      <td style="font-weight:600">${r.title||''}</td>
+      <td style="color:var(--text-3)">${r.type||''}</td>
+      <td><span class="status-badge ${REQ_STATUS_CLASS[status]||'status-Pending'}">${status}</span></td>
+      <td>${details}</td>
+    </tr>`;
+  }).join('');
 }
 
 const MAX_WORDS = 200;
@@ -200,11 +322,13 @@ window.submitRequest = async function() {
   const title = document.getElementById('f-title').value.trim();
   const department = document.getElementById('f-department').value;
   const type = document.getElementById('f-type').value;
+  const targetAudience = document.getElementById('f-audience').value.trim();
   const description = document.getElementById('f-description').value.trim();
+  const referenceLink = document.getElementById('f-reference').value.trim();
   const deadline = document.getElementById('f-deadline').value;
   const priority = document.getElementById('f-priority').value;
 
-  if(!requesterName || !email || !title || !department || !type || !description || !deadline) {
+  if(!requesterName || !email || !title || !department || !type || !selectedEntities.length || !targetAudience || !description || !deadline) {
     showToast('Please fill in all required fields (*)', true);
     return;
   }
@@ -220,11 +344,17 @@ window.submitRequest = async function() {
       return;
     }
 
-    await addRequest({ requesterName, email, title, department, type, description, deadline, priority, submittedBy: currentUserEmail });
+    await addRequest({
+      requesterName, email, title, department, type,
+      entity: [...selectedEntities], targetAudience, description, referenceLink,
+      deadline, priority, submittedBy: currentUserEmail, status: 'Pending'
+    });
     document.getElementById('success-msg').classList.add('show');
-    ['f-requester-name','f-email','f-title','f-description','f-deadline'].forEach(id => document.getElementById(id).value = '');
+    ['f-requester-name','f-email','f-title','f-audience','f-description','f-reference','f-deadline'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-department').value = '';
     document.getElementById('f-type').value = '';
+    selectedEntities = [];
+    populateEntityChips();
     onDescInput();
     setTimeout(()=>document.getElementById('success-msg').classList.remove('show'), 5000);
   } catch(e) {
