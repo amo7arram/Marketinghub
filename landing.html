@@ -18,12 +18,12 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .hidden{display:none !important}
 .page{width:640px;max-width:100%}
 .logo-row{display:flex;justify-content:center;margin-bottom:20px}
-.logo-row img{height:36px}
+.logo-row img{height:64px}
 .card{background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden}
 .hero-img{width:100%;max-height:320px;object-fit:cover;display:block}
 .card-body{padding:32px}
-.headline{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--text);margin-bottom:8px;line-height:1.25}
-.subheadline{font-size:15px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+.headline{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--text);margin-bottom:8px;line-height:1.25;text-align:center}
+.subheadline{font-size:15px;color:var(--text-2);margin-bottom:18px;line-height:1.5;text-align:center}
 .body-text{font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:24px}
 .body-text p{margin-bottom:10px}
 .body-text table{border-collapse:collapse;width:100%;margin-bottom:14px}
@@ -34,6 +34,7 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .body-text a{color:var(--navy)}
 .body-text h1,.body-text h2,.body-text h3,.body-text h4{font-family:'Syne',sans-serif;color:var(--text);margin-bottom:8px}
 .form-section{border-top:1px solid var(--border);padding-top:22px}
+.form-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text);margin-bottom:16px;text-align:center}
 .field-group{margin-bottom:14px}
 .field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
 .field-input{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:14px}
@@ -50,6 +51,10 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .unavailable-icon{font-size:36px;margin-bottom:12px;color:var(--text-3)}
 .unavailable-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text-2);margin-bottom:6px}
 .footer-note{text-align:center;font-size:11px;color:var(--text-3);margin-top:20px}
+.site-footer{text-align:center;margin-top:24px;padding-top:20px;border-top:1px solid var(--border);font-size:12px;color:var(--text-3);line-height:1.7}
+.site-footer a{color:var(--navy);text-decoration:none}
+.site-footer .footer-org{font-weight:700;color:var(--text-2)}
+.site-footer .footer-hours-title{font-weight:600;color:var(--text-2);margin-top:10px}
 .toast{position:fixed;bottom:24px;right:24px;left:24px;margin:auto;max-width:400px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none;text-align:center}
 .toast.show{display:block}
 .toast.error{background:var(--red)}
@@ -80,6 +85,7 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
       <div class="body-text hidden" id="p-body"></div>
 
       <div class="form-section" id="form-wrap">
+        <div class="form-title">Fill the form to receive a call</div>
         <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span></label><input class="field-input" id="f-name" placeholder="Your name"></div>
         <div class="field-group"><label class="field-label">Email<span style="color:var(--red)">*</span></label><input class="field-input" type="email" id="f-email" placeholder="you@example.com"></div>
         <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span></label><input class="field-input" type="tel" id="f-phone" placeholder="05XXXXXXXX"></div>
@@ -100,7 +106,14 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
     </div>
   </div>
 
-  <div class="footer-note">International Medical Center</div>
+  <div class="site-footer">
+    <div class="footer-org">International Medical Center</div>
+    <div>Hail Street, Al Ruwais, Jeddah 23214, Saudi Arabia</div>
+    <div><a href="https://imc.med.sa" target="_blank" rel="noopener">https://imc.med.sa</a></div>
+    <div class="footer-hours-title">Working Hours</div>
+    <div>Outpatient Clinics: Saturday – Thursday, 9:00 AM – 10:00 PM</div>
+    <div>Emergency: 24/7</div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
