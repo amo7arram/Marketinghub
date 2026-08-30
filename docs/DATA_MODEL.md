@@ -121,9 +121,11 @@ Admin-built lead-capture pages, published at a stable public URL (`landing.html?
 |---|---|---|
 | `title` | string | Internal/admin-facing name |
 | `headline`, `subheadline` | string | Public-facing hero copy |
-| `bodyText` | string | Plain paragraphs, line breaks preserved — no rich text editor |
+| `bodyText` | string | **Raw admin-authored HTML**, not plain text — tables/formatting/links/pasted content from an external page all work. Sanitized via DOMPurify at render time only (both `admin.html`'s live preview and `landing.html`'s public render), never at write time, so a future sanitizer/library upgrade doesn't require touching already-stored content. Since this is public-facing, treat any pasted HTML from an untrusted external source as a real supply-chain risk even though it's sanitized — DOMPurify strips `<script>`/event-handlers/unsafe URLs, but review what you paste. |
 | `heroImageUrl` | string \| null | Optional, a pasted link — same convention as `requests.referenceLink`, since this app has no file upload anywhere |
 | `ctaButtonText` | string | Defaults to "Submit" if empty |
+| `thankYouMessage` | string \| null | Optional custom text shown after a successful submission; falls back to a generic message if unset |
+| `redirectUrl` | string \| null | Optional. If set, a visitor is redirected here immediately after submitting instead of ever seeing `thankYouMessage` — e.g. a booking page, WhatsApp link, or a separate thank-you page |
 | `campaignId` / `campaignTitle` | string \| null | Denormalized at save time in `admin.html` so `landing.html` never needs to fetch the full `initiatives` collection just to label one lead — read straight off this doc and copied onto every lead this page generates |
 | `department`, `entity` | string | Single values, matching `leads.department`/`leads.entity`'s shape (not arrays) — copied onto every lead this page generates |
 | `status` | string | `Draft` \| `Published` (`LANDING_PAGE_STATUSES`) — only `Published` pages are visitable; a Draft's content is unreachable even by direct slug guess (see the Firestore rule below) |

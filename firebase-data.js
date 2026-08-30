@@ -1012,6 +1012,12 @@ export async function fetchGoogleSheetCSV(sheetUrlOrId) {
 // ── LANDING PAGES (admin-built lead-capture pages, public URL via landing.html) ──
 // Doc ID = slug — this IS the URL (landing.html?slug=<id>), a single getDoc
 // by known ID, no query needed. Deterministic-ID write, per CLAUDE.md rule 6.
+// `bodyText` holds raw admin-authored HTML, NOT plain text — it is sanitized
+// via DOMPurify at render time (both admin.html's live preview and
+// landing.html's public render), never at write time, so a future sanitizer
+// upgrade doesn't require re-sanitizing already-stored content.
+// `thankYouMessage`/`redirectUrl` (both optional) customize what a visitor
+// sees immediately after a successful submission on landing.html.
 const LANDING_PAGES = "landing_pages";
 export const LANDING_PAGE_STATUSES = ["Draft", "Published"];
 

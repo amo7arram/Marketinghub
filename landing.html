@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IMC</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -23,7 +24,15 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .card-body{padding:32px}
 .headline{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--text);margin-bottom:8px;line-height:1.25}
 .subheadline{font-size:15px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
-.body-text{font-size:13px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;margin-bottom:24px}
+.body-text{font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:24px}
+.body-text p{margin-bottom:10px}
+.body-text table{border-collapse:collapse;width:100%;margin-bottom:14px}
+.body-text th,.body-text td{border:1px solid var(--border);padding:8px 10px;text-align:left}
+.body-text th{background:var(--bg);font-weight:600}
+.body-text ul,.body-text ol{margin:0 0 10px 20px}
+.body-text img{max-width:100%;border-radius:var(--radius)}
+.body-text a{color:var(--navy)}
+.body-text h1,.body-text h2,.body-text h3,.body-text h4{font-family:'Syne',sans-serif;color:var(--text);margin-bottom:8px}
 .form-section{border-top:1px solid var(--border);padding-top:22px}
 .field-group{margin-bottom:14px}
 .field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
@@ -86,7 +95,7 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
       <div class="thankyou hidden" id="thankyou-state">
         <div class="thankyou-icon">✓</div>
         <div class="thankyou-title">Thank you!</div>
-        <div class="thankyou-sub">We've received your details and will be in touch shortly.</div>
+        <div class="thankyou-sub" id="thankyou-sub">We've received your details and will be in touch shortly.</div>
       </div>
     </div>
   </div>
@@ -141,7 +150,9 @@ function renderPage(lp) {
     document.getElementById('p-subheadline').classList.remove('hidden');
   }
   if (lp.bodyText) {
-    document.getElementById('p-body').textContent = lp.bodyText;
+    // Sanitized here, at render time, never at write time (see firebase-data.js)
+    // — strips scripts/event-handlers/unsafe URLs, keeps tables/formatting/links.
+    document.getElementById('p-body').innerHTML = DOMPurify.sanitize(lp.bodyText);
     document.getElementById('p-body').classList.remove('hidden');
   }
   if (lp.heroImageUrl) {
@@ -150,6 +161,16 @@ function renderPage(lp) {
     img.classList.remove('hidden');
   }
   document.getElementById('submit-btn').textContent = lp.ctaButtonText || 'Submit';
+}
+
+// Shared by both the real success path and the silent-spam-fake-success path
+// — kept identical on purpose, so a bot probing this page can't tell caught
+// vs. genuine by comparing behavior against a known-good manual submission.
+function completeSubmission() {
+  if (PAGE.redirectUrl) { location.href = PAGE.redirectUrl; return; }
+  document.getElementById('form-wrap').classList.add('hidden');
+  document.getElementById('thankyou-sub').textContent = PAGE.thankYouMessage || "We've received your details and will be in touch shortly.";
+  document.getElementById('thankyou-state').classList.remove('hidden');
 }
 
 window.submitLead = async function() {
@@ -176,11 +197,7 @@ window.submitLead = async function() {
   // page's JS entirely could still write straight to Firestore within the
   // rule's field whitelist.
   const isSpam = honeypot || (Date.now() - pageLoadedAt < MIN_SUBMIT_DELAY_MS);
-  if (isSpam) {
-    document.getElementById('form-wrap').classList.add('hidden');
-    document.getElementById('thankyou-state').classList.remove('hidden');
-    return;
-  }
+  if (isSpam) { completeSubmission(); return; }
 
   try {
     await addLead({
@@ -195,8 +212,7 @@ window.submitLead = async function() {
       contactStatus: 'Untouched',
       outcome: 'Pending',
     });
-    document.getElementById('form-wrap').classList.add('hidden');
-    document.getElementById('thankyou-state').classList.remove('hidden');
+    completeSubmission();
   } catch (e) {
     showToast('Something went wrong — please try again: ' + e.message, true);
     btn.disabled = false;

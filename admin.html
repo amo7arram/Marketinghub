@@ -6,6 +6,7 @@
 <title>IMC Admin — Marketing & Business Development Hub</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1216,7 +1217,12 @@ tr.row-overdue:hover td{background:#FFD6D6}
       </div>
       <div class="field-group"><label class="field-label">Headline<span style="color:var(--red)">*</span></label><input class="field-input" id="fld-lp-headline"></div>
       <div class="field-group"><label class="field-label">Subheadline</label><input class="field-input" id="fld-lp-subheadline"></div>
-      <div class="field-group"><label class="field-label">Body Text</label><textarea class="field-textarea" id="fld-lp-body" placeholder="What is this offer/campaign about? Plain paragraphs — line breaks are preserved."></textarea></div>
+      <div class="field-group">
+        <label class="field-label">Body Content <span style="color:var(--text-3);font-weight:400;font-size:11px">— HTML allowed (tables, formatting, links...). Sanitized before it's ever shown publicly — scripts and other unsafe markup are stripped.</span></label>
+        <textarea class="field-textarea" id="fld-lp-body" oninput="updateLpBodyPreview()" placeholder="Paste HTML here, or just write plain paragraphs." style="min-height:120px;font-family:monospace;font-size:12px"></textarea>
+        <div style="font-size:11px;color:var(--text-3);font-weight:600;margin-top:10px">Preview (what visitors will actually see):</div>
+        <div id="lp-body-preview" style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-top:6px;font-size:13px;max-height:200px;overflow:auto;background:var(--bg)"></div>
+      </div>
       <div class="field-group"><label class="field-label">Hero Image URL <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, paste a link (e.g. Brand Resources or Drive)</span></label><input class="field-input" type="url" id="fld-lp-heroImage" placeholder="https://..."></div>
       <div class="field-group"><label class="field-label">CTA Button Text</label><input class="field-input" id="fld-lp-cta" placeholder="Submit"></div>
       <div class="field-row">
@@ -1227,6 +1233,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div class="field-group"><label class="field-label">Linked Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">— for lead attribution</span></label><select class="field-select" id="fld-lp-campaign"><option value="">— None —</option></select></div>
         <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-lp-status"></select></div>
       </div>
+      <div class="field-section-title">After Submission</div>
+      <div class="field-group"><label class="field-label">Thank You Message <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, defaults to a generic message</span></label><textarea class="field-textarea" id="fld-lp-thankyou" style="min-height:60px" placeholder="Thank you! We've received your details and will be in touch shortly."></textarea></div>
+      <div class="field-group"><label class="field-label">Redirect URL after submission <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional. If set, the visitor is sent here immediately instead of seeing the Thank You Message above</span></label><input class="field-input" type="url" id="fld-lp-redirect" placeholder="https://..."></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeLandingPageForm()">Cancel</button>
@@ -3818,10 +3827,20 @@ window.openLandingPageForm = function(lp = null) {
   document.getElementById('fld-lp-dept').value = lp?.department || DEPARTMENTS[0];
   document.getElementById('fld-lp-entity').value = lp?.entity || '';
   document.getElementById('fld-lp-status').value = lp?.status || 'Draft';
+  document.getElementById('fld-lp-thankyou').value = lp?.thankYouMessage || '';
+  document.getElementById('fld-lp-redirect').value = lp?.redirectUrl || '';
   populateLpCampaignSelect();
   document.getElementById('fld-lp-campaign').value = lp?.campaignId || '';
   updateLpUrlPreview();
+  updateLpBodyPreview();
   document.getElementById('lp-overlay').classList.add('open');
+}
+// Sanitized with the SAME library/config landing.html uses at render time —
+// this preview is only trustworthy if it matches exactly what a real visitor
+// will see, not an approximation.
+window.updateLpBodyPreview = function() {
+  const raw = document.getElementById('fld-lp-body').value;
+  document.getElementById('lp-body-preview').innerHTML = raw ? DOMPurify.sanitize(raw) : '<span style="color:var(--text-3)">(nothing to preview yet)</span>';
 }
 window.closeLandingPageForm = function() {
   document.getElementById('lp-overlay').classList.remove('open');
@@ -3858,6 +3877,8 @@ window.saveLandingPageForm = async function() {
     ctaButtonText: document.getElementById('fld-lp-cta').value.trim() || 'Submit',
     department: document.getElementById('fld-lp-dept').value,
     entity: document.getElementById('fld-lp-entity').value,
+    thankYouMessage: document.getElementById('fld-lp-thankyou').value.trim() || null,
+    redirectUrl: document.getElementById('fld-lp-redirect').value.trim() || null,
     campaignId,
     campaignTitle: campaignId ? (initiativeInfoFor(campaignId)?.title || null) : null,
     status: document.getElementById('fld-lp-status').value,

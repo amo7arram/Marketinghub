@@ -24,6 +24,7 @@ An internal marketing operations platform for International Medical Center (IMC)
 | Styling | Hand-written CSS per file, no CSS framework |
 | Charts | Chart.js (CDN) |
 | Excel parsing | SheetJS/XLSX (CDN) |
+| HTML sanitization | DOMPurify (CDN) — used only for `landing_pages.bodyText`, see §4.6 |
 | AI generation | Anthropic API, called directly from the browser |
 | Metricool CORS proxy | One Cloudflare Worker — the sole exception to "no backend," see below |
 
@@ -112,6 +113,8 @@ Every write in this app, until now, required a logged-in admin/agent/coordinator
 **The exact boundary** (`firestore.rules`, `match /leads/{doc}`): an anonymous `create` is allowed only when the new document has `source == 'Landing Page'`, `contactStatus == 'Untouched'`, `outcome == 'Pending'`, a plausible `name`/`phone`, and **no fields outside a fixed whitelist**. This stops a scripted write from setting `outcome: 'Booked'`, `assignedAgentUid`, `revenueValue`, or any unexpected field — it cannot inject fake revenue or hijack an existing lead. No read access is granted at all; `landing.html` can create a lead, never see one. `landing_pages` itself follows the mirror pattern: an anonymous visitor may `get` exactly one `Published` page by its known slug, never `list` the collection, so Draft content stays invisible and a slug can't be discovered by browsing.
 
 **What this boundary does *not* stop, stated honestly**: Firestore rules have no concept of rate-limiting or IP awareness, so nothing here prevents a scripted flood of well-formed fake leads — only a real backend (a Cloud Function checking request volume) could, and that's out of scope per this app's no-backend constraint. `landing.html`'s honeypot field and minimum-submit-delay check are a real deterrent against unsophisticated/automated bots, but they're enforced in the page's own JavaScript — a scripted attacker who bypasses that JS entirely and writes straight to Firestore via the SDK, staying inside the rule's field whitelist, is not stopped by them. This is the same "deterrent, not a hard boundary" tradeoff already accepted for the Public Access Gate (§4.5), stated with the same honesty here.
+
+**A second, separate risk on this same page**: `landing_pages.bodyText` accepts raw admin-authored HTML (tables/formatting/pasted content), rendered on a genuinely public page every visitor loads. It's sanitized via DOMPurify at render time — `<script>` tags, event handlers, `javascript:` URLs are stripped before anything reaches the DOM — but sanitization only protects against *malicious* content, not *mistaken* content: an admin pasting HTML copied from an untrusted external source (a sketchy "free template" site, for instance) is the realistic threat model here, more than an attacker with admin credentials (who could already do damage elsewhere in the app). Review what you paste before publishing.
 
 ---
 
