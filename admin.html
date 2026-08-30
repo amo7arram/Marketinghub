@@ -234,6 +234,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
       </div>
     </div>
     <div class="tab" onclick="switchTab('leads',this)">Leads CRM</div>
+    <div class="tab" onclick="switchTab('landingpages',this)">Landing Pages</div>
     <div class="tab" onclick="switchTab('budget',this)">Budget</div>
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
@@ -461,13 +462,27 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <table style="min-width:1080px">
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
-            <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
+            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Entity</th><th>Source</th>
             <th>Campaign</th><th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="14" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="15" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
+    </div>
+
+    <!-- LANDING PAGES PAGE -->
+    <div class="page" id="page-landingpages">
+      <div class="toolbar">
+        <div style="font-size:12px;color:var(--text-3)">Admin-built lead-capture pages, published at a stable public URL for use in ad campaigns</div>
+        <button class="btn btn-primary" onclick="openLandingPageForm()">+ New Landing Page</button>
+      </div>
+      <table>
+        <thead><tr>
+          <th>Title</th><th>Slug</th><th>Status</th><th>Campaign</th><th>Department</th><th>Submissions</th><th></th>
+        </tr></thead>
+        <tbody id="landingpages-table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+      </table>
     </div>
 
     <!-- BUDGET PAGE -->
@@ -1185,6 +1200,41 @@ tr.row-overdue:hover td{background:#FFD6D6}
   </div>
 </div>
 
+<!-- ── LANDING PAGE FORM MODAL ── -->
+<div class="modal-overlay" id="lp-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="lp-form-title">New Landing Page</div>
+      <button class="modal-close" onclick="closeLandingPageForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="fld-lp-title" oninput="onLpTitleInput()"></div>
+      <div class="field-group">
+        <label class="field-label">Slug (URL) <span style="color:var(--text-3);font-weight:400;font-size:11px" id="lp-slug-hint">— auto-generated from title, editable until first save</span></label>
+        <input class="field-input" id="fld-lp-slug" oninput="onLpSlugInput()">
+        <div id="lp-url-preview" style="font-size:11px;color:var(--text-3);margin-top:4px;word-break:break-all"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Headline<span style="color:var(--red)">*</span></label><input class="field-input" id="fld-lp-headline"></div>
+      <div class="field-group"><label class="field-label">Subheadline</label><input class="field-input" id="fld-lp-subheadline"></div>
+      <div class="field-group"><label class="field-label">Body Text</label><textarea class="field-textarea" id="fld-lp-body" placeholder="What is this offer/campaign about? Plain paragraphs — line breaks are preserved."></textarea></div>
+      <div class="field-group"><label class="field-label">Hero Image URL <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional, paste a link (e.g. Brand Resources or Drive)</span></label><input class="field-input" type="url" id="fld-lp-heroImage" placeholder="https://..."></div>
+      <div class="field-group"><label class="field-label">CTA Button Text</label><input class="field-input" id="fld-lp-cta" placeholder="Submit"></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="fld-lp-dept"></select></div>
+        <div class="field-group"><label class="field-label">Entity</label><select class="field-select" id="fld-lp-entity"><option value="">— None —</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Linked Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">— for lead attribution</span></label><select class="field-select" id="fld-lp-campaign"><option value="">— None —</option></select></div>
+        <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-lp-status"></select></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeLandingPageForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveLandingPageForm()">Save Landing Page</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── PROMOTION FORM MODAL ── -->
 <div class="modal-overlay" id="promo-overlay">
   <div class="modal" style="width:540px">
@@ -1539,6 +1589,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span></label><input class="field-input" id="lead-name"></div>
         <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span></label><input class="field-input" id="lead-phone" type="tel"></div>
       </div>
+      <div class="field-group"><label class="field-label">Email <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label><input class="field-input" type="email" id="lead-email"></div>
       <div class="field-row">
         <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="lead-dept"></select></div>
         <div class="field-group"><label class="field-label">Entity</label><select class="field-select" id="lead-entity"><option value="">— None —</option></select></div>
@@ -1664,6 +1715,8 @@ import {
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, reviewRequest, REQUEST_TYPES,
   REQUEST_STATUSES, REQUEST_REJECTION_REASONS, migrateLegacyRequestStatuses,
+  watchLandingPages, createLandingPage, saveLandingPage, deleteLandingPage,
+  getLandingPageBySlug, slugify, LANDING_PAGE_STATUSES,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
   getAnnualBudget, setAnnualBudget,
   watchPromotions, addPromotion, updatePromotion, deletePromotion, promoStatus,
@@ -1704,6 +1757,9 @@ let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let currentAdminEmail = '';
 let editingRequestAcceptId = null, pendingRequestUnlink = false;
+let ALL_LANDING_PAGES = [];
+let editingLandingPageSlug = null; // null = creating; non-null = editing (slug locked)
+let unsubLandingPages = null;
 let ALL_EXPENSES = [];
 let ALL_PROMOTIONS = [];
 let ALL_BD_CARDS = [];
@@ -1877,6 +1933,7 @@ watchAuth(async user => {
     if(unsubMetricoolSettings) unsubMetricoolSettings();
     if(unsubLeads) unsubLeads();
     if(unsubMarketingActions) unsubMarketingActions();
+    if(unsubLandingPages) unsubLandingPages();
   }
 });
 
@@ -1898,8 +1955,9 @@ function initData() {
   unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
-  unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); });
+  unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); renderLandingPagesTable(); });
   unsubMarketingActions = watchMarketingActions(data => { ALL_MARKETING_ACTIONS = data; renderMarketingActionsTable(); });
+  unsubLandingPages = watchLandingPages(data => { ALL_LANDING_PAGES = data; renderLandingPagesTable(); });
   initMetricsTab();
   initBudgetTab();
 }
@@ -1987,6 +2045,8 @@ function populateEntitySelects() {
   if(leadEntityFilter) leadEntityFilter.innerHTML = filterOptionsHtml;
   const bulkEntity = document.getElementById('bulk-entity');
   if(bulkEntity) bulkEntity.innerHTML = '<option value="">— No change —</option>' + names.map(e=>`<option>${e}</option>`).join('');
+  const lpEntity = document.getElementById('fld-lp-entity');
+  if(lpEntity) lpEntity.innerHTML = optionsHtml;
 }
 
 // Re-populates every "pick a campaign" dropdown in the Leads CRM from
@@ -2071,6 +2131,10 @@ function populateStaticSelects() {
   document.getElementById('fld-req-init-type').innerHTML = TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('fld-req-init-dept').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('fld-req-init-status').innerHTML = STATUSES.map(s=>`<option>${s}</option>`).join('');
+
+  // Landing Pages
+  document.getElementById('fld-lp-dept').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('fld-lp-status').innerHTML = LANDING_PAGE_STATUSES.map(s=>`<option>${s}</option>`).join('');
 
   // Marketing Actions
   document.getElementById('ma-status-filter').innerHTML += ACTION_STATUSES.map(s=>`<option>${s}</option>`).join('');
@@ -3708,6 +3772,136 @@ window.renderRequestsTable = function() {
         </tr>`;
       }).join('')
     : '<tr><td colspan="13" class="empty">No requests found</td></tr>';
+}
+
+// ── LANDING PAGES ─────────────────────────────────────────────────────────
+const LANDING_PAGE_STATUS_CLASS = {'Draft':'b-planned','Published':'b-published'};
+const LANDING_PAGE_BASE_URL = 'landing.html?slug=';
+let lpSlugManuallyEdited = false; // once the admin touches the Slug field directly, stop auto-overwriting it from Title
+
+function populateLpCampaignSelect() {
+  const sel = document.getElementById('fld-lp-campaign');
+  if (!sel) return;
+  const campaigns = ALL_INITIATIVES.filter(i => i.type === 'Campaign');
+  sel.innerHTML = '<option value="">— None —</option>' +
+    campaigns.map(c => `<option value="${c.id}">${c.title||'Untitled Campaign'}</option>`).join('');
+}
+
+window.onLpTitleInput = function() {
+  if (lpSlugManuallyEdited) return;
+  document.getElementById('fld-lp-slug').value = slugify(document.getElementById('fld-lp-title').value);
+  updateLpUrlPreview();
+}
+window.onLpSlugInput = function() {
+  lpSlugManuallyEdited = true;
+  document.getElementById('fld-lp-slug').value = slugify(document.getElementById('fld-lp-slug').value);
+  updateLpUrlPreview();
+}
+function updateLpUrlPreview() {
+  const slug = document.getElementById('fld-lp-slug').value;
+  document.getElementById('lp-url-preview').textContent = slug ? `Will be live at: ${location.origin}${location.pathname.replace(/admin\.html$/,'')}${LANDING_PAGE_BASE_URL}${slug}` : '';
+}
+
+window.openLandingPageForm = function(lp = null) {
+  editingLandingPageSlug = lp ? lp.id : null;
+  lpSlugManuallyEdited = !!lp; // editing an existing page — slug is already fixed, don't auto-regenerate it
+  document.getElementById('lp-form-title').textContent = lp ? 'Edit Landing Page' : 'New Landing Page';
+  document.getElementById('fld-lp-title').value = lp?.title || '';
+  document.getElementById('fld-lp-slug').value = lp?.id || '';
+  document.getElementById('fld-lp-slug').disabled = !!lp; // locked once created — never silently break a live campaign URL
+  document.getElementById('lp-slug-hint').textContent = lp ? '— locked once created, to avoid breaking a live campaign URL' : '— auto-generated from title, editable until first save';
+  document.getElementById('fld-lp-headline').value = lp?.headline || '';
+  document.getElementById('fld-lp-subheadline').value = lp?.subheadline || '';
+  document.getElementById('fld-lp-body').value = lp?.bodyText || '';
+  document.getElementById('fld-lp-heroImage').value = lp?.heroImageUrl || '';
+  document.getElementById('fld-lp-cta').value = lp?.ctaButtonText || '';
+  document.getElementById('fld-lp-dept').value = lp?.department || DEPARTMENTS[0];
+  document.getElementById('fld-lp-entity').value = lp?.entity || '';
+  document.getElementById('fld-lp-status').value = lp?.status || 'Draft';
+  populateLpCampaignSelect();
+  document.getElementById('fld-lp-campaign').value = lp?.campaignId || '';
+  updateLpUrlPreview();
+  document.getElementById('lp-overlay').classList.add('open');
+}
+window.closeLandingPageForm = function() {
+  document.getElementById('lp-overlay').classList.remove('open');
+}
+window.editLandingPage = function(slug) {
+  const lp = ALL_LANDING_PAGES.find(x => x.id === slug);
+  if (lp) openLandingPageForm(lp);
+}
+window.removeLandingPage = async function(slug, title) {
+  if (!confirm(`Delete landing page "${title}"? Its public URL will stop working immediately. Leads it already captured are NOT deleted.`)) return;
+  try { await deleteLandingPage(slug); showToast('Landing page deleted'); }
+  catch (e) { showToast('Delete failed: ' + e.message, true); }
+}
+window.copyLandingPageLink = function(slug) {
+  const url = `${location.origin}${location.pathname.replace(/admin\.html$/,'')}${LANDING_PAGE_BASE_URL}${slug}`;
+  navigator.clipboard.writeText(url).then(
+    () => showToast('Link copied: ' + url),
+    () => showToast('Could not copy automatically — here is the link: ' + url, true)
+  );
+}
+
+window.saveLandingPageForm = async function() {
+  const title = document.getElementById('fld-lp-title').value.trim();
+  const slug = document.getElementById('fld-lp-slug').value.trim();
+  const headline = document.getElementById('fld-lp-headline').value.trim();
+  if (!title || !slug || !headline) { showToast('Title, Slug, and Headline are required', true); return; }
+
+  const campaignId = document.getElementById('fld-lp-campaign').value || null;
+  const data = {
+    title, headline,
+    subheadline: document.getElementById('fld-lp-subheadline').value.trim(),
+    bodyText: document.getElementById('fld-lp-body').value.trim(),
+    heroImageUrl: document.getElementById('fld-lp-heroImage').value.trim() || null,
+    ctaButtonText: document.getElementById('fld-lp-cta').value.trim() || 'Submit',
+    department: document.getElementById('fld-lp-dept').value,
+    entity: document.getElementById('fld-lp-entity').value,
+    campaignId,
+    campaignTitle: campaignId ? (initiativeInfoFor(campaignId)?.title || null) : null,
+    status: document.getElementById('fld-lp-status').value,
+  };
+
+  try {
+    if (editingLandingPageSlug) {
+      await saveLandingPage(editingLandingPageSlug, data);
+      showToast('Landing page updated');
+    } else {
+      // Slug is the doc ID — creating with one already in use would silently
+      // overwrite that page (setDoc), so check first.
+      const existing = await getLandingPageBySlug(slug);
+      if (existing) { showToast(`Slug "${slug}" is already in use by "${existing.title}" — choose another`, true); return; }
+      await createLandingPage(slug, data);
+      showToast('Landing page created');
+    }
+    closeLandingPageForm();
+  } catch (e) {
+    showToast('Save failed: ' + e.message, true);
+  }
+}
+
+window.renderLandingPagesTable = function() {
+  const tbody = document.getElementById('landingpages-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = ALL_LANDING_PAGES.length
+    ? ALL_LANDING_PAGES.map(lp => {
+        const submissions = ALL_LEADS.filter(l => l.landingPageId === lp.id).length;
+        return `<tr>
+          <td style="font-weight:600">${lp.title||''}</td>
+          <td style="font-size:11px;color:var(--text-3)">${lp.id}</td>
+          <td><span class="badge ${LANDING_PAGE_STATUS_CLASS[lp.status]||'b-planned'}">${lp.status||'Draft'}</span></td>
+          <td style="font-size:11px">${lp.campaignTitle||'—'}</td>
+          <td style="font-size:11px">${lp.department||'—'}</td>
+          <td style="font-size:11px;cursor:pointer;text-decoration:underline" onclick="filterLeadsByLandingPage('${lp.id}')" title="View these leads in the Leads CRM">${submissions}</td>
+          <td class="row-actions">
+            ${lp.status==='Published' ? `<button class="btn btn-sm" onclick="copyLandingPageLink('${lp.id}')">🔗 Copy Link</button>` : ''}
+            <button class="btn btn-sm" onclick="editLandingPage('${lp.id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="removeLandingPage('${lp.id}','${(lp.title||'').replace(/'/g,"\\'")}')">Delete</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="7" class="empty">No landing pages yet</td></tr>';
 }
 
 // ── AI CAPTION GENERATOR — shared logic used by both the initiative form ──
@@ -5412,6 +5606,18 @@ window.filterLeadsByAgent = function(uid) {
   document.getElementById('page-leads').scrollIntoView({behavior:'smooth'});
 }
 
+// Jumps to the Leads CRM tab filtered to one landing page's submissions —
+// slug is a distinctive, human-readable string, so the existing free-text
+// search box (extended to also match landingPageId) does this precisely
+// without needing a dedicated dropdown filter for a comparatively rare click-through.
+window.filterLeadsByLandingPage = function(slug) {
+  document.querySelector(`.tab[onclick*="switchTab('leads'"]`)?.click();
+  const search = document.getElementById('lead-search');
+  if(!search) return;
+  search.value = slug;
+  resetLeadsPageAndRender();
+}
+
 // ── Table ──────────────────────────────────────────────────────────────────
 let selectedLeadIds = new Set();
 let currentLeadsPage = 1;
@@ -5482,7 +5688,7 @@ function getFilteredLeads() {
     if(entityF && l.entity!==entityF) return false;
     if(campaignF && l.campaignId!==campaignF) return false;
     if(agentF==='__unassigned__' ? l.assignedAgentUid : (agentF && l.assignedAgentUid!==agentF)) return false;
-    if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source}`.toLowerCase().includes(q)) return false;
+    if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source} ${l.landingPageId||''}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -5511,6 +5717,7 @@ window.renderLeadsTable = function() {
           <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
           <td style="font-weight:600">${l.name||'—'}</td>
           <td style="font-size:12px">${l.phone||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${l.email||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.entity||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.source||'—'}</td>
@@ -5549,7 +5756,7 @@ window.renderLeadsTable = function() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="14" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
+    : `<tr><td colspan="15" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
 
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
@@ -5751,6 +5958,7 @@ window.openLeadForm = function(lead=null) {
   document.getElementById('lead-form-title').textContent = lead ? 'Edit Lead' : 'New Lead';
   document.getElementById('lead-name').value           = lead?.name||'';
   document.getElementById('lead-phone').value          = lead?.phone||'';
+  document.getElementById('lead-email').value          = lead?.email||'';
   document.getElementById('lead-dept').value           = lead?.department||DEPARTMENTS[0];
   document.getElementById('lead-entity').value         = lead?.entity||'';
   document.getElementById('lead-contact-status').value = lead?.contactStatus||'Untouched';
@@ -5796,6 +6004,7 @@ window.saveLead = async function() {
   const campaignId = document.getElementById('lead-campaign').value;
   const data = {
     name, phone,
+    email:         document.getElementById('lead-email').value.trim() || null,
     department:    document.getElementById('lead-dept').value,
     entity:        document.getElementById('lead-entity').value,
     contactStatus: document.getElementById('lead-contact-status').value,

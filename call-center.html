@@ -155,10 +155,10 @@ tr:hover td{background:var(--bg)}
       <div style="overflow-x:auto">
         <table style="min-width:1000px">
           <thead><tr>
-            <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
+            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Entity</th><th>Source</th>
             <th>Campaign</th><th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="table-body"><tr class="empty-row"><td colspan="13">Loading leads...</td></tr></tbody>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="14">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
@@ -379,6 +379,7 @@ function renderTable() {
         return `<tr>
           <td style="font-weight:600">${l.name||'—'}</td>
           <td>${l.phone||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${l.email||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${l.department||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${l.entity||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${l.source||'—'}</td>
@@ -413,7 +414,7 @@ function renderTable() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="13">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="14">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
 
   renderPagination(data.length, totalPages, startIdx, pageData.length);
 }

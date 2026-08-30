@@ -71,6 +71,34 @@ service cloud.firestore {
     }
     match /leads/{doc} {
       allow read: if request.auth != null;
+      allow update, delete: if request.auth != null;
+      // First unauthenticated write path in this app: a landing.html visitor
+      // is nobody, not even a coordinator, so lead capture there can't
+      // require auth. Narrowly scoped — fixed source/contactStatus/outcome
+      // (can't fake a "Booked" submission or set assignedAgentUid/
+      // revenueValue), field-whitelisted (no arbitrary extra fields), no
+      // read access granted at all. This is a real but client-side-only
+      // deterrent against a *shaped* bad write, not a defense against a
+      // scripted flood — Firestore rules have no rate-limiting/IP concept,
+      // and a Cloud Function is out of scope (no backend). Same "deterrent,
+      // not a hard boundary" tradeoff already accepted for the Public
+      // Access Gate (see ARCHITECTURE.md §4.5). See ARCHITECTURE.md for the
+      // full writeup of this exception.
+      allow create: if request.auth != null || (
+        request.resource.data.source == 'Landing Page' &&
+        request.resource.data.contactStatus == 'Untouched' &&
+        request.resource.data.outcome == 'Pending' &&
+        request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 200 &&
+        request.resource.data.phone is string && request.resource.data.phone.size() > 0 && request.resource.data.phone.size() < 20 &&
+        request.resource.data.keys().hasOnly(['name','phone','email','source','landingPageId','campaignId','campaign','department','entity','dateCreated','contactStatus','outcome','createdAt'])
+      );
+    }
+    match /landing_pages/{slug} {
+      // Anonymous visitors may fetch exactly one Published page by known
+      // slug (landing.html), never list the collection — so Draft titles/
+      // content stay invisible and a slug can't be discovered by browsing.
+      allow get: if resource.data.status == 'Published' || request.auth != null;
+      allow list: if request.auth != null;
       allow write: if request.auth != null;
     }
     match /team_members/{doc} {

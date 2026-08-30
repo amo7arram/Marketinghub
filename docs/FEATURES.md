@@ -55,6 +55,13 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 ### Well-span / Loyalty
 - Package and loyalty card CRUD, shown on the corresponding public pages
 
+### Landing Pages
+- Build lead-capture pages entirely from the admin: Title, Slug (auto-generated from Title, editable until first save, then locked so a live campaign URL is never silently broken), Headline, Subheadline, Body Text, optional Hero Image URL (pasted link — no file upload exists anywhere in this app), CTA Button Text, linked Campaign (for attribution), Department, Entity, and a Draft/Published status
+- Each page is instantly live at a stable public URL (`landing.html?slug=<id>`) once Published — no developer/code change needed per page. One reusable template reads its content from Firestore by slug; a Draft page has no working public URL and is unreachable even by direct slug guess (enforced by the Firestore rule, not just the UI)
+- Submissions write straight into the same `leads` collection as everything else (source: "Landing Page"), so they immediately show up in the Leads CRM, can be assigned to agents, and count in attribution — no separate inbox to check
+- Submission count shown per page (live-computed from `leads`, never stored) — click through to jump to the Leads CRM pre-filtered to that page's leads
+- "🔗 Copy Link" — copies the public URL once Published
+
 ### Leads CRM
 - Two-dimension status tracking: Contact Status (Untouched/Reached/Unreached/Missed) + Outcome (Pending/Open File/Follow-up Scheduled/Booked/Wrong Number/Already a Patient/Closed-Unsuccessful, only active once Reached)
 - **Closure Reason** — a second, conditional dropdown shown only when Outcome is Closed - Unsuccessful, capturing *why* (Not Interested, Price/Insurance Objection, Went Elsewhere, Wrong Department/Specialty, Unable to Reach After Multiple Attempts, Other). Cleared automatically if Outcome moves away from Closed - Unsuccessful.
@@ -66,6 +73,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Bulk Edit** — Department/Entity/Contact Status/Outcome/Date, plus Campaign (bulk-attach leads to a campaign) and Assign to Agent, applied only to fields explicitly set
 - **Campaign script popover** — clicking a lead's Campaign cell (when linked) shows that campaign's Agent Script (calling context, edited on the campaign record) and Post Link, if set
 - **WhatsApp / click-to-call** — icon links per lead (`wa.me`/`tel:`), using the lead's normalized phone number
+- **Email** — optional field, shown in the table and the manual Add/Edit modal; every landing-page-captured lead has one, most others don't (not yet part of Excel/Sheet import column-detection)
 - **Excel export** — Export Selected (from a bulk selection) or Export Filtered (whatever the current filters produce), reusing the same XLSX library used for import
 - **Phone number normalization** — all phone writes (manual entry, Excel import, Sheet import) unify to bare-digits international format; a one-time "☎ Normalize Phone Numbers" migration button (with a before/after preview) backfills existing records
 - Excel upload with automatic column detection (name/phone/department/entity/source/campaign/date/status/notes), department fuzzy-matching, and a campaign-attribution picker. Deduplicates by phone+campaign combination (not phone alone) against existing leads — recomputed live as the campaign dropdown changes, since that's the only input the dedupe key depends on that isn't fixed at parse time; duplicate rows are shown dimmed in the preview and skipped on import, with the skip count called out
@@ -160,6 +168,18 @@ A live, read-only dashboard for executive leadership to track marketing action i
 - Table sorted **overdue-first, then by ascending deadline** — nothing needs filtering to surface what's late.
 - Each row's linked initiative (if any) shows its **live** current title + status, not a stale snapshot — both this page and `admin.html` read the same real-time `initiatives` data, so a status change made in `admin.html` appears here immediately, no refresh needed.
 - Filters: status, "Overdue only," free-text search — same as the admin-side management tab, for visual/behavioral consistency between the two views.
+
+---
+
+## Landing Pages (`landing.html`) — public, no login, first entry point with an unauthenticated write
+
+One reusable template serving every landing page an admin builds — the URL is `landing.html?slug=<id>`, resolved by fetching the matching `landing_pages` document (see `docs/DATA_MODEL.md`). No login anywhere on this page, matching `index.html`'s public model.
+
+- Renders hero image (if set) / headline / subheadline / body text / CTA button text from the fetched page, then a Name / Email / Phone form
+- A missing slug, a slug that never existed, and a Draft page's slug all render the exact same generic "This page is no longer available" message — deliberately uniform so a slug can never be enumerated by trial and error
+- **Anti-spam**: a honeypot field invisible to real visitors (a bot that blindly fills every field on the page fills this one too) plus a minimum ~2-second delay between page load and submission — both cases silently pretend success without writing anything, never tipping off a bot that it was caught. This is a real but client-side-only deterrent, not a hard boundary — see `docs/ARCHITECTURE.md` §4.6 for the honest limit of what it can and can't stop
+- A genuine submission writes straight into the `leads` collection (`source: "Landing Page"`) via this app's **first unauthenticated Firestore write path** — narrowly scoped by a field-whitelisted, fixed-status Firestore rule (see `docs/ARCHITECTURE.md` §4.6) — so it shows up immediately in the Leads CRM like any other lead
+- Never imports anything beyond `getLandingPageBySlug`/`addLead`/`normalizePhone` — no read access to the `leads` collection at all, and no write access to anything else
 
 ---
 

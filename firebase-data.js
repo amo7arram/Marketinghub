@@ -1009,6 +1009,38 @@ export async function fetchGoogleSheetCSV(sheetUrlOrId) {
   return res.text();
 }
 
+// ── LANDING PAGES (admin-built lead-capture pages, public URL via landing.html) ──
+// Doc ID = slug — this IS the URL (landing.html?slug=<id>), a single getDoc
+// by known ID, no query needed. Deterministic-ID write, per CLAUDE.md rule 6.
+const LANDING_PAGES = "landing_pages";
+export const LANDING_PAGE_STATUSES = ["Draft", "Published"];
+
+export function watchLandingPages(callback) {
+  return onSnapshot(collection(db, LANDING_PAGES), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+    callback(data);
+  }, err => { console.error('watchLandingPages:', err.code, '— add Firestore rules for landing_pages'); callback([]); });
+}
+export function createLandingPage(slug, data) {
+  return setDoc(doc(db, LANDING_PAGES, slug), { ...data, createdAt: Timestamp.now(), updatedAt: Timestamp.now() });
+}
+export function saveLandingPage(slug, data) {
+  return setDoc(doc(db, LANDING_PAGES, slug), { ...data, updatedAt: Timestamp.now() }, { merge: true });
+}
+export function deleteLandingPage(slug) {
+  return deleteDoc(doc(db, LANDING_PAGES, slug));
+}
+// One-time fetch, not a live listener — a landing page's content doesn't
+// need a socket held open per ad-driven visitor. Used by landing.html only.
+export async function getLandingPageBySlug(slug) {
+  const snap = await getDoc(doc(db, LANDING_PAGES, slug));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+export function slugify(title) {
+  return String(title||'').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
 // ── DEPARTMENT REVENUE ESTIMATES (ROI fallback) ───────────────────────────
 // Stored as config/department_revenue_estimates → { "Cardiology": 1200, ... }
 // Used as a fallback when a booked lead has no actual revenueValue entered,

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--gold:#C8A96E;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;--green:#1DB87A;--red:#E0392B;
+  --radius:6px;--radius-lg:10px;--shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+}
+html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
+.hidden{display:none !important}
+.page{width:640px;max-width:100%}
+.logo-row{display:flex;justify-content:center;margin-bottom:20px}
+.logo-row img{height:36px}
+.card{background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);overflow:hidden}
+.hero-img{width:100%;max-height:320px;object-fit:cover;display:block}
+.card-body{padding:32px}
+.headline{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--text);margin-bottom:8px;line-height:1.25}
+.subheadline{font-size:15px;color:var(--text-2);margin-bottom:18px;line-height:1.5}
+.body-text{font-size:13px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;margin-bottom:24px}
+.form-section{border-top:1px solid var(--border);padding-top:22px}
+.field-group{margin-bottom:14px}
+.field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.field-input{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:14px}
+.field-input:focus{outline:none;border-color:var(--navy)}
+.honeypot-field{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden}
+.submit-btn{width:100%;padding:13px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;margin-top:4px}
+.submit-btn:hover{background:#003f7a}
+.submit-btn:disabled{opacity:0.6;cursor:default}
+.thankyou{text-align:center;padding:20px 0}
+.thankyou-icon{font-size:40px;margin-bottom:10px}
+.thankyou-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
+.thankyou-sub{font-size:13px;color:var(--text-3)}
+.unavailable{text-align:center;padding:60px 32px}
+.unavailable-icon{font-size:36px;margin-bottom:12px;color:var(--text-3)}
+.unavailable-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--text-2);margin-bottom:6px}
+.footer-note{text-align:center;font-size:11px;color:var(--text-3);margin-top:20px}
+.toast{position:fixed;bottom:24px;right:24px;left:24px;margin:auto;max-width:400px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none;text-align:center}
+.toast.show{display:block}
+.toast.error{background:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="logo-row"><img src="logo.jpg" alt="IMC"></div>
+
+  <div class="card hidden" id="loading-state">
+    <div class="card-body" style="text-align:center;color:var(--text-3);padding:60px 32px">Loading…</div>
+  </div>
+
+  <div class="card hidden" id="unavailable-state">
+    <div class="unavailable">
+      <div class="unavailable-icon">🔒</div>
+      <div class="unavailable-title">This page is no longer available</div>
+      <div class="footer-note">Please check the link, or contact the person who shared it with you.</div>
+    </div>
+  </div>
+
+  <div class="card hidden" id="content-state">
+    <img class="hero-img hidden" id="hero-img">
+    <div class="card-body">
+      <div class="headline" id="p-headline"></div>
+      <div class="subheadline hidden" id="p-subheadline"></div>
+      <div class="body-text hidden" id="p-body"></div>
+
+      <div class="form-section" id="form-wrap">
+        <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span></label><input class="field-input" id="f-name" placeholder="Your name"></div>
+        <div class="field-group"><label class="field-label">Email<span style="color:var(--red)">*</span></label><input class="field-input" type="email" id="f-email" placeholder="you@example.com"></div>
+        <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span></label><input class="field-input" type="tel" id="f-phone" placeholder="05XXXXXXXX"></div>
+        <!-- Honeypot: real visitors never see or fill this. Any bot that
+             blindly fills every field on the page will. -->
+        <div class="honeypot-field" aria-hidden="true">
+          <label for="f-website">Website</label>
+          <input type="text" id="f-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        <button class="submit-btn" id="submit-btn" onclick="submitLead()">Submit</button>
+      </div>
+
+      <div class="thankyou hidden" id="thankyou-state">
+        <div class="thankyou-icon">✓</div>
+        <div class="thankyou-title">Thank you!</div>
+        <div class="thankyou-sub">We've received your details and will be in touch shortly.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-note">International Medical Center</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { getLandingPageBySlug, addLead, normalizePhone } from './firebase-data.js';
+
+const pageLoadedAt = Date.now();
+const MIN_SUBMIT_DELAY_MS = 2000; // faster than this after page load is treated as a bot
+let PAGE = null;
+
+function show(id) {
+  ['loading-state','unavailable-state','content-state'].forEach(x =>
+    document.getElementById(x).classList.toggle('hidden', x !== id)
+  );
+}
+
+function showToast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(()=>t.className='toast', 3000);
+}
+
+async function init() {
+  show('loading-state');
+  const slug = new URLSearchParams(location.search).get('slug');
+  if (!slug) { show('unavailable-state'); return; }
+  try {
+    const lp = await getLandingPageBySlug(slug);
+    // Deliberately identical treatment for "never existed" and "not
+    // Published" — never hints at which, so a slug can't be enumerated.
+    if (!lp || lp.status !== 'Published') { show('unavailable-state'); return; }
+    PAGE = lp;
+    renderPage(lp);
+    show('content-state');
+  } catch (e) {
+    show('unavailable-state');
+  }
+}
+
+function renderPage(lp) {
+  document.title = lp.title ? `${lp.title} — IMC` : 'IMC';
+  document.getElementById('p-headline').textContent = lp.headline || '';
+  if (lp.subheadline) {
+    document.getElementById('p-subheadline').textContent = lp.subheadline;
+    document.getElementById('p-subheadline').classList.remove('hidden');
+  }
+  if (lp.bodyText) {
+    document.getElementById('p-body').textContent = lp.bodyText;
+    document.getElementById('p-body').classList.remove('hidden');
+  }
+  if (lp.heroImageUrl) {
+    const img = document.getElementById('hero-img');
+    img.src = lp.heroImageUrl;
+    img.classList.remove('hidden');
+  }
+  document.getElementById('submit-btn').textContent = lp.ctaButtonText || 'Submit';
+}
+
+window.submitLead = async function() {
+  const name = document.getElementById('f-name').value.trim();
+  const email = document.getElementById('f-email').value.trim();
+  const phoneRaw = document.getElementById('f-phone').value.trim();
+  const honeypot = document.getElementById('f-website').value.trim();
+
+  if (!name || !email || !phoneRaw) {
+    showToast('Please fill in your name, email, and phone number', true);
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('Please enter a valid email address', true);
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+
+  // Silent fake-success for both spam signals — never tip off a bot that it
+  // was caught, just don't write anything. This is a client-side deterrent
+  // only (see docs/ARCHITECTURE.md) — a scripted attacker bypassing this
+  // page's JS entirely could still write straight to Firestore within the
+  // rule's field whitelist.
+  const isSpam = honeypot || (Date.now() - pageLoadedAt < MIN_SUBMIT_DELAY_MS);
+  if (isSpam) {
+    document.getElementById('form-wrap').classList.add('hidden');
+    document.getElementById('thankyou-state').classList.remove('hidden');
+    return;
+  }
+
+  try {
+    await addLead({
+      name, email, phone: normalizePhone(phoneRaw),
+      source: 'Landing Page',
+      landingPageId: PAGE.id,
+      campaignId: PAGE.campaignId || null,
+      campaign: PAGE.campaignTitle || '',
+      department: PAGE.department || '',
+      entity: PAGE.entity || '',
+      dateCreated: new Date().toISOString().slice(0,10),
+      contactStatus: 'Untouched',
+      outcome: 'Pending',
+    });
+    document.getElementById('form-wrap').classList.add('hidden');
+    document.getElementById('thankyou-state').classList.remove('hidden');
+  } catch (e) {
+    showToast('Something went wrong — please try again: ' + e.message, true);
+    btn.disabled = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

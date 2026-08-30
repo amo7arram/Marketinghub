@@ -103,6 +103,8 @@ The CRM core. Each document is **one interaction** — a person engaging with on
 | `assignedAgentName` | string | Denormalized display name, same convention as `campaign`/`campaignId`. |
 | `revenueValue` | number \| null | SAR — actual known revenue from this booking, feeds campaign ROI |
 | `notes` | string | |
+| `email` | string \| null | Optional — most leads never had this (manual entry, Excel/Sheet import don't collect it), but every `source:"Landing Page"` lead does. Not yet added to the Excel/Sheet import column-detection — a natural, separate follow-up. |
+| `landingPageId` | string \| null | Set only when `source === "Landing Page"` — references the `landing_pages` doc (by slug) that generated this lead. Informational only, no live lookup renders against it the way `initiatives`-linking fields do elsewhere, so a deleted landing page leaves this harmlessly dangling. |
 | `createdAt`, `updatedAt` | Timestamp | |
 
 **⚠️ Legacy field:** `status` (old flat single-status model: `Lead`/`Open File`/`Booked`/`Closed`). Migrated via `migrateLegacyLeadStatuses()` — should be fully absent on any document that has gone through migration.
@@ -110,6 +112,24 @@ The CRM core. Each document is **one interaction** — a person engaging with on
 **Known limitation:** there is no formal "Contact" entity separate from "Lead interaction." A phone-number lookup at read time simulates contact history; this is not a true relational model and would need a proper `contacts` collection (one per unique person) with `lead_interactions` as child records in any serious rebuild.
 
 ---
+
+## `landing_pages`
+
+Admin-built lead-capture pages, published at a stable public URL (`landing.html?slug=<id>`) for use in ad campaigns — see `docs/FEATURES.md` and `docs/ARCHITECTURE.md` §4.6 for the full design. **Doc ID = slug** (deterministic ID, `setDoc`, per CLAUDE.md rule 6) — the slug *is* the URL, so `landing.html` resolves a page with a single `getDoc` by known ID, never a query, and never lists the collection.
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | string | Internal/admin-facing name |
+| `headline`, `subheadline` | string | Public-facing hero copy |
+| `bodyText` | string | Plain paragraphs, line breaks preserved — no rich text editor |
+| `heroImageUrl` | string \| null | Optional, a pasted link — same convention as `requests.referenceLink`, since this app has no file upload anywhere |
+| `ctaButtonText` | string | Defaults to "Submit" if empty |
+| `campaignId` / `campaignTitle` | string \| null | Denormalized at save time in `admin.html` so `landing.html` never needs to fetch the full `initiatives` collection just to label one lead — read straight off this doc and copied onto every lead this page generates |
+| `department`, `entity` | string | Single values, matching `leads.department`/`leads.entity`'s shape (not arrays) — copied onto every lead this page generates |
+| `status` | string | `Draft` \| `Published` (`LANDING_PAGE_STATUSES`) — only `Published` pages are visitable; a Draft's content is unreachable even by direct slug guess (see the Firestore rule below) |
+| `createdAt` / `updatedAt` | Timestamp | |
+
+**Firestore rule** (`firestore.rules`): anonymous visitors may `get` exactly one `Published` page by known slug, never `list` the collection (so Draft titles/content stay invisible and can't be discovered by browsing); authenticated admins get full `list`/`get`/`write`.
 
 ## `entities`
 
@@ -338,6 +358,10 @@ initiatives (type=Campaign)
 
 leads
   └── phone number ~ informal grouping             [Contact History — not a real FK]
+
+landing_pages (slug = doc ID)
+  ├── campaignId → initiatives (type=Campaign)      [denormalized campaignTitle, for attribution]
+  └── leads (landingPageId → landing_pages)         [every submission this page generated]
 
 team_members
   └── authUid → Firebase Auth user → roles/{uid}   [login account, if granted]
