@@ -959,6 +959,18 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <span id="mc-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
         </div>
 
+        <!-- Google Analytics Setup -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">📈 Google Analytics</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:14px">Adds Google Analytics (GA4) to every public Landing Page — page views plus a "lead submitted" conversion event per page, so you can compare performance across campaigns. Only loads after a visitor accepts the cookie-consent banner on the page; leave blank to keep Landing Pages tracking-free.</div>
+          <div class="field-group">
+            <label class="field-label">GA4 Measurement ID</label>
+            <input class="field-input" id="ga-measurement-id-input" placeholder="G-XXXXXXXXXX">
+          </div>
+          <button class="btn btn-primary" onclick="saveAnalyticsSettings()">Save</button>
+          <span id="ga-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+        </div>
+
         <!-- Placeholder for future settings sections -->
         <div style="text-align:center;padding:24px;color:var(--text-3);font-size:11px;border:1px dashed var(--border);border-radius:var(--radius-lg)">
           More portal-wide settings will appear here as they're added.
@@ -1734,6 +1746,7 @@ import {
   getBrandVoice, setBrandVoice, watchBrandVoice,
   getAnthropicKey, setAnthropicKey, watchAnthropicKey,
   getMetricoolSettings, setMetricoolSettings, watchMetricoolSettings,
+  setAnalyticsSettings, watchAnalyticsSettings,
   getMetricoolStats, setMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
   saveMonthMetrics as saveLegacyMonthMetrics, getMetricsForPeriod as getLegacyMetricsForPeriod, getAllMetrics,
   getAccessGate, setAccessGate, hashPassword,
@@ -1780,6 +1793,8 @@ let BRAND_VOICE = {};
 let ALL_ENTITIES = [];
 let ANTHROPIC_API_KEY = '';
 let METRICOOL_SETTINGS = { apiToken: '', userId: '', blogId: '' };
+let ANALYTICS_SETTINGS = {};
+let unsubAnalyticsSettings = null;
 let METRICOOL_FETCHED_PROFILES = [];
 let METRICOOL_STATS = null;
 let ANNUAL_BUDGET = 0;
@@ -1943,6 +1958,7 @@ watchAuth(async user => {
     if(unsubLeads) unsubLeads();
     if(unsubMarketingActions) unsubMarketingActions();
     if(unsubLandingPages) unsubLandingPages();
+    if(unsubAnalyticsSettings) unsubAnalyticsSettings();
   }
 });
 
@@ -1964,6 +1980,7 @@ function initData() {
   unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
+  unsubAnalyticsSettings = watchAnalyticsSettings(data => { ANALYTICS_SETTINGS = data; loadAnalyticsSettingsForm(); });
   unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); renderLandingPagesTable(); });
   unsubMarketingActions = watchMarketingActions(data => { ALL_MARKETING_ACTIONS = data; renderMarketingActionsTable(); });
   unsubLandingPages = watchLandingPages(data => { ALL_LANDING_PAGES = data; renderLandingPagesTable(); });
@@ -5159,6 +5176,22 @@ window.saveMetricoolSettings = async function() {
     s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
     loadMetricoolSettingsForm();
     showToast('Metricool settings saved');
+  } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── GOOGLE ANALYTICS SETTINGS ──────────────────────────────────────────
+function loadAnalyticsSettingsForm() {
+  const el = document.getElementById('ga-measurement-id-input');
+  if(el) el.value = ANALYTICS_SETTINGS.measurementId || '';
+}
+window.saveAnalyticsSettings = async function() {
+  const measurementId = document.getElementById('ga-measurement-id-input').value.trim();
+  try {
+    await setAnalyticsSettings({ measurementId });
+    ANALYTICS_SETTINGS = { measurementId };
+    const s = document.getElementById('ga-save-status');
+    s.style.display = 'inline'; setTimeout(()=>s.style.display='none', 3000);
+    showToast(measurementId ? 'Google Analytics saved' : 'Google Analytics disabled — Landing Pages will not load tracking');
   } catch(e) { showToast('Save failed: '+e.message, true); }
 }
 

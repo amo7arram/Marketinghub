@@ -318,6 +318,7 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 | `department_revenue_estimates` | Per-department average revenue, used as the ROI fallback when actual `leads.revenueValue` isn't entered |
 | `metricool_settings` | Metricool API token + userId/blogId (⚠️ stored here, visible client-side — same tradeoff as `ai_settings`, see `ARCHITECTURE.md` §4). Needs an authenticated-only Firestore rule, same sensitivity class as `ai_settings`. |
 | `metricool_stats` | **Public-readable** synced social performance series — written by `admin.html`'s "Sync Now" action, read by `index.html`. Contains zero PII by design (aggregate public social numbers only). See the `config/metricool_stats` series structure section above. Needs a public-read/authenticated-write Firestore rule, same pattern as `lead_stats`. |
+| `analytics_settings` | `{ measurementId }` — Google Analytics (GA4) Measurement ID for `landing.html`. **Public-readable**, unlike `ai_settings`/`metricool_settings` above — a Measurement ID isn't a secret, it's meant to sit in every page's visible HTML by design. `landing.html` only loads the GA script after the visitor accepts a cookie-consent banner (choice stored in that browser's `localStorage`, never sent anywhere) — see `docs/ARCHITECTURE.md` §4.6. Empty/missing means Landing Pages stay tracking-free. |
 
 ---
 

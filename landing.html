@@ -58,6 +58,12 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .toast{position:fixed;bottom:24px;right:24px;left:24px;margin:auto;max-width:400px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none;text-align:center}
 .toast.show{display:block}
 .toast.error{background:var(--red)}
+.consent-banner{position:fixed;bottom:0;left:0;right:0;background:var(--text);color:#fff;padding:16px 20px;display:none;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;z-index:150;font-size:12px;line-height:1.5}
+.consent-banner.show{display:flex}
+.consent-banner a{color:var(--gold)}
+.consent-btn{padding:8px 18px;border-radius:var(--radius);font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;border:none;white-space:nowrap}
+.consent-accept{background:var(--green);color:#fff}
+.consent-decline{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4)}
 </style>
 </head>
 <body>
@@ -113,17 +119,82 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
     <div class="footer-hours-title">Working Hours</div>
     <div>Outpatient Clinics: Saturday – Thursday, 9:00 AM – 10:00 PM</div>
     <div>Emergency: 24/7</div>
+    <div style="margin-top:10px">
+      <a href="https://www.imc.med.sa/terms-conditions" target="_blank" rel="noopener">Terms & Conditions</a>
+      &nbsp;·&nbsp;
+      <a href="https://www.imc.med.sa/privacy-policy-cookie-notice" target="_blank" rel="noopener">Privacy Policy & Cookie Notice</a>
+    </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
+<!-- Only shown when Google Analytics is configured (admin.html Settings)
+     AND the visitor hasn't already made a consent choice this browser. -->
+<div class="consent-banner" id="consent-banner">
+  <span>We use cookies to understand how our pages perform. See our <a href="https://www.imc.med.sa/privacy-policy-cookie-notice" target="_blank" rel="noopener">Privacy Policy & Cookie Notice</a>.</span>
+  <button class="consent-btn consent-accept" onclick="handleConsent(true)">Accept</button>
+  <button class="consent-btn consent-decline" onclick="handleConsent(false)">Decline</button>
+</div>
+
 <script type="module">
-import { getLandingPageBySlug, addLead, normalizePhone } from './firebase-data.js';
+import { getLandingPageBySlug, addLead, normalizePhone, getAnalyticsSettings } from './firebase-data.js';
 
 const pageLoadedAt = Date.now();
 const MIN_SUBMIT_DELAY_MS = 2000; // faster than this after page load is treated as a bot
 let PAGE = null;
+
+// ── GOOGLE ANALYTICS — off by default, only loads after explicit consent ──
+const CONSENT_KEY = 'imc_lp_analytics_consent'; // localStorage, per-browser, never sent anywhere
+let gaMeasurementId = null;
+let gaLoaded = false;
+
+function loadGoogleAnalytics(id) {
+  if (gaLoaded) return;
+  gaLoaded = true;
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function(){ dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', id);
+}
+
+// Fired only on a genuine successful submission — never on the honeypot/
+// timing spam-fake-success path, so conversion numbers aren't polluted by
+// bot traffic. No PII (name/email/phone) is ever sent to GA.
+function trackLeadConversion() {
+  if (window.gtag) {
+    gtag('event', 'generate_lead', {
+      landing_page_slug: PAGE.id,
+      campaign: PAGE.campaignTitle || '',
+      department: PAGE.department || '',
+    });
+  }
+}
+
+// Non-blocking — never delays showing the actual landing page content.
+// Fails silently on any error (a missing/unreachable analytics_settings doc
+// should never break the page for a real visitor).
+async function initAnalytics() {
+  try {
+    const settings = await getAnalyticsSettings();
+    if (!settings.measurementId) return; // not configured — stay tracking-free
+    gaMeasurementId = settings.measurementId;
+    let consent = null;
+    try { consent = localStorage.getItem(CONSENT_KEY); } catch(e) {}
+    if (consent === 'accepted') loadGoogleAnalytics(gaMeasurementId);
+    else if (consent !== 'declined') document.getElementById('consent-banner').classList.add('show');
+  } catch (e) { /* analytics is non-critical — never surface this to the visitor */ }
+}
+
+window.handleConsent = function(accepted) {
+  try { localStorage.setItem(CONSENT_KEY, accepted ? 'accepted' : 'declined'); } catch(e) {}
+  document.getElementById('consent-banner').classList.remove('show');
+  if (accepted && gaMeasurementId) loadGoogleAnalytics(gaMeasurementId);
+}
 
 function show(id) {
   ['loading-state','unavailable-state','content-state'].forEach(x =>
@@ -150,6 +221,7 @@ async function init() {
     PAGE = lp;
     renderPage(lp);
     show('content-state');
+    initAnalytics(); // not awaited — never delays rendering the page itself
   } catch (e) {
     show('unavailable-state');
   }
@@ -225,6 +297,7 @@ window.submitLead = async function() {
       contactStatus: 'Untouched',
       outcome: 'Pending',
     });
+    trackLeadConversion();
     completeSubmission();
   } catch (e) {
     showToast('Something went wrong — please try again: ' + e.message, true);

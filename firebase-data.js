@@ -1047,6 +1047,26 @@ export function slugify(title) {
   return String(title||'').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
 
+// ── ANALYTICS SETTINGS (Google Analytics on landing.html) ────────────────
+// Public-read (unlike ai_settings/metricool_settings above) — a GA4
+// Measurement ID isn't a secret, it's meant to sit in every page's visible
+// HTML by design. landing.html reads this while fully unauthenticated, and
+// only ever loads the GA script after the visitor accepts the cookie-consent
+// banner — see landing.html for that gate.
+export async function getAnalyticsSettings() {
+  const snap = await getDoc(doc(db, CONFIG, "analytics_settings"));
+  return snap.exists() ? snap.data() : {};
+}
+export function setAnalyticsSettings(data) {
+  return setDoc(doc(db, CONFIG, "analytics_settings"), data, { merge: true });
+}
+export function watchAnalyticsSettings(callback) {
+  return onSnapshot(doc(db, CONFIG, "analytics_settings"),
+    snap => callback(snap.exists() ? snap.data() : {}),
+    err => { console.error('watchAnalyticsSettings:', err.code); callback({}); }
+  );
+}
+
 // ── DEPARTMENT REVENUE ESTIMATES (ROI fallback) ───────────────────────────
 // Stored as config/department_revenue_estimates → { "Cardiology": 1200, ... }
 // Used as a fallback when a booked lead has no actual revenueValue entered,

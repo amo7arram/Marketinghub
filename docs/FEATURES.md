@@ -119,6 +119,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Team Members** — directory + optional real login account creation (Admin / Agent / Coordinator role), using a secondary Firebase app instance so creating a user doesn't sign out the admin
 - **Department Revenue Estimates** — per-department average revenue, used as an ROI fallback
 - **Metricool Setup** — API token + brand/profile selection (via "Fetch My Profiles"), stored in `config/metricool_settings`; powers Dashboard Metrics syncing
+- **Google Analytics** — a single GA4 Measurement ID, stored in `config/analytics_settings`, adds analytics to every Landing Page (page views + a "lead submitted" conversion event per page). Blank by default (no tracking); see the Landing Pages entry above and `docs/ARCHITECTURE.md` §4.6 for the consent-gating mechanism
 - **Public Access Gate** — enable/disable + set the password gate on the public portal
 - **Admin Login Passcode ("Magic Word")** — set a shared passcode as an alternative login path; changing it force-logs-out the current session
 - **Brand Voice** — AI generation tone, formality, closing hashtag, CTA text, banned words — feeds every AI caption/content generation call system-wide
@@ -182,7 +183,9 @@ One reusable template serving every landing page an admin builds — the URL is 
 - **Anti-spam**: a honeypot field invisible to real visitors (a bot that blindly fills every field on the page fills this one too) plus a minimum ~2-second delay between page load and submission — both cases silently pretend success without writing anything, and follow the *exact same* post-submission behavior (custom message or redirect) as a genuine submission, so a bot can't distinguish caught-vs-real by comparing behavior. This is a real but client-side-only deterrent, not a hard boundary — see `docs/ARCHITECTURE.md` §4.6 for the honest limit of what it can and can't stop
 - A genuine submission writes straight into the `leads` collection (`source: "Landing Page"`) via this app's **first unauthenticated Firestore write path** — narrowly scoped by a field-whitelisted, fixed-status Firestore rule (see `docs/ARCHITECTURE.md` §4.6) — so it shows up immediately in the Leads CRM like any other lead
 - After submitting, the visitor either sees that page's custom Thank You Message (or a generic default) or is redirected to that page's Redirect URL, per how the admin configured it
-- Never imports anything beyond `getLandingPageBySlug`/`addLead`/`normalizePhone` — no read access to the `leads` collection at all, and no write access to anything else
+- Never imports anything beyond `getLandingPageBySlug`/`addLead`/`normalizePhone`/`getAnalyticsSettings` — no read access to the `leads` collection at all, and no write access to anything else
+- Footer links to IMC's real Terms & Conditions and Privacy Policy & Cookie Notice pages (`imc.med.sa`), plus the full address/website/working hours
+- **Google Analytics, off by default, consent-gated**: if an admin has configured a Measurement ID (Settings → Google Analytics), a cookie-consent banner appears on first visit (per browser, remembered via `localStorage`) linking to the Privacy Policy; GA only loads after Accept. A `generate_lead` event (page slug, campaign, department — never name/email/phone) fires only on a genuine successful submission, not on a spam-caught one
 
 ---
 
