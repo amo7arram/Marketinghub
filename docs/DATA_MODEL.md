@@ -102,7 +102,7 @@ The CRM core. Each document is **one interaction** — a person engaging with on
 | `assignedAgentUid` | string \| null | Firebase Auth UID of the agent this lead is assigned to. Set only by admins (`admin.html`) — agents can't reassign, matching the existing role boundary (`ARCHITECTURE.md` §4.1). Only team members with `hasLoginAccount && authUid` can be assigned, since anyone else could never see the lead in their own scoped view. Drives Contact Center Control's default "My Leads" filter (`l.assignedAgentUid === auth.currentUser.uid`). |
 | `assignedAgentName` | string | Denormalized display name, same convention as `campaign`/`campaignId`. |
 | `revenueValue` | number \| null | SAR — actual known revenue from this booking, feeds campaign ROI |
-| `notes` | string | |
+| `notes` | string | For `source:"Landing Page"` leads, populated from that page's optional Comment field |
 | `email` | string \| null | Optional — most leads never had this (manual entry, Excel/Sheet import don't collect it), but every `source:"Landing Page"` lead does. Not yet added to the Excel/Sheet import column-detection — a natural, separate follow-up. |
 | `landingPageId` | string \| null | Set only when `source === "Landing Page"` — references the `landing_pages` doc (by slug) that generated this lead. Informational only, no live lookup renders against it the way `initiatives`-linking fields do elsewhere, so a deleted landing page leaves this harmlessly dangling. |
 | `createdAt`, `updatedAt` | Timestamp | |

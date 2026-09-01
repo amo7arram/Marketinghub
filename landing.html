@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IMC</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -24,6 +24,15 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .card-body{padding:32px}
 .headline{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--text);margin-bottom:8px;line-height:1.25;text-align:center}
 .subheadline{font-size:15px;color:var(--text-2);margin-bottom:18px;line-height:1.5;text-align:center}
+.ar{font-family:'IBM Plex Sans Arabic',sans-serif;direction:rtl}
+.scroll-cue{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:22px;cursor:pointer;text-align:center;line-height:1.5}
+.scroll-cue:hover{background:#E4E9F5}
+.scroll-cue-text{font-size:13px;font-weight:600;color:var(--navy)}
+.scroll-cue-arrow{font-size:16px;animation:scroll-cue-bounce 1.4s infinite}
+@keyframes scroll-cue-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+.float-cta{position:fixed;left:0;right:0;bottom:0;background:var(--navy);color:#fff;text-align:center;padding:14px 20px;font-size:13px;font-weight:700;cursor:pointer;z-index:140;box-shadow:0 -2px 12px rgba(0,0,0,0.15);display:none}
+.float-cta.show{display:block}
+.float-cta .ar{font-weight:600;font-size:12px;opacity:0.9;margin-top:2px}
 .body-text{font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:24px}
 .body-text p{margin-bottom:10px}
 .body-text table{border-collapse:collapse;width:100%;margin-bottom:14px}
@@ -34,11 +43,13 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .body-text a{color:var(--navy)}
 .body-text h1,.body-text h2,.body-text h3,.body-text h4{font-family:'Syne',sans-serif;color:var(--text);margin-bottom:8px}
 .form-section{border-top:1px solid var(--border);padding-top:22px}
-.form-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text);margin-bottom:16px;text-align:center}
+.form-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text);margin-bottom:4px;text-align:center}
+.form-title-ar{font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:16px;text-align:center}
 .field-group{margin-bottom:14px}
 .field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
-.field-input{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:14px}
-.field-input:focus{outline:none;border-color:var(--navy)}
+.field-input,.field-textarea{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:14px}
+.field-textarea{min-height:70px;resize:vertical}
+.field-input:focus,.field-textarea:focus{outline:none;border-color:var(--navy)}
 .honeypot-field{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden}
 .submit-btn{width:100%;padding:13px;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;margin-top:4px}
 .submit-btn:hover{background:#003f7a}
@@ -88,13 +99,24 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
     <div class="card-body">
       <div class="headline" id="p-headline"></div>
       <div class="subheadline hidden" id="p-subheadline"></div>
+
+      <div class="scroll-cue" id="scroll-cue" onclick="scrollToForm()">
+        <div>
+          <div class="scroll-cue-text">📝 Fill the form below to get started</div>
+          <div class="scroll-cue-text ar">املأ النموذج أدناه للبدء</div>
+        </div>
+        <span class="scroll-cue-arrow">↓</span>
+      </div>
+
       <div class="body-text hidden" id="p-body"></div>
 
       <div class="form-section" id="form-wrap">
         <div class="form-title">Fill the form to receive a call</div>
+        <div class="form-title-ar ar">املأ النموذج لتلقي مكالمة</div>
         <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span></label><input class="field-input" id="f-name" placeholder="Your name"></div>
         <div class="field-group"><label class="field-label">Email<span style="color:var(--red)">*</span></label><input class="field-input" type="email" id="f-email" placeholder="you@example.com"></div>
         <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span></label><input class="field-input" type="tel" id="f-phone" placeholder="05XXXXXXXX"></div>
+        <div class="field-group"><label class="field-label">Comment <span style="color:var(--text-3);font-weight:400">— optional</span></label><textarea class="field-textarea" id="f-comment" placeholder="Anything you'd like us to know?"></textarea></div>
         <!-- Honeypot: real visitors never see or fill this. Any bot that
              blindly fills every field on the page will. -->
         <div class="honeypot-field" aria-hidden="true">
@@ -128,6 +150,14 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Persistent nudge for long pages — appears once the form has scrolled
+     out of view, so it's never more than one tap away regardless of how
+     much body content sits above it. -->
+<div class="float-cta" id="float-cta" onclick="scrollToForm()">
+  <div>Fill the Form ↓</div>
+  <div class="ar">املأ النموذج ↓</div>
+</div>
 
 <!-- Only shown when Google Analytics is configured (admin.html Settings)
      AND the visitor hasn't already made a consent choice this browser. -->
@@ -186,7 +216,7 @@ async function initAnalytics() {
     let consent = null;
     try { consent = localStorage.getItem(CONSENT_KEY); } catch(e) {}
     if (consent === 'accepted') loadGoogleAnalytics(gaMeasurementId);
-    else if (consent !== 'declined') document.getElementById('consent-banner').classList.add('show');
+    else if (consent !== 'declined') { document.getElementById('consent-banner').classList.add('show'); updateFloatCta(); }
   } catch (e) { /* analytics is non-critical — never surface this to the visitor */ }
 }
 
@@ -194,6 +224,28 @@ window.handleConsent = function(accepted) {
   try { localStorage.setItem(CONSENT_KEY, accepted ? 'accepted' : 'declined'); } catch(e) {}
   document.getElementById('consent-banner').classList.remove('show');
   if (accepted && gaMeasurementId) loadGoogleAnalytics(gaMeasurementId);
+  updateFloatCta(); // the consent banner no longer occupies the bottom of the screen
+}
+
+// ── SCROLL-TO-FORM NUDGE — for pages long enough that the form risks being
+// missed. A static cue up top (scroll-cue) plus a floating button (float-cta)
+// that only appears once the form has scrolled out of view, so it's never
+// shown redundantly right next to the cue itself.
+let formInView = true;
+window.scrollToForm = function() {
+  document.getElementById('form-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function updateFloatCta() {
+  const consentShowing = document.getElementById('consent-banner').classList.contains('show');
+  document.getElementById('float-cta').classList.toggle('show', !formInView && !consentShowing);
+}
+function initScrollCue() {
+  const formWrap = document.getElementById('form-wrap');
+  if (!formWrap || typeof IntersectionObserver === 'undefined') return;
+  new IntersectionObserver(entries => {
+    formInView = entries[0].isIntersecting;
+    updateFloatCta();
+  }, { threshold: 0.1 }).observe(formWrap);
 }
 
 function show(id) {
@@ -221,6 +273,7 @@ async function init() {
     PAGE = lp;
     renderPage(lp);
     show('content-state');
+    initScrollCue();
     initAnalytics(); // not awaited — never delays rendering the page itself
   } catch (e) {
     show('unavailable-state');
@@ -254,6 +307,8 @@ function renderPage(lp) {
 function completeSubmission() {
   if (PAGE.redirectUrl) { location.href = PAGE.redirectUrl; return; }
   document.getElementById('form-wrap').classList.add('hidden');
+  document.getElementById('scroll-cue').classList.add('hidden');
+  document.getElementById('float-cta').classList.remove('show');
   document.getElementById('thankyou-sub').textContent = PAGE.thankYouMessage || "We've received your details and will be in touch shortly.";
   document.getElementById('thankyou-state').classList.remove('hidden');
 }
@@ -262,6 +317,7 @@ window.submitLead = async function() {
   const name = document.getElementById('f-name').value.trim();
   const email = document.getElementById('f-email').value.trim();
   const phoneRaw = document.getElementById('f-phone').value.trim();
+  const comment = document.getElementById('f-comment').value.trim();
   const honeypot = document.getElementById('f-website').value.trim();
 
   if (!name || !email || !phoneRaw) {
@@ -296,6 +352,7 @@ window.submitLead = async function() {
       dateCreated: new Date().toISOString().slice(0,10),
       contactStatus: 'Untouched',
       outcome: 'Pending',
+      notes: comment,
     });
     trackLeadConversion();
     completeSubmission();

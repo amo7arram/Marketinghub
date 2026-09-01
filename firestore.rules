@@ -90,7 +90,8 @@ service cloud.firestore {
         request.resource.data.outcome == 'Pending' &&
         request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 200 &&
         request.resource.data.phone is string && request.resource.data.phone.size() > 0 && request.resource.data.phone.size() < 20 &&
-        request.resource.data.keys().hasOnly(['name','phone','email','source','landingPageId','campaignId','campaign','department','entity','dateCreated','contactStatus','outcome','createdAt'])
+        (!('notes' in request.resource.data) || (request.resource.data.notes is string && request.resource.data.notes.size() < 2000)) &&
+        request.resource.data.keys().hasOnly(['name','phone','email','source','landingPageId','campaignId','campaign','department','entity','dateCreated','contactStatus','outcome','createdAt','notes'])
       );
     }
     match /landing_pages/{slug} {
