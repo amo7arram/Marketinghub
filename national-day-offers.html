@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC Saudi National Day Offers 2026</title>
+<style>
+  :root{
+    --navy:#004D8C;
+    --blue:#0073BA;
+    --sky:#0094D9;
+    --lightblue:#99DCF3;
+    --card-tint:#EAF4FB;
+    --slate:#44546A;
+    --muted:#5E7184;
+    --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Tahoma, Arial, sans-serif;
+    background:#F4F9FC;
+    color:var(--slate);
+  }
+  .imc-wrap{max-width:1180px;margin:0 auto;padding:0 20px;}
+
+  /* HERO */
+  .imc-hero{
+    background:linear-gradient(135deg,var(--navy) 0%,var(--blue) 100%);
+    color:#fff;
+    padding:48px 0 64px;
+    position:relative;
+    overflow:hidden;
+  }
+  .imc-hero-inner{position:relative;z-index:2;text-align:center;}
+  .imc-eyebrow{
+    display:inline-block;
+    letter-spacing:2px;
+    font-size:13px;
+    text-transform:uppercase;
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.35);
+    padding:6px 16px;
+    border-radius:999px;
+    margin-bottom:18px;
+  }
+  .imc-hero h1{
+    font-size:38px;
+    margin:0 0 8px;
+    font-weight:700;
+  }
+  .imc-hero .ar-title{
+    font-size:24px;
+    margin:0 0 18px;
+    font-weight:600;
+    color:var(--lightblue);
+    direction:rtl;
+  }
+  .imc-hero p.sub{
+    max-width:640px;
+    margin:0 auto 6px;
+    font-size:16px;
+    color:#E5F3FB;
+    line-height:1.6;
+  }
+  .imc-validity{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-top:18px;
+    background:rgba(255,255,255,0.1);
+    border:1px solid rgba(255,255,255,0.3);
+    padding:8px 18px;
+    border-radius:999px;
+    font-size:14px;
+  }
+  .imc-strip{
+    position:absolute;
+    bottom:0;left:0;right:0;
+    height:46px;
+    opacity:0.5;
+  }
+
+  /* TABS */
+  .imc-tabs{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:-30px auto 30px;
+    position:relative;
+    z-index:5;
+    flex-wrap:wrap;
+    padding:0 20px;
+  }
+  .imc-tab-btn{
+    background:#fff;
+    border:2px solid var(--blue);
+    color:var(--navy);
+    font-weight:600;
+    font-size:15px;
+    padding:10px 26px;
+    border-radius:12px;
+    cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,77,140,0.12);
+    transition:all .15s ease;
+    text-align:center;
+    line-height:1.5;
+  }
+  .imc-tab-btn .tab-ar{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    direction:rtl;
+  }
+  .imc-tab-btn:hover{background:var(--card-tint);}
+  .imc-tab-btn.active{
+    background:var(--navy);
+    color:#fff;
+    border-color:var(--navy);
+  }
+  .imc-tab-btn.active .tab-ar{color:var(--lightblue);}
+  .imc-tab-btn:not(.active) .tab-ar{color:var(--blue);}
+
+  /* FILTERS */
+  .imc-filters{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:0 0 26px;
+    justify-content:center;
+  }
+  .imc-chip{
+    background:#fff;
+    border:1px solid #C9E1F2;
+    color:var(--blue);
+    font-size:13px;
+    font-weight:600;
+    padding:7px 16px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:all .15s ease;
+    white-space:nowrap;
+    direction:ltr;
+  }
+  .imc-chip .chip-ar{
+    direction:rtl;
+    font-weight:600;
+  }
+  .imc-chip:hover{background:var(--card-tint);}
+  .imc-chip.active{
+    background:var(--sky);
+    border-color:var(--sky);
+    color:#fff;
+  }
+
+  /* GRID */
+  .imc-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(270px,1fr));
+    gap:18px;
+    margin-bottom:20px;
+  }
+  .imc-card{
+    background:#fff;
+    border-radius:16px;
+    overflow:hidden;
+    border:1px solid #E2EEF6;
+    box-shadow:0 4px 14px rgba(0,77,140,0.06);
+    display:flex;
+    flex-direction:column;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .imc-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 10px 24px rgba(0,77,140,0.14);
+  }
+  .imc-card-visual{
+    height:110px;
+    background:linear-gradient(135deg,var(--card-tint),#DCEFFA);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+  }
+  .imc-card-visual svg{width:44px;height:44px;}
+  .imc-badge-discount{
+    position:absolute;
+    top:10px;
+    inset-inline-end:10px;
+    background:var(--navy);
+    color:#fff;
+    font-size:12px;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:999px;
+  }
+  .imc-card-body{
+    padding:16px 16px 18px;
+    display:flex;
+    flex-direction:column;
+    flex:1;
+  }
+  .imc-cat-label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    color:var(--sky);
+    font-weight:700;
+    margin-bottom:6px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .imc-cat-label .cat-ar{
+    direction:rtl;
+    text-transform:none;
+    color:var(--sky);
+    font-weight:700;
+  }
+  .imc-cat-label .cat-sep{
+    color:#C9E1F2;
+  }
+  .imc-card-title{
+    font-size:15px;
+    font-weight:700;
+    color:var(--navy);
+    margin:0 0 4px;
+    line-height:1.35;
+  }
+  .imc-card-ar{
+    font-size:13px;
+    color:var(--muted);
+    direction:rtl;
+    margin:0 0 12px;
+    line-height:1.4;
+  }
+  .imc-price-row{
+    margin-top:auto;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .imc-price-old{
+    font-size:13px;
+    color:#9AA9B8;
+    text-decoration:line-through;
+  }
+  .imc-price-new{
+    font-size:20px;
+    font-weight:800;
+    color:var(--navy);
+  }
+  .imc-price-cur{
+    font-size:12px;
+    font-weight:600;
+    color:var(--muted);
+  }
+  .imc-call-btn{
+    margin-top:14px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    background:var(--sky);
+    color:#fff;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:700;
+    padding:10px 14px;
+    border-radius:10px;
+    transition:background .15s ease;
+  }
+  .imc-call-btn:hover{background:var(--navy);}
+  .imc-call-btn svg{width:15px;height:15px;flex-shrink:0;}
+
+  .imc-empty{
+    text-align:center;
+    color:var(--muted);
+    padding:60px 20px;
+    font-size:15px;
+  }
+
+  .imc-count{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:16px;
+  }
+
+  /* FOOTER */
+  .imc-footer{
+    background:var(--navy);
+    color:#fff;
+    padding:36px 0;
+    margin-top:40px;
+    text-align:center;
+  }
+  .imc-footer .ar-tag{
+    font-size:18px;
+    color:var(--lightblue);
+    margin-bottom:10px;
+    direction:rtl;
+  }
+  .imc-book-channels{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-top:16px;
+  }
+  .imc-book-channels span{
+    background:rgba(255,255,255,0.1);
+    border:1px solid rgba(255,255,255,0.3);
+    padding:8px 18px;
+    border-radius:999px;
+    font-size:13px;
+  }
+  .imc-disclaimer{
+    font-size:12px;
+    color:#B9D6EC;
+    margin-top:22px;
+    max-width:640px;
+    margin-left:auto;
+    margin-right:auto;
+    line-height:1.6;
+  }
+
+  @media (max-width:600px){
+    .imc-hero h1{font-size:27px;}
+    .imc-hero .ar-title{font-size:19px;}
+    .imc-tab-btn{padding:10px 18px;font-size:14px;}
+  }
+</style>
+</head>
+<body>
+
+<section class="imc-hero">
+  <div class="imc-wrap imc-hero-inner">
+    <span class="imc-eyebrow">Saudi National Day 2026</span>
+    <h1>National Day Offers</h1>
+    <div class="ar-title">عروض اليوم الوطني السعودي</div>
+    <p class="sub">Special discounts across our specialties at International Medical Center, Jeddah, IMC Makkah, and First Clinic — celebrating the Kingdom together.</p>
+    <div class="imc-validity">📅 Valid from 01–30 September 2026 · Cash patients only</div>
+  </div>
+  <svg class="imc-strip" viewBox="0 0 1200 46" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 30 Q 60 10 120 30 T 240 30 T 360 30 T 480 30 T 600 30 T 720 30 T 840 30 T 960 30 T 1080 30 T 1200 30" stroke="#99DCF3" stroke-width="2" fill="none"/>
+  </svg>
+</section>
+
+<div class="imc-wrap">
+  <div class="imc-tabs" id="imcTabs"></div>
+  <div class="imc-filters" id="imcFilters"></div>
+  <div class="imc-count" id="imcCount"></div>
+  <div class="imc-grid" id="imcGrid"></div>
+</div>
+
+<footer class="imc-footer">
+  <div class="imc-wrap">
+    <div class="ar-tag">غايتنا عافيتكم</div>
+    <div>Book your appointment today via:</div>
+    <div class="imc-book-channels">
+      <span>📱 IMC App</span>
+      <span>☎️ Call Center</span>
+      <span>💬 WhatsApp Assistant</span>
+    </div>
+    <div class="imc-disclaimer">
+      Offers valid 1–30 September 2026 for cash-paying patients only. Prices in Saudi Riyals (SAR). Discounts cannot be combined with insurance coverage or other promotions. Terms and availability may vary by branch.
+    </div>
+  </div>
+</footer>
+
+<script>
+const IMC_DATA = {"imc_jeddah": [{"code": "CON001", "description": "Consultation - Registrar", "billgroup": "Consultation", "price": 250.0, "discount_pct": 61.6, "discounted_price": 96.0, "arabic": "استشارة - طبيب مقيم", "category": "CONSULTATION"}, {"code": "CON002", "description": "Consultation - Consultant", "billgroup": "Consultation", "price": 400.0, "discount_pct": 76.0, "discounted_price": 96.0, "arabic": "استشارة - استشاري", "category": "CONSULTATION"}, {"code": "CON003", "description": "Consultation - Senior Registrar", "billgroup": "Consultation", "price": 250.0, "discount_pct": 61.6, "discounted_price": 96.0, "arabic": "استشارة - نائب أول", "category": "CONSULTATION"}, {"code": "CON031", "description": "CONSULTATION - DIABETIC EDUCATOR", "billgroup": "Consultation", "price": 100.0, "discount_pct": 4.0, "discounted_price": 96.0, "arabic": "استشارة - مثقف سكري", "category": "CONSULTATION"}, {"code": "CON037", "description": "CONSULTATION - BARIATRIC", "billgroup": "Consultation", "price": 500.0, "discount_pct": 80.8, "discounted_price": 96.0, "arabic": "استشارة جراحة سمنة", "category": "CONSULTATION"}, {"code": "CON014", "description": "Dental Consultation", "billgroup": "Consultation", "price": 300.0, "discount_pct": 68.0, "discounted_price": 96.0, "arabic": "أستشارة اسنان", "category": "CONSULTATION"}, {"code": "CON054", "description": "Consultation Optometrist", "billgroup": "Consultation", "price": 100.0, "discount_pct": 4.0, "discounted_price": 96.0, "arabic": "أخصائي بصريات", "category": "CONSULTATION"}, {"code": "CON056", "description": "Consultation - Senior Consultant", "billgroup": "Consultation", "price": 500.0, "discount_pct": 80.8, "discounted_price": 96.0, "arabic": null, "category": "CONSULTATION"}, {"code": "CON058", "description": "CONSULTATION - BREAST FEEDING EDUCATOR", "billgroup": "Consultation", "price": 150.0, "discount_pct": 36.0, "discounted_price": 96.0, "arabic": "مثقفة رضاعة طبيعية", "category": "CONSULTATION"}, {"code": "CON072", "description": "CONSULTATION - FUNCTIONAL MEDICINE - DR. MATHEW TRACEY", "billgroup": "Consultation", "price": 500.0, "discount_pct": 80.8, "discounted_price": 96.0, "arabic": null, "category": "CONSULTATION"}, {"code": "CON039", "description": "CONSULTATION - CLINICAL NUTRITIONIST", "billgroup": "Consultation", "price": 250.0, "discount_pct": 61.6, "discounted_price": 96.0, "arabic": "استشارة – أخصائي التغذية السريرية", "category": "CONSULTATION"}, {"code": "CON032", "description": "Consultation - Oncology", "billgroup": "Consultation", "price": 400.0, "discount_pct": 76.0, "discounted_price": 96.0, "arabic": "استشارة – الأورام", "category": "CONSULTATION"}, {"code": "CON024", "description": "CONSULTATION - ONCOLOGY EDUCATOR", "billgroup": "Consultation", "price": 150.0, "discount_pct": 36.0, "discounted_price": 96.0, "arabic": "تخصص الأورام", "category": "CONSULTATION"}, {"code": "CON044", "description": "CONSULTATION - SPEECH & LANGUAGE THERAPIST", "billgroup": "Consultation", "price": 250.0, "discount_pct": 61.6, "discounted_price": 96.0, "arabic": "استشارة – أخصائي النطق و التخاطب", "category": "CONSULTATION"}, {"code": "CON070", "description": "Consultation - Psychiatry - Psychotherapy 60 min", "billgroup": "Consultation", "price": 400.0, "discount_pct": 76.0, "discounted_price": 96.0, "arabic": null, "category": "PSYCHIATRY"}, {"code": "CON078", "description": "CONSULTATION   SENIOR CONSULTANT PSYCHIATRY", "billgroup": "Consultation", "price": 500.0, "discount_pct": 80.8, "discounted_price": 96.0, "arabic": null, "category": "PSYCHIATRY"}, {"code": "XY0292", "description": "MRI Cervical Spine (Screening)", "billgroup": "Medical Imaging", "price": 1950.0, "discount_pct": 48.9, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للفقرات الرقبة (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0298", "description": "MRI Thoracic Spine (Screening)", "billgroup": "Medical Imaging", "price": 1760.0, "discount_pct": 49.1, "discounted_price": 896.0, "arabic": "رنين مغناطيسي للفقرات الصدرية (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0297", "description": "MRI Lumbar Spine (Screening)", "billgroup": "Medical Imaging", "price": 1950.0, "discount_pct": 48.9, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للفقرات القطنية (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0276", "description": "MRI Brain (Screening)", "billgroup": "Medical Imaging", "price": 1950.0, "discount_pct": 48.9, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للدماغ (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0462", "description": "CT Calcium Scoring", "billgroup": "Medical Imaging", "price": 1310.0, "discount_pct": 46.9, "discounted_price": 696.0, "arabic": "أشعة مقطعية لقياس تكلس الشرايين التاجية", "category": "IMAGING SERVICES"}, {"code": "XY0163", "description": "BMD (Bone Mineral Density)", "billgroup": "Medical Imaging", "price": 730.0, "discount_pct": 45.8, "discounted_price": 396.0, "arabic": "فحص كثافة العظام (هشاشة العظام)", "category": "IMAGING SERVICES"}, {"code": "XY0639", "description": "MAMMO - MAMMOGRAM SCREENING (BILATERAL)", "billgroup": "Medical Imaging", "price": 1105.0, "discount_pct": 46.1, "discounted_price": 596.0, "arabic": "ماموجرام للثديين - فحص مسحي (حملة الكشف عن سرطان الثدي)", "category": "IMAGING SERVICES"}, {"code": "PM0098", "description": "Extra Corporeal shock wave treatment (ECSW) per session", "billgroup": "Procedure", "price": 440.0, "discount_pct": 10.0, "discounted_price": 396.0, "arabic": "جلسة علاج بالموجات التصادمية (ECSW)", "category": "PAIN MANAGEMENT"}, {"code": "PM0099", "description": "Extra Corporeal shock wave treatment (ECSW) for 3 sessions", "billgroup": "Procedure", "price": 1155.0, "discount_pct": 22.4, "discounted_price": 896.0, "arabic": "3 جلسات علاج بالموجات التصادمية (ECSW)", "category": "PAIN MANAGEMENT"}, {"code": "PM0100", "description": "Extra Corporeal shock wave treatment (ECSW) for 6 sessions", "billgroup": "Procedure", "price": 2370.0, "discount_pct": 24.2, "discounted_price": 1796.0, "arabic": "6 جلسات علاج بالموجات التصادمية (ECSW)", "category": "PAIN MANAGEMENT"}, {"code": "PM0308", "description": "GANGLION IMPAR BLOCK  PM", "billgroup": "Procedure", "price": 3500.0, "discount_pct": 23.0, "discounted_price": 2696.0, "arabic": "For coccyx pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0009", "description": "Drug Infiltration Technique / Chronic Headache Protocol (III) Without Medication", "billgroup": "Procedure", "price": 1380.0, "discount_pct": 20.6, "discounted_price": 1096.0, "arabic": "Fibromyalgia and chronic pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0258", "description": "FACET, CERVICAL/THORACIC (JOINT/NERVE) 1ST LEVEL INJECTION PM", "billgroup": "Package", "price": 2400.0, "discount_pct": 21.0, "discounted_price": 1896.0, "arabic": "Neck pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0242", "description": "THERAPEUTIC COOLED RADIOFREQUENCY ABLATION, KNEE GENICULAR NERVE PM", "billgroup": "Package", "price": 8500.0, "discount_pct": 24.8, "discounted_price": 6396.0, "arabic": "Knee pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0244", "description": "THERAPEUTIC COOLED RADIOFREQUENCY ABLATION, SACRAL NERVE LATERAL BRANCH PM", "billgroup": "Package", "price": 9500.0, "discount_pct": 24.3, "discounted_price": 7196.0, "arabic": "Low back pain (SI joint)", "category": "PAIN MANAGEMENT"}, {"code": "PM0324", "description": "Suprascapular Pulse Radiofrequency PRF Unilateral PM", "billgroup": "Procedure", "price": 3600.0, "discount_pct": 22.3, "discounted_price": 2796.0, "arabic": "Shoulder pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0252", "description": "EPIDURAL STEROID INJECTION (CERVICAL/THORACIC) PM", "billgroup": "Package", "price": 5959.0, "discount_pct": 24.6, "discounted_price": 4496.0, "arabic": "Neck and arm pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0253", "description": "EPIDURAL STEROID INJECTION (LUMBAR/SACRAL/CAUDAL) PM", "billgroup": "Package", "price": 3916.0, "discount_pct": 23.5, "discounted_price": 2996.0, "arabic": "Low back and leg pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0014", "description": "BOTOX INJECTION, HEADCACHE", "billgroup": "Procedure", "price": 2810.0, "discount_pct": 21.9, "discounted_price": 2196.0, "arabic": "migraine", "category": "PAIN MANAGEMENT"}, {"code": "PM0015", "description": "BOTOX INJECTION,LBP", "billgroup": "Procedure", "price": 2810.0, "discount_pct": 21.9, "discounted_price": 2196.0, "arabic": "Myofascial pain", "category": "PAIN MANAGEMENT"}, {"code": "PM0257", "description": "SACRO ILIAC JOINT INJECTION WITH STEROIDS UNILATERAL PM", "billgroup": "Package", "price": 2700.0, "discount_pct": 22.4, "discounted_price": 2096.0, "arabic": "Low back pain", "category": "PAIN MANAGEMENT"}, {"code": "CA0161", "description": "Echocardiography Limited Study", "billgroup": "Procedure", "price": 605.0, "discount_pct": 34.5, "discounted_price": 396.0, "arabic": "إيكو القلب (محدود)", "category": "CARDIOLOGY"}, {"code": "CA0143", "description": "ECHO - Full", "billgroup": "Procedure", "price": 1510.0, "discount_pct": 47.3, "discounted_price": 796.0, "arabic": "إيكو القلب (كامل)", "category": "CARDIOLOGY"}, {"code": "CA0141", "description": "ECG", "billgroup": "Procedure", "price": 195.0, "discount_pct": 50.8, "discounted_price": 96.0, "arabic": "تخطيط القلب (ECG)", "category": "CARDIOLOGY"}, {"code": "CA0145", "description": "Stress Test", "billgroup": "Procedure", "price": 1510.0, "discount_pct": 47.3, "discounted_price": 796.0, "arabic": "اختبار الجهد للقلب", "category": "CARDIOLOGY"}, {"code": "CA0142", "description": "Holter- 24 hrs", "billgroup": "Procedure", "price": 1360.0, "discount_pct": 48.8, "discounted_price": 696.0, "arabic": "جهاز هولتر لمراقبة القلب (24 ساعة)", "category": "CARDIOLOGY"}, {"code": "CA0171", "description": "Holter - 3 days", "billgroup": "Procedure", "price": 3415.0, "discount_pct": 47.4, "discounted_price": 1796.0, "arabic": "جهاز هولتر لمراقبة القلب (3 أيام)", "category": "CARDIOLOGY"}, {"code": "PK3531", "description": "Lasik Pre-Assessment", "billgroup": "Package", "price": 500.0, "discount_pct": 40.8, "discounted_price": 296.0, "arabic": "فحص ما قبل الليزك", "category": "OPHTHALMOLOGY"}, {"code": "PKC639", "description": "LASER REFRACTIVE SURGERY / LASIK", "billgroup": "Procedure", "price": 8665.0, "discount_pct": 23.9, "discounted_price": 6596.0, "arabic": "عمليات تصحيح النظر / الليزك", "category": "OPHTHALMOLOGY"}, {"code": "PKC780", "description": "BILATERAL LASER REFRACTIVE SURGERY/ FEMTO LASIK PROMO", "billgroup": "Inactive Item", "price": 8000.0, "discount_pct": 23.8, "discounted_price": 6096.0, "arabic": "عرض الفيمتو ليزك للعينين", "category": "OPHTHALMOLOGY"}, {"code": "PKC781", "description": "UNILATERAL LASER REFRACTIVE SURGERY/ FEMTO LASIK / SMILE", "billgroup": "Package", "price": 4000.0, "discount_pct": 22.6, "discounted_price": 3096.0, "arabic": "تصحيح النظر لعين واحدة (فيمتو/سمايل)", "category": "OPHTHALMOLOGY"}, {"code": "OP0071", "description": "Smile (Small Incision Lenticule Extraction) one eyes", "billgroup": "Procedure", "price": 4000.0, "discount_pct": 22.6, "discounted_price": 3096.0, "arabic": "عملية سمايل لعين واحدة", "category": "OPHTHALMOLOGY"}, {"code": "OP0072", "description": "Smile (Small Incision Lenticule Extraction) both eyes", "billgroup": "Procedure", "price": 8000.0, "discount_pct": 23.8, "discounted_price": 6096.0, "arabic": "عملية سمايل للعينين", "category": "OPHTHALMOLOGY"}, {"code": "PK0752", "description": "Cataract Extraction + IOL (phaco)", "billgroup": "Package", "price": 12390.0, "discount_pct": 25.0, "discounted_price": 9296.0, "arabic": "إزالة المياه البيضاء + زراعة عدسة (فاكو)", "category": "OPHTHALMOLOGY"}, {"code": "PK0747", "description": "Cataract Extraction + IOL (ECCE)", "billgroup": "Package", "price": 9010.0, "discount_pct": 24.6, "discounted_price": 6796.0, "arabic": "إزالة المياه البيضاء + زراعة عدسة (جراحي)", "category": "OPHTHALMOLOGY"}, {"code": "OP0023", "description": "Cross linking one eye", "billgroup": "Procedure", "price": 5250.0, "discount_pct": 23.9, "discounted_price": 3996.0, "arabic": "عملية تثبيت القرنية لعين واحدة", "category": "OPHTHALMOLOGY"}, {"code": "OP0064", "description": "FemtoLasik both eyes", "billgroup": "Procedure", "price": 6000.0, "discount_pct": 23.4, "discounted_price": 4596.0, "arabic": "فيمتو ليزك للعينين", "category": "OPHTHALMOLOGY"}, {"code": "OP0074", "description": "Phototherapeutic Keratectomy (PTK)", "billgroup": "Procedure", "price": 6000.0, "discount_pct": 23.4, "discounted_price": 4596.0, "arabic": "كشط القرنية العلاجي (PTK)", "category": "OPHTHALMOLOGY"}, {"code": "OP0066", "description": "Laser Photorefractive Keratotomy (PRK) both eyes", "billgroup": "Procedure", "price": 4000.0, "discount_pct": 7.6, "discounted_price": 3696.0, "arabic": "تصحيح النظر (PRK) للعينين", "category": "OPHTHALMOLOGY"}, {"code": "OP0067", "description": "Laser Photorefractive Keratotomy (PRK) one eye", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 5.2, "discounted_price": 1896.0, "arabic": "تصحيح النظر (PRK) لعين واحدة", "category": "OPHTHALMOLOGY"}, {"code": "PKC886", "description": "ICL/Visian - without lense", "billgroup": "Package", "price": 12705.0, "discount_pct": 30.0, "discounted_price": 8896.0, "arabic": null, "category": "OPHTHALMOLOGY"}, {"code": "PK0754", "description": "Posterior Chamber Phakic IOL", "billgroup": "Package", "price": 11320.0, "discount_pct": 29.4, "discounted_price": 7996.0, "arabic": null, "category": "OPHTHALMOLOGY"}, {"code": "DN0001", "description": "Gum treatment for adults, adults, scaling and polishing", "billgroup": "Dental", "price": 500.0, "discount_pct": 20.8, "discounted_price": 396.0, "arabic": "علاج اللثة وتنظيف الأسنان وتلميعها", "category": "DENTAL"}, {"code": "DN0513", "description": "Panoramic X-ray - Panoramic Film", "billgroup": "Dental", "price": 350.0, "discount_pct": 15.4, "discounted_price": 296.0, "arabic": "أشعة بانوراما للأسنان", "category": "DENTAL"}, {"code": "DN0650", "description": "Pits and Fissure sealants", "billgroup": "Dental", "price": 200.0, "discount_pct": 2.0, "discounted_price": 196.0, "arabic": "سد الشقوق السنية (لحماية الأسنان)", "category": "DENTAL"}, {"code": "DN0033", "description": "Topical application of fluoride/Arch", "billgroup": "Dental", "price": 80.0, "discount_pct": 17.5, "discounted_price": 66.0, "arabic": "تطبيق الفلورايد الموضعي", "category": "DENTAL"}, {"code": "DN0002", "description": "Gum treatment for children aged up to 15 years", "billgroup": "Dental", "price": 300.0, "discount_pct": 1.3, "discounted_price": 296.0, "arabic": "علاج اللثة للأطفال (حتى عمر 15 سنة)", "category": "DENTAL"}, {"code": "DN0064", "description": "Bleaching of Discolored Teeth", "billgroup": "Dental", "price": 925.0, "discount_pct": 24.8, "discounted_price": 696.0, "arabic": "تبييض الأسنان المتصبغة", "category": "DENTAL"}, {"code": "PK4108", "description": "First Trimester Antenatal care ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2800.0, "discount_pct": 10.9, "discounted_price": 2496.0, "arabic": "متابعة الحمل (الشهور الثلاثة الأولى)", "category": "OB-GYN"}, {"code": "PK4109", "description": "Second Trimester Antenatal care  ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2200.0, "discount_pct": 9.3, "discounted_price": 1996.0, "arabic": "متابعة الحمل (الشهور الثلاثة الوسطى)", "category": "OB-GYN"}, {"code": "PK4110", "description": "Third Trimester Antenatal care  ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2000.0, "discount_pct": 10.2, "discounted_price": 1796.0, "arabic": "متابعة الحمل (الشهور الثلاثة الأخيرة)", "category": "OB-GYN"}, {"code": "APS010", "description": "Tab lock - for Cesarean section", "billgroup": "Procedure", "price": 1000.0, "discount_pct": 40.4, "discounted_price": 596.0, "arabic": "تقنية \"تاب لوك\" لتسكين آلام القيصرية", "category": "OB-GYN"}, {"code": "AR0859", "description": "IVF - ICSI Cycle", "billgroup": "Package", "price": 14000.0, "discount_pct": 14.3, "discounted_price": 11996.0, "arabic": "دورة أطفال الأنابيب / الحقن المجهري", "category": "OB-GYN"}, {"code": "AR0880", "description": "IVF - ICSI Cycle - Repeated", "billgroup": "Package", "price": 12500.0, "discount_pct": 7.2, "discounted_price": 11596.0, "arabic": "تكرار دورة الحقن المجهري", "category": "OB-GYN"}, {"code": "OB0183", "description": "Emsella - 6 Sessions", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "جهاز إمسيلا لتقوية الحوض (6 جلسات)", "category": "OB-GYN"}, {"code": "OB0182", "description": "Esmella - 1 Session", "billgroup": "Procedure", "price": 450.0, "discount_pct": 12.0, "discounted_price": 396.0, "arabic": "جهاز إمسيلا لتقوية الحوض (جلسة واحدة)", "category": "OB-GYN"}, {"code": "OB0107", "description": "Obststetric 4D Only", "billgroup": "Procedure", "price": 550.0, "discount_pct": 46.2, "discounted_price": 296.0, "arabic": null, "category": "OB-GYN"}, {"code": "PK2001", "description": "General Medical Checkup - male below 40 y/o", "billgroup": "Package", "price": 4935.0, "discount_pct": 23.1, "discounted_price": 3796.0, "arabic": "فحص طبي شامل - للرجال (أقل من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2002", "description": "General Medical Checkup - male above 40 y/o", "billgroup": "Package", "price": 5250.0, "discount_pct": 23.9, "discounted_price": 3996.0, "arabic": "فحص طبي شامل - للرجال (أكبر من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2003", "description": "General Medical Checkup - female below 40 y/o", "billgroup": "Package", "price": 5250.0, "discount_pct": 23.9, "discounted_price": 3996.0, "arabic": "فحص طبي شامل - للنساء (أقل من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2004", "description": "General Medical Checkup - female above 40 y/o", "billgroup": "Package", "price": 6985.0, "discount_pct": 24.2, "discounted_price": 5296.0, "arabic": "فحص طبي شامل - للنساء (أكبر من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2012", "description": "Smoking cessation package 1 (3 Visits)", "billgroup": "Package", "price": 1365.0, "discount_pct": 56.3, "discounted_price": 596.0, "arabic": null, "category": "FAMILY MEDICINE"}, {"code": "PT0106", "description": "Low back / neck pain treatment 7 Sessions", "billgroup": "Package", "price": 1300.0, "discount_pct": 23.4, "discounted_price": 996.0, "arabic": "سبعة جلسات علاج طبيعي -7 Female Physiotherapy session", "category": "REHABILITATION"}, {"code": "PT0126", "description": "Hydrotherapy 12 Sessions", "billgroup": "Package", "price": 1985.0, "discount_pct": 24.6, "discounted_price": 1496.0, "arabic": "Female Aqua private  -12 جلسه مسبح للنساء (خاصه)", "category": "REHABILITATION"}, {"code": "PT0147", "description": "Women’s health Physiotherapy session / 10 Session", "billgroup": "Package", "price": 4250.0, "discount_pct": 24.8, "discounted_price": 3196.0, "arabic": "جلسات علاج طبيعي لصحة المرأه - Women health physiotherapy session 10", "category": "REHABILITATION"}, {"code": "PT0148", "description": "Men’s health physiotherapy session / 10 Session", "billgroup": "Package", "price": 4250.0, "discount_pct": 24.8, "discounted_price": 3196.0, "arabic": "جلسات علاج طبيعي لصحة الرجل -10 Men’s health physiotherapy session", "category": "REHABILITATION"}, {"code": "PT0149", "description": "Pediatric Physiotherapy session / 10 Session", "billgroup": "Package", "price": 3400.0, "discount_pct": 23.6, "discounted_price": 2596.0, "arabic": "جلسات علاج طبيعي للاطفال- Pediatric physiotherapy session 10", "category": "REHABILITATION"}, {"code": "DM0338", "description": "Filler 1 ml injection (Promo)", "billgroup": "Procedure", "price": 1300.0, "discount_pct": 8.0, "discounted_price": 1196.0, "arabic": "فيلر 1 مل (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0339", "description": "Filler 2 ml injection (Promo)", "billgroup": "Procedure", "price": 2600.0, "discount_pct": 19.4, "discounted_price": 2096.0, "arabic": "فيلر 2 مل (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0722", "description": "Botox For wrinkles (Promo)", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 17.0, "discounted_price": 996.0, "arabic": "بوتوكس للتجاعيد (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0688", "description": "Botox for hyperhidrosis (Promo)", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "بوتوكس لعلاج فرط التعرق (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0813", "description": "Exosome session (Promo)", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 17.0, "discounted_price": 996.0, "arabic": "جلسة إكسوزوم (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0723", "description": "Hydra Facial with Deep Clean (Promo)", "billgroup": "Procedure", "price": 450.0, "discount_pct": 12.0, "discounted_price": 396.0, "arabic": "هيدرافيشل مع تنظيف عميق (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0731", "description": "Hydra facial with mask (Promo)", "billgroup": "Procedure", "price": 500.0, "discount_pct": 0.8, "discounted_price": 496.0, "arabic": "هيدرافيشل مع ماسك (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0726", "description": "Cold peel -small area (Promo)", "billgroup": "Procedure", "price": 500.0, "discount_pct": 0.8, "discounted_price": 496.0, "arabic": "تقشير بارد - منطقة صغيرة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0188", "description": "Laser hair removal Bikini + Under Arm with retouch (Promo)", "billgroup": "Procedure", "price": 300.0, "discount_pct": 1.3, "discounted_price": 296.0, "arabic": "ليزر (بكيني + إبط) مع رتوش (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0872", "description": "Laser hair removal Bikini + Under Arm 3 session with retouch (Promo)", "billgroup": "Procedure", "price": 700.0, "discount_pct": 29.1, "discounted_price": 496.0, "arabic": "ليزر (بكيني + إبط) 3 جلسات مع رتوش (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0873", "description": "Laser hair removal Full body without retouch  session (Promo)", "billgroup": "Procedure", "price": 700.0, "discount_pct": 43.4, "discounted_price": 396.0, "arabic": "ليزر جسم كامل بدون رتوش - جلسة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0874", "description": "Laser hair removal Full body 3 session without retouch (Promo)", "billgroup": "Procedure", "price": 2100.0, "discount_pct": 47.8, "discounted_price": 1096.0, "arabic": "ليزر جسم كامل 3 جلسات بدون رتوش (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0875", "description": "Laser hair removal for chin (men) Promo", "billgroup": "Procedure", "price": 200.0, "discount_pct": 2.0, "discounted_price": 196.0, "arabic": "ليزر تحديد ذقن (للرجال) عرض خاص", "category": "DERMATOLOGY"}, {"code": "DM0793", "description": "PRP Classic 3 session (Promo)", "billgroup": "Procedure", "price": 2700.0, "discount_pct": 22.4, "discounted_price": 2096.0, "arabic": "بلازما (PRP) كلاسيك 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0691", "description": "PRP Gold + HA (Promo)", "billgroup": "Procedure", "price": 1400.0, "discount_pct": 14.6, "discounted_price": 1196.0, "arabic": "بلازما ذهبية + هيالورونيك أسيد (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0695", "description": "Mesotherapy Hair 3ml 3 sessions  (Promo)", "billgroup": "Procedure", "price": 1350.0, "discount_pct": 18.8, "discounted_price": 1096.0, "arabic": "ميزوثيرابي شعر 3 مل - 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0680", "description": "Mesotherapy face + derma pen 3 sessions (Promo)", "billgroup": "Procedure", "price": 2400.0, "discount_pct": 33.5, "discounted_price": 1596.0, "arabic": "ميزوثيرابي وجه + ديرما بن 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0876", "description": "Skin booster (Promo)", "billgroup": "Procedure", "price": 1700.0, "discount_pct": 23.8, "discounted_price": 1296.0, "arabic": "إبر نضارة - سكين بوستر (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0655", "description": "Hyalual skin booster (Promo)", "billgroup": "Procedure", "price": 1400.0, "discount_pct": 7.4, "discounted_price": 1296.0, "arabic": "إبر نضارة هيالوال - Hyalual (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0360", "description": "Dives Lip rejuvenation 3 sessions (Promo)", "billgroup": "Procedure", "price": 1600.0, "discount_pct": 19.0, "discounted_price": 1296.0, "arabic": "توريد وتجديد الشفايف 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0877", "description": "Matrix Pro Face One Tip (Promo)", "billgroup": "Procedure", "price": 1500.0, "discount_pct": 26.9, "discounted_price": 1096.0, "arabic": "ماتريكس برو للوجه - رأس واحد (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0878", "description": "Matrix Pro Face and Neck (Promo)", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "ماتريكس برو للوجه والرقبة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0879", "description": "Crystal Pro Middle Area (Promo)", "billgroup": "Procedure", "price": 1750.0, "discount_pct": 8.8, "discounted_price": 1596.0, "arabic": "كريستال برو للمنطقة المتوسطة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0880", "description": "Crystal Pro Small Area (Promo)", "billgroup": "Procedure", "price": 999.0, "discount_pct": 10.3, "discounted_price": 896.0, "arabic": "كريستال برو للمنطقة الصغيرة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0881", "description": "Pico Small Aree (Promo)", "billgroup": "Procedure", "price": 800.0, "discount_pct": 13.0, "discounted_price": 696.0, "arabic": "بيكو ليزر لمنطقة صغيرة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0882", "description": "Fractinal laser (Promo)", "billgroup": "Procedure", "price": 900.0, "discount_pct": 44.9, "discounted_price": 496.0, "arabic": "فراكشنال ليزر (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "WL0061", "description": "Non Surgical Spinal Decompression Single Session (Cash Only)", "billgroup": "Allied Health", "price": 250.0, "discount_pct": 21.6, "discounted_price": 196.0, "arabic": null, "category": "FUNCTIONAL MEDICINE"}, {"code": "WL0062", "description": "Non-Surgical Spinal Decompression 10 Sessions (Cash Only)", "billgroup": "Allied Health", "price": 2250.0, "discount_pct": 15.7, "discounted_price": 1896.0, "arabic": null, "category": "FUNCTIONAL MEDICINE"}], "imc_makkah": [{"code": "PT0146", "description": "Shock Wave Session", "billgroup": "Allied Health", "price": 200.0, "discount_pct": 52.0, "discounted_price": 96.0, "arabic": "جلسة علاج بجهاز الموجات التصادمية", "category": "REHABILITATION"}, {"code": "PT0043", "description": "Physical Therapy Treatment / unlisted", "billgroup": "Allied Health", "price": 260.0, "discount_pct": 24.6, "discounted_price": 196.0, "arabic": "جلسة علاج طبيعي", "category": "REHABILITATION"}, {"code": "PK4108", "description": "First Trimester Antenatal care ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2800.0, "discount_pct": 14.4, "discounted_price": 2396.0, "arabic": "متابعة الحمل (الشهور الثلاثة الأولى)", "category": "OB-GYN"}, {"code": "PK4109", "description": "Second Trimester Antenatal care  ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2200.0, "discount_pct": 13.8, "discounted_price": 1896.0, "arabic": "متابعة الحمل (الشهور الثلاثة الوسطى)", "category": "OB-GYN"}, {"code": "PK4110", "description": "Third Trimester Antenatal care  ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "متابعة الحمل (الشهور الثلاثة الأخيرة)", "category": "OB-GYN"}, {"code": "DN0927", "description": "GUM TREATMENT FOR ADULTS (Promo)", "billgroup": "Dental", "price": 291.0, "discount_pct": 67.0, "discounted_price": 96.0, "arabic": "علاج اللثة للبالغين", "category": "DENTAL"}, {"code": "DN0928", "description": "GUM TREATMENT FOR CHILDREN AGED UP TO 15 YRS. (Promo)", "billgroup": "Dental", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "علاج اللثة للأطفال حتى ١٥ سنة", "category": "DENTAL"}, {"code": "DN0926", "description": "GROSS SCALING (Promo)", "billgroup": "Dental", "price": 600.0, "discount_pct": 50.7, "discounted_price": 296.0, "arabic": "تنظيف عميق للأسنان", "category": "DENTAL"}, {"code": "DN0924", "description": "Bleaching with Zoom (Promo)", "billgroup": "Dental", "price": 1200.0, "discount_pct": 25.3, "discounted_price": 896.0, "arabic": "تبييض الأسنان المتصبغة", "category": "DENTAL"}, {"code": "DN0932", "description": "SCALING, ROOT PLANNING AND POLISHING (SIMPLE/QUADRANT)( Promo)", "billgroup": "Dental", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "تنظيف عميق الأسنان  (لكل ربع فم)", "category": "DENTAL"}, {"code": "DN0939", "description": "COMPOSITE FOUR SURFACES PERMANENT (Promo)", "billgroup": "Dental", "price": 800.0, "discount_pct": 25.5, "discounted_price": 596.0, "arabic": "حشوة كومبوزيت – أربع أسطح (سن دائم)", "category": "DENTAL"}, {"code": "DN0953", "description": "NIGHT GUARD ( Promo)", "billgroup": "Dental", "price": 1000.0, "discount_pct": 20.4, "discounted_price": 796.0, "arabic": "واقي الأسنان الليلي", "category": "DENTAL"}, {"code": "DN0954", "description": "Night guard soft & hard ( Promo)", "billgroup": "Dental", "price": 1500.0, "discount_pct": 26.9, "discounted_price": 1096.0, "arabic": "واقي أسنان ليلي (لين أو صلب)", "category": "DENTAL"}, {"code": "DN0955", "description": "PANORAMIC FILM ( Promo)", "billgroup": "Dental", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "أشعة بانورامية للفم", "category": "DENTAL"}, {"code": "XY0292", "description": "MRI Cervical Spine (Screening)", "billgroup": "Medical Imaging", "price": 1500.0, "discount_pct": 53.6, "discounted_price": 696.0, "arabic": "رنين مغناطيسي للفقرات الرقبة (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0298", "description": "MRI Thoracic Spine (Screening)", "billgroup": "Medical Imaging", "price": 1500.0, "discount_pct": 53.6, "discounted_price": 696.0, "arabic": "رنين مغناطيسي للفقرات الصدرية (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0297", "description": "MRI Lumbar Spine (Screening)", "billgroup": "Medical Imaging", "price": 1500.0, "discount_pct": 53.6, "discounted_price": 696.0, "arabic": "رنين مغناطيسي للفقرات القطنية (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0303", "description": "MRI - WHOLE SPINE C-/+", "billgroup": "Medical Imaging", "price": 3500.0, "discount_pct": 51.5, "discounted_price": 1696.0, "arabic": "رنين مغناطيسي لفقرات العمود الفقري", "category": "IMAGING SERVICES"}, {"code": "XY0545", "description": "MRI - KNEE (RIGHT)", "billgroup": "Medical Imaging", "price": 1500.0, "discount_pct": 53.6, "discounted_price": 696.0, "arabic": "رنين مغناطيسي للركبة(اليمين)", "category": "IMAGING SERVICES"}, {"code": "XY0267", "description": "MRI - KNEE (LEFT)", "billgroup": "Medical Imaging", "price": 1500.0, "discount_pct": 53.6, "discounted_price": 696.0, "arabic": "رنين مغناطيسي للركبة(اليسار)", "category": "IMAGING SERVICES"}, {"code": "XY0276", "description": "MRI Brain (Screening)", "billgroup": "Medical Imaging", "price": 1500.0, "discount_pct": 53.6, "discounted_price": 696.0, "arabic": "رنين مغناطيسي للدماغ (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0166", "description": "CT - ABDOMEN AND PELVIS C-/+", "billgroup": "Medical Imaging", "price": 1200.0, "discount_pct": 42.0, "discounted_price": 696.0, "arabic": "اشعة مقطعية على البطن والحوض بالصبغة", "category": "IMAGING SERVICES"}, {"code": "XY0202", "description": "CT - BRAIN C-", "billgroup": "Medical Imaging", "price": 700.0, "discount_pct": 29.1, "discounted_price": 496.0, "arabic": "اشعة مقطعية على الراس", "category": "IMAGING SERVICES"}, {"code": "XY0213", "description": "CT - PARANASAL SINUSES C-", "billgroup": "Medical Imaging", "price": 700.0, "discount_pct": 29.1, "discounted_price": 496.0, "arabic": "اشعة مقطعية للجيوب الانفية", "category": "IMAGING SERVICES"}, {"code": "XY0125", "description": "US - PELVIS DATING (OBSTETRIC)", "billgroup": "Medical Imaging", "price": 520.0, "discount_pct": 23.8, "discounted_price": 396.0, "arabic": "اشعة فوق الموجات الصوتية لمتابعة الحمل", "category": "IMAGING SERVICES"}, {"code": "XY0111", "description": "US - ABDOMEN AND PELVIS", "billgroup": "Medical Imaging", "price": 520.0, "discount_pct": 23.8, "discounted_price": 396.0, "arabic": "اشعة فوق الموجات الصوتية للبطن والحوض", "category": "IMAGING SERVICES"}, {"code": "XY0117", "description": "US - FEMALE PELVIS (TRANSABDOMINAL OR TRANSVAGINAL)", "billgroup": "Medical Imaging", "price": 520.0, "discount_pct": 23.8, "discounted_price": 396.0, "arabic": "اشعة فوق الموجات الصوتية للحوض", "category": "IMAGING SERVICES"}, {"code": "XY0129", "description": "US - SCROTUM", "billgroup": "Medical Imaging", "price": 800.0, "discount_pct": 38.0, "discounted_price": 496.0, "arabic": null, "category": "IMAGING SERVICES"}, {"code": "XY0138", "description": "US - LOWER LIMB ARTERIAL DOPPLER (BILATERAL)", "billgroup": "Medical Imaging", "price": 1000.0, "discount_pct": 40.4, "discounted_price": 596.0, "arabic": "اشعة فوق الموجات الصوتية لشرايين القدم(للجهتين)", "category": "IMAGING SERVICES"}, {"code": "XY0140", "description": "US - LOWER LIMB VENOUS DOPPLER FOR DVT (BILATERAL)", "billgroup": "Medical Imaging", "price": 680.0, "discount_pct": 27.1, "discounted_price": 496.0, "arabic": "اشعة فوق الموجات الصوتية لاوردة القدم (للجهتين)", "category": "IMAGING SERVICES"}, {"code": "XY0152", "description": "US - NECK OR THYROID", "billgroup": "Medical Imaging", "price": 440.0, "discount_pct": 32.7, "discounted_price": 296.0, "arabic": "اشعة فوق الموجات الصوتية للغدة الدرقية", "category": "IMAGING SERVICES"}, {"code": "XY0154", "description": "US - NECK (CAROTID) DOPPLER", "billgroup": "Medical Imaging", "price": 840.0, "discount_pct": 41.0, "discounted_price": 496.0, "arabic": "اشعة فوق الموجات الصوتية لشرايين الرقبة", "category": "IMAGING SERVICES"}, {"code": "XY0076", "description": "X-RAY - THORACIC SPINE (AP, LAT)", "billgroup": "Medical Imaging", "price": 264.0, "discount_pct": 63.6, "discounted_price": 96.0, "arabic": "اشعة سينية للفقرات الصدرية", "category": "IMAGING SERVICES"}, {"code": "XY0074", "description": "X-RAY - LUMBAR SPINE (ROUTINE)", "billgroup": "Medical Imaging", "price": 264.0, "discount_pct": 63.6, "discounted_price": 96.0, "arabic": "اشعة سينية للفقرات القطنية", "category": "IMAGING SERVICES"}, {"code": "XY0070", "description": "X-RAY - CERVICAL SPINE (AP, LAT)", "billgroup": "Medical Imaging", "price": 264.0, "discount_pct": 63.6, "discounted_price": 96.0, "arabic": "اشعة سينية للفقرات الرقبة", "category": "IMAGING SERVICES"}, {"code": "XY0037", "description": "X-RAY - KNEE JOINT (BILATERAL) (2-VIEWS)", "billgroup": "Medical Imaging", "price": 360.0, "discount_pct": 45.6, "discounted_price": 196.0, "arabic": "اشعة سينية للركبة (الجهتين)", "category": "IMAGING SERVICES"}, {"code": "XY0042", "description": "X-RAY - SCOLIOSIS (AP, LAT, BENDING BOTH SIDES)", "billgroup": "Medical Imaging", "price": 624.0, "discount_pct": 52.6, "discounted_price": 296.0, "arabic": "اشعة سينية للعمود الفقري", "category": "IMAGING SERVICES"}, {"code": "XY0163", "description": "BMD (Bone Mineral Density)", "billgroup": "Medical Imaging", "price": 700.0, "discount_pct": 29.1, "discounted_price": 496.0, "arabic": "فحص كثافة العظام (هشاشة العظام)", "category": "IMAGING SERVICES"}, {"code": "XY0639", "description": "MAMMO - MAMMOGRAM SCREENING (BILATERAL)", "billgroup": "Medical Imaging", "price": 640.0, "discount_pct": 38.1, "discounted_price": 396.0, "arabic": "اشعة ماموجرام للثدي", "category": "IMAGING SERVICES"}, {"code": "XY0134", "description": "US - BREASTS (BILATERAL)", "billgroup": "Medical Imaging", "price": 520.0, "discount_pct": 23.8, "discounted_price": 396.0, "arabic": "اشعة فوق الموجات الصوتية للثدي", "category": "IMAGING SERVICES"}, {"code": "XY0558", "description": "US - LOWER LIMB VENOUS DOPPLER FOR VARICOSE VEIN AND REFLUX (RIGHT)", "billgroup": "Medical Imaging", "price": 755.0, "discount_pct": 34.3, "discounted_price": 496.0, "arabic": "أشعة دوبلر بالموجات فوق الصوتية لأوردة الطرف السفلي لتقييم الدوالي والارتجاع الوريدي – الساق اليمنى", "category": "IMAGING SERVICES"}, {"code": "XY0142", "description": "US - LOWER LIMB VENOUS DOPPLER FOR VARICOSE VEIN AND REFLUX (LEFT)", "billgroup": "Medical Imaging", "price": 755.0, "discount_pct": 34.3, "discounted_price": 496.0, "arabic": "أشعة دوبلر بالموجات فوق الصوتية لأوردة الطرف السفلي لتقييم الدوالي والارتجاع الوريدي – الساق اليسرى", "category": "IMAGING SERVICES"}, {"code": "DM0073", "description": "Botox in treatment of facial hyperdynamic wrinkles", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 25.3, "discounted_price": 896.0, "arabic": "بوتوكس  للتجاعيد والخطوط التعبيريه", "category": "DERMATOLOGY"}, {"code": "DM0364", "description": "Filler 1st injection", "billgroup": "Procedure", "price": 1199.0, "discount_pct": 16.9, "discounted_price": 996.0, "arabic": "ابره فيلر توسيال  1 مل", "category": "DERMATOLOGY"}, {"code": "DM0077", "description": "botox treatment of hyperhydrosis of the axilla (two axillae)", "billgroup": "Procedure", "price": 1350.0, "discount_pct": 18.8, "discounted_price": 1096.0, "arabic": "بوتوكس لعلاج فرط التعرق", "category": "DERMATOLOGY"}, {"code": "DM01002", "description": "Filler 1 ml + Botox for Face", "billgroup": "Procedure", "price": 2200.0, "discount_pct": 18.4, "discounted_price": 1796.0, "arabic": "ابره فيلر توسيال  1 مل + بوتوكس للتجاعيد", "category": "DERMATOLOGY"}, {"code": "DM01028", "description": "MATRIX PRO Full Face Rejuvenation + mesotherapy (Single session)", "billgroup": "Procedure", "price": 1800.0, "discount_pct": 22.4, "discounted_price": 1396.0, "arabic": "جلسه ماتريكس برو +  ميزوثيرابي", "category": "DERMATOLOGY"}, {"code": "DM01093", "description": "Dives MED Platenium Ultra 4 Amber 1 session", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 17.0, "discounted_price": 996.0, "arabic": "ابرة الديفا  الفضيه بالتركيبه الرباعيه  للشد والنضاره", "category": "DERMATOLOGY"}, {"code": "DM01108", "description": "Lip Lightening", "billgroup": "Procedure", "price": 350.0, "discount_pct": 44.0, "discounted_price": 196.0, "arabic": "جلسه توريد شفايف", "category": "DERMATOLOGY"}, {"code": "DM01100", "description": "SHA+ Redermis 1 session", "billgroup": "Procedure", "price": 1250.0, "discount_pct": 12.3, "discounted_price": 1096.0, "arabic": "ابره العنبر ديفا البرونزيه  للنضاره والتفتيح", "category": "DERMATOLOGY"}, {"code": "DM01006", "description": "PRP with HA + derma pen (1 session)", "billgroup": "Procedure", "price": 1299.0, "discount_pct": 23.3, "discounted_price": 996.0, "arabic": "جلسه بلازما دهبيه + ديرما بن", "category": "DERMATOLOGY"}, {"code": "DM01116", "description": "Devote Revital 3 Sessions", "billgroup": "Procedure", "price": 2300.0, "discount_pct": 21.9, "discounted_price": 1796.0, "arabic": "ابره سالمون  3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM0441", "description": "PRP 1 Session  (for Dermatology use only)", "billgroup": "Procedure", "price": 799.0, "discount_pct": 25.4, "discounted_price": 596.0, "arabic": "جلسه بلازما عاديه للوجه او الشعر", "category": "DERMATOLOGY"}, {"code": "DM01054", "description": "Mesotherapy Hair Loss-  (4 sessions)", "billgroup": "Procedure", "price": 2750.0, "discount_pct": 16.5, "discounted_price": 2296.0, "arabic": "ميزوثيرابي لتساقط الشعر  4 جلسات", "category": "DERMATOLOGY"}, {"code": "DM0884", "description": "Reversa Ultra Procedure", "billgroup": "Procedure", "price": 2799.0, "discount_pct": 25.1, "discounted_price": 2096.0, "arabic": "جلسه ريفيرسا الترا للشدالمائي وتحفيز الكولاجين", "category": "DERMATOLOGY"}, {"code": "DM01090", "description": "Regenera Evo + Mesotherapy  (Hair Booster)", "billgroup": "Procedure", "price": 5800.0, "discount_pct": 20.8, "discounted_price": 4596.0, "arabic": "جلسه ريجينيرا مع استخلاص الاكسوزوم الذاتي+ ميزو ثيرابي  لتساقط الشعر الوراثي", "category": "DERMATOLOGY"}, {"code": "DM0346", "description": "Laser Hair Removal Full Body (Single session)", "billgroup": "Procedure", "price": 700.0, "discount_pct": 29.1, "discounted_price": 496.0, "arabic": "جلسه فل بدي ليزر  جنتل الابيض", "category": "DERMATOLOGY"}, {"code": "DM0202", "description": "LASER HAIR REMOVAL MINI FULL BODY SINGLE SESSION", "billgroup": "Procedure", "price": 600.0, "discount_pct": 34.0, "discounted_price": 396.0, "arabic": "جلسه ميني فل بدي ليزر  جنتل الابيض", "category": "DERMATOLOGY"}, {"code": "DM0088", "description": "laser hair removal full face Per session", "billgroup": "Procedure", "price": 200.0, "discount_pct": 52.0, "discounted_price": 96.0, "arabic": "جلسه  ليزر  الجنتل الابيض للوجه او تحديد الذقن", "category": "DERMATOLOGY"}, {"code": "DM0803", "description": "Laser Hair Removal Bikini And Axilla (Single session)", "billgroup": "Procedure", "price": 400.0, "discount_pct": 26.0, "discounted_price": 296.0, "arabic": "جلسه ليزر الجنتل الابيض للمناطق الحساسه", "category": "DERMATOLOGY"}, {"code": "DM0834", "description": "Hydra Facial (Facial with mask)", "billgroup": "Procedure", "price": 500.0, "discount_pct": 20.8, "discounted_price": 396.0, "arabic": "جلسه هيدرافيشيال مع ماسك هديه", "category": "DERMATOLOGY"}, {"code": "DM0354", "description": "Fractional Laser Large Area", "billgroup": "Procedure", "price": 500.0, "discount_pct": 40.8, "discounted_price": 296.0, "arabic": "جلسه فراكشنال ليزر للوجه", "category": "DERMATOLOGY"}, {"code": "DM0352", "description": "Fractional Laser Small Area", "billgroup": "Procedure", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "جلسه فراكشنال ليزر منطقه صغيه", "category": "DERMATOLOGY"}, {"code": "DM01074", "description": "PICO Full Face (1 Session)", "billgroup": "Procedure", "price": 600.0, "discount_pct": 17.3, "discounted_price": 496.0, "arabic": "جلسه بيكو ليزر للتصبغات وازاله التاتو", "category": "DERMATOLOGY"}, {"code": "DM01088", "description": "Regenera Evo - Hair Loss (Scalp) Single Session", "billgroup": "Procedure", "price": 5500.0, "discount_pct": 20.1, "discounted_price": 4396.0, "arabic": "جلسه ريجينيرا مع استخلاص الاكسوزوم الذاتي  لتساقط الشعر الوراثي", "category": "DERMATOLOGY"}, {"code": "DM01098", "description": "Royal Stimulate 1 session", "billgroup": "Procedure", "price": 3000.0, "discount_pct": 16.8, "discounted_price": 2496.0, "arabic": "ابره الديفا  الذهبيه للشد المائى وتحفيز الكولاجين", "category": "DERMATOLOGY"}, {"code": "DM01103", "description": "Spectra Carbon Peel (Full Face)", "billgroup": "Procedure", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "جلسه ليزر كربوني سبكترا هوليوود", "category": "DERMATOLOGY"}, {"code": "DM01114", "description": "Eyebrows Bleaching", "billgroup": "Procedure", "price": 150.0, "discount_pct": 36.0, "discounted_price": 96.0, "arabic": "جلسه تشقير الحواجب سبكترا هوليوود", "category": "DERMATOLOGY"}, {"code": "DM01126", "description": "Exo Capa 1 session 2.5 ml", "billgroup": "Procedure", "price": 800.0, "discount_pct": 25.5, "discounted_price": 596.0, "arabic": "جلسه  يونيفا الامريكيه لعلاج تساقط الشعر", "category": "DERMATOLOGY"}, {"code": "DM01127", "description": "Exo Capa 4 sessions", "billgroup": "Procedure", "price": 2900.0, "discount_pct": 20.8, "discounted_price": 2296.0, "arabic": "يونيفا الامريكيه لعلاج تساقط الشعر 4 جلسات", "category": "DERMATOLOGY"}, {"code": "DM01129", "description": "Exo Bright 1 session 2.5 ml", "billgroup": "Procedure", "price": 800.0, "discount_pct": 25.5, "discounted_price": 596.0, "arabic": "جلسه  يونيفا الامريكيه للتفتيح والنضاره", "category": "DERMATOLOGY"}, {"code": "DM01120", "description": "Exo Light 1 ml  under eye", "billgroup": "Procedure", "price": 450.0, "discount_pct": 34.2, "discounted_price": 296.0, "arabic": "جلسه  يونيفا الامريكيه للهالات السوداء", "category": "DERMATOLOGY"}, {"code": "DM01117", "description": "Exo HA 1 session2.5 ml", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 17.0, "discounted_price": 996.0, "arabic": "جلسه  يونيفا الامريكيه للنضاره والشد", "category": "DERMATOLOGY"}, {"code": "DM01141", "description": "HIFU  Face and neck Lift", "billgroup": "Procedure", "price": 2200.0, "discount_pct": 18.4, "discounted_price": 1796.0, "arabic": "جلسه هايفو لشد الوجه والرقبه", "category": "DERMATOLOGY"}, {"code": "DM01132", "description": "HIFU Double Chin Contouring", "billgroup": "Procedure", "price": 900.0, "discount_pct": 22.7, "discounted_price": 696.0, "arabic": "جلسه هايفو لشد وعلاج  الذقن المزدوجه", "category": "DERMATOLOGY"}, {"code": "DM01144", "description": "Full Body 1 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 500.0, "discount_pct": 20.8, "discounted_price": 396.0, "arabic": "جلسه فل بدي ليزر  ديكا مع الرتوش", "category": "DERMATOLOGY"}, {"code": "DM01146", "description": "Mini Full Body  1 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 400.0, "discount_pct": 26.0, "discounted_price": 296.0, "arabic": "جلسه ميني فل بدي ليزر  ديكا مع الرتوش", "category": "DERMATOLOGY"}, {"code": "DM01156", "description": "Full Face 1 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 150.0, "discount_pct": 36.0, "discounted_price": 96.0, "arabic": "جلسه  ليزر  ديكا  للوجه او تحديد الذقن  مع الرتوش", "category": "DERMATOLOGY"}, {"code": "DM01152", "description": "Underarms & Bikini 1 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "جلسه ليزر ديكا  للمناطق الحساسه مع الرتوش", "category": "DERMATOLOGY"}, {"code": "DM0831", "description": "Hydra facial signature", "billgroup": "Procedure", "price": 450.0, "discount_pct": 12.0, "discounted_price": 396.0, "arabic": "جلسه هيدرافيشيال", "category": "DERMATOLOGY"}, {"code": "DM0832", "description": "Hydra facial Deluxe", "billgroup": "Procedure", "price": 600.0, "discount_pct": 34.0, "discounted_price": 396.0, "arabic": "جلسه هيدرافيشيال مع  العلاج الضوئى لتعزيز نضاره البشره + ماسك هديه", "category": "DERMATOLOGY"}, {"code": "DM0838", "description": "Hydra Facial with treatment Booster", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 25.3, "discounted_price": 896.0, "arabic": "جلسه هيدرافيشيال  + علاج ضوئى+ بوستر علاجي مع ماسك هديه", "category": "DERMATOLOGY"}, {"code": "DM01064", "description": "Dermapen Microneedling Session", "billgroup": "Procedure", "price": 250.0, "discount_pct": 61.6, "discounted_price": 96.0, "arabic": "جلسه ديرما بن", "category": "DERMATOLOGY"}, {"code": "DM01147", "description": "Mini Full Body 3 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 1100.0, "discount_pct": 18.5, "discounted_price": 896.0, "arabic": "ميني فل بدي ليزر  ديكا مع الرتوش 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM01157", "description": "Full Face 3 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 400.0, "discount_pct": 26.0, "discounted_price": 296.0, "arabic": "ليزر  ديكا  للوجه او تحديد الذقن  مع الرتوش 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM01153", "description": "Underarms & Bikini 3 session AGAIN Pro Plus", "billgroup": "Procedure", "price": 800.0, "discount_pct": 25.5, "discounted_price": 596.0, "arabic": "ليزر ديكا  للمناطق الحساسه مع الرتوش 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM0801", "description": "Laser Hair Removal  mini full body (3 sessions)", "billgroup": "Procedure", "price": 1500.0, "discount_pct": 20.3, "discounted_price": 1196.0, "arabic": "ميني فل بدي ليزر  جنتل الابيض 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM01025", "description": "Laser hair removal full face (3 sessions)", "billgroup": "Procedure", "price": 500.0, "discount_pct": 20.8, "discounted_price": 396.0, "arabic": "ليزر  الجنتل الابيض للوجه او تحديد الذقن 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM0805", "description": "under arm& bikini (3 sessions)", "billgroup": "Procedure", "price": 1100.0, "discount_pct": 36.7, "discounted_price": 696.0, "arabic": "ليزر الجنتل الابيض للمناطق الحساسه 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM01115", "description": "Devote Revital 1 Session 5 ml", "billgroup": "Procedure", "price": 850.0, "discount_pct": 29.9, "discounted_price": 596.0, "arabic": "ابره السالمون ريفيتال", "category": "DERMATOLOGY"}, {"code": "DM01058", "description": "Mesotherapy 3d hair loss treatment( one session)", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 25.2, "discounted_price": 1496.0, "arabic": "جلسه 3D  لعلاج تساقط الشعر والصلع الوراثي", "category": "DERMATOLOGY"}, {"code": "DM01122", "description": "Exo Reform3 session 1.5 ml", "billgroup": "Procedure", "price": 1600.0, "discount_pct": 31.5, "discounted_price": 1096.0, "arabic": "يونيفا الامريكيه لعلاج حب الشباب 3 جلسات", "category": "DERMATOLOGY"}, {"code": "DM0443", "description": "PRP one session with HA (Dermatology only)", "billgroup": "Procedure", "price": 1199.0, "discount_pct": 16.9, "discounted_price": 996.0, "arabic": "جلسه بلازما دهبيه  مع كولاجين للبشره أو الشعر", "category": "DERMATOLOGY"}], "first_clinic": [{"code": "XY0292", "description": "MRI Cervical Spine (Screening)", "billgroup": "Medical Imaging", "price": 1900.0, "discount_pct": 47.6, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للفقرات الرقبة (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0298", "description": "MRI Thoracic Spine (Screening)", "billgroup": "Medical Imaging", "price": 1900.0, "discount_pct": 47.6, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للفقرات الصدرية (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0297", "description": "MRI Lumbar Spine (Screening)", "billgroup": "Medical Imaging", "price": 1900.0, "discount_pct": 47.6, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للفقرات القطنية (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0276", "description": "MRI Brain (Screening)", "billgroup": "Medical Imaging", "price": 1900.0, "discount_pct": 47.6, "discounted_price": 996.0, "arabic": "رنين مغناطيسي للدماغ (فحص مسحي)", "category": "IMAGING SERVICES"}, {"code": "XY0163", "description": "BMD (Bone Mineral Density)", "billgroup": "Medical Imaging", "price": 975.0, "discount_pct": 49.1, "discounted_price": 496.0, "arabic": "فحص كثافة العظام (هشاشة العظام)", "category": "IMAGING SERVICES"}, {"code": "XY0639", "description": "MAMMO - MAMMOGRAM SCREENING (BILATERAL)", "billgroup": "Medical Imaging", "price": 1000.0, "discount_pct": 50.4, "discounted_price": 496.0, "arabic": "ماموجرام للثديين - فحص مسحي (حملة الكشف عن سرطان الثدي)", "category": "IMAGING SERVICES"}, {"code": "XY0142", "description": "US - LOWER LIMB VENOUS DOPPLER FOR VARICOSE VEIN AND REFLUX (LEFT)", "billgroup": "Medical Imaging", "price": 755.0, "discount_pct": 34.3, "discounted_price": 496.0, "arabic": "أشعة دوبلر بالموجات فوق الصوتية لأوردة الطرف السفلي لتقييم الدوالي والارتجاع الوريدي – الساق اليسرى", "category": "IMAGING SERVICES"}, {"code": "XY0143", "description": "US - LOWER LIMB VENOUS DOPPLER FOR VARICOSE VEIN AND REFLUX (BILATERAL)", "billgroup": "Medical Imaging", "price": 1330.0, "discount_pct": 32.6, "discounted_price": 896.0, "arabic": "أشعة دوبلر بالموجات فوق الصوتية لأوردة الطرف السفلي لتقييم الدوالي والارتجاع الوريدي – الساقين", "category": "IMAGING SERVICES"}, {"code": "XY0558", "description": "US - LOWER LIMB VENOUS DOPPLER FOR VARICOSE VEIN AND REFLUX (RIGHT)", "billgroup": "Medical Imaging", "price": 755.0, "discount_pct": 34.3, "discounted_price": 496.0, "arabic": "أشعة دوبلر بالموجات فوق الصوتية لأوردة الطرف السفلي لتقييم الدوالي والارتجاع الوريدي – الساق اليمنى", "category": "IMAGING SERVICES"}, {"code": "CA0144", "description": "3D Echocardiogram", "billgroup": "Procedure", "price": 1000.0, "discount_pct": 50.4, "discounted_price": 496.0, "arabic": "إيكو القلب (كامل)", "category": "CARDIOLOGY"}, {"code": "CA0141", "description": "ECG", "billgroup": "Procedure", "price": 200.0, "discount_pct": 52.0, "discounted_price": 96.0, "arabic": "تخطيط القلب (ECG)", "category": "CARDIOLOGY"}, {"code": "CA0145", "description": "Stress Test", "billgroup": "Procedure", "price": 1000.0, "discount_pct": 20.4, "discounted_price": 796.0, "arabic": "اختبار الجهد للقلب", "category": "CARDIOLOGY"}, {"code": "CA0142", "description": "Holter- 24 hrs", "billgroup": "Procedure", "price": 1000.0, "discount_pct": 50.4, "discounted_price": 496.0, "arabic": "جهاز هولتر لمراقبة القلب (24 ساعة)", "category": "CARDIOLOGY"}, {"code": "CA0171", "description": "Holter - 3 days", "billgroup": "Procedure", "price": 2200.0, "discount_pct": 36.5, "discounted_price": 1396.0, "arabic": "جهاز هولتر لمراقبة القلب (3 أيام)", "category": "CARDIOLOGY"}, {"code": "PK3531", "description": "Lasik Pre-Assessment", "billgroup": "Package", "price": 500.0, "discount_pct": 40.8, "discounted_price": 296.0, "arabic": "فحص ما قبل الليزك", "category": "OPHTHALMOLOGY"}, {"code": "DN0923", "description": "3D scanning (Promo)", "billgroup": "Dental", "price": 500.0, "discount_pct": 20.8, "discounted_price": 396.0, "arabic": "مسح ثلاثي الأبعاد للأسنان", "category": "DENTAL"}, {"code": "DN0924", "description": "Bleaching with Zoom (Promo)", "billgroup": "Dental", "price": 1200.0, "discount_pct": 25.3, "discounted_price": 896.0, "arabic": "تبييض الأسنان بتقنية زووم", "category": "DENTAL"}, {"code": "DN0925", "description": "Emax Crown (Promo)", "billgroup": "Dental", "price": 3000.0, "discount_pct": 20.1, "discounted_price": 2396.0, "arabic": "تلبيسة (تاج) إيماكس تجميلية", "category": "DENTAL"}, {"code": "DN0926", "description": "GROSS SCALING (Promo)", "billgroup": "Dental", "price": 600.0, "discount_pct": 50.7, "discounted_price": 296.0, "arabic": "تنظيف عميق للأسنان", "category": "DENTAL"}, {"code": "DN0927", "description": "GUM TREATMENT FOR ADULTS (Promo)", "billgroup": "Dental", "price": 291.0, "discount_pct": 67.0, "discounted_price": 96.0, "arabic": "علاج اللثة للبالغين", "category": "DENTAL"}, {"code": "DN0928", "description": "GUM TREATMENT FOR CHILDREN AGED UP TO 15 YRS. (Promo)", "billgroup": "Dental", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "علاج اللثة للأطفال حتى ١٥ سنة", "category": "DENTAL"}, {"code": "DN0929", "description": "Home Bleaching (Promo)", "billgroup": "Dental", "price": 900.0, "discount_pct": 33.8, "discounted_price": 596.0, "arabic": "تبييض الأسنان المنزلي", "category": "DENTAL"}, {"code": "DN0930", "description": "Implant placement( Prom)", "billgroup": "Dental", "price": 4500.0, "discount_pct": 22.3, "discounted_price": 3496.0, "arabic": "زراعة الأسنان", "category": "DENTAL"}, {"code": "DN0931", "description": "Implant crown ( Promo)", "billgroup": "Dental", "price": 4500.0, "discount_pct": 22.3, "discounted_price": 3496.0, "arabic": "تلبيسة ( تاج) زرعة سنية", "category": "DENTAL"}, {"code": "DN0932", "description": "SCALING, ROOT PLANNING AND POLISHING (SIMPLE/QUADRANT)( Promo)", "billgroup": "Dental", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "تنظيف عميق الأسنان  (لكل ربع فم)", "category": "DENTAL"}, {"code": "DN0933", "description": "REMOVAL OF IMPACTED TOOTH -  COMPLETELY BONY( Promo)", "billgroup": "Dental", "price": 2000.0, "discount_pct": 20.2, "discounted_price": 1596.0, "arabic": "خلع جراحي لضرس مطمور بالكامل", "category": "DENTAL"}, {"code": "DN0934", "description": "REMOVAL OF IMPACTED TOOTH  SOFT TISSUE ( Promo)", "billgroup": "Dental", "price": 1500.0, "discount_pct": 20.3, "discounted_price": 1196.0, "arabic": "خلع جراحي  لضرس مطمور تحت اللثة", "category": "DENTAL"}, {"code": "DN0935", "description": "SURG. EXPOSE / IMPACT. TOOTH ( Promo)", "billgroup": "Dental", "price": 1461.0, "discount_pct": 31.8, "discounted_price": 996.0, "arabic": "خلع جراحي لضرس مطمور", "category": "DENTAL"}, {"code": "DN0936", "description": "Bone graft + collagen membrane (Dental) ( Promo)", "billgroup": "Dental", "price": 2500.0, "discount_pct": 20.2, "discounted_price": 1996.0, "arabic": "زراعة عظم مع غشاء كولاجين", "category": "DENTAL"}, {"code": "DN0937", "description": "ROOT CANAL THERAPY RETREATMENT  ANTERIOR (Promo)", "billgroup": "Dental", "price": 1800.0, "discount_pct": 16.9, "discounted_price": 1496.0, "arabic": "إعادة علاج عصب الأسنان الأمامية", "category": "DENTAL"}, {"code": "DN0938", "description": "Root canal Treatment two canals (Promo)", "billgroup": "Dental", "price": 1800.0, "discount_pct": 16.9, "discounted_price": 1496.0, "arabic": "علاج عصب – قناتين", "category": "DENTAL"}, {"code": "DN0939", "description": "COMPOSITE FOUR SURFACES PERMANENT (Promo)", "billgroup": "Dental", "price": 800.0, "discount_pct": 25.5, "discounted_price": 596.0, "arabic": "حشوة كومبوزيت – أربع أسطح (سن دائم)", "category": "DENTAL"}, {"code": "DN0940", "description": "CROWN PORCELAIN - CERAMIC SUBSTRATE (Promo)", "billgroup": "Dental", "price": 2500.0, "discount_pct": 20.2, "discounted_price": 1996.0, "arabic": "تلبيسه (تاج) بورسلان – قاعدة سيراميك", "category": "DENTAL"}, {"code": "DN0944", "description": "THERAPEUTIC PULPOTOMY(EXCLD FINAL RESTORATION) ( Promo)", "billgroup": "Dental", "price": 550.0, "discount_pct": 28.0, "discounted_price": 396.0, "arabic": "علاج عصب جزئي للاسنان اللبنيه او الدائمه غير المكتمله", "category": "DENTAL"}, {"code": "DN0948", "description": "Smartee offer  First Payment ( Promo)", "billgroup": "Dental", "price": 5000.0, "discount_pct": 20.1, "discounted_price": 3996.0, "arabic": "عرض تقويم Smartee الشفاف", "category": "DENTAL"}, {"code": "DN0949", "description": "Smartee Installment ( Promo)", "billgroup": "Dental", "price": null, "discount_pct": null, "discounted_price": 1496.0, "arabic": "تقويم Smartee الشفاف – خطة تقسيط ميسّرة", "category": "DENTAL"}, {"code": "DN0950", "description": "ROOT CANAL THERAPY RETREATMENT  BICUSPID ( Promo)", "billgroup": "Dental", "price": 2000.0, "discount_pct": 20.2, "discounted_price": 1596.0, "arabic": "إعادة علاج وتنظيف قنوات العصب في الضرس الصغير", "category": "DENTAL"}, {"code": "DN0951", "description": "ROOT CANAL THERAPY RETREATMENT ? MOLAR ( Promo)", "billgroup": "Dental", "price": 2500.0, "discount_pct": 16.2, "discounted_price": 2096.0, "arabic": "إعادة علاج عصب – الضرس الخلفي", "category": "DENTAL"}, {"code": "DN0952", "description": "MOLARS ROOT CANAL THERAPY ( Promo)", "billgroup": "Dental", "price": 2000.0, "discount_pct": 20.2, "discounted_price": 1596.0, "arabic": "علاج عصب الأضراس الخلفية", "category": "DENTAL"}, {"code": "DN0953", "description": "NIGHT GUARD ( Promo)", "billgroup": "Dental", "price": 1000.0, "discount_pct": 20.4, "discounted_price": 796.0, "arabic": "واقي الأسنان الليلي", "category": "DENTAL"}, {"code": "DN0954", "description": "Night guard soft & hard ( Promo)", "billgroup": "Dental", "price": 1500.0, "discount_pct": 26.9, "discounted_price": 1096.0, "arabic": "واقي أسنان ليلي (لين أو صلب)", "category": "DENTAL"}, {"code": "DN0955", "description": "PANORAMIC FILM ( Promo)", "billgroup": "Dental", "price": 300.0, "discount_pct": 34.7, "discounted_price": 196.0, "arabic": "أشعة بانورامية للفم", "category": "DENTAL"}, {"code": "DN0956", "description": "PREFABRICATED POST AND CORE ( Promo)", "billgroup": "Dental", "price": 1000.0, "discount_pct": 20.4, "discounted_price": 796.0, "arabic": "دعامة ( وتد ) سنية", "category": "DENTAL"}, {"code": "DN0957", "description": "PREFABRICATED STAINLESS STEEL CROWN  PRIMARY ( Promo)", "billgroup": "Dental", "price": 500.0, "discount_pct": 20.8, "discounted_price": 396.0, "arabic": "تلبيسه (تاج) ستانلس ستيل جاهز – أسنان لبنية", "category": "DENTAL"}, {"code": "PK4108", "description": "First Trimester Antenatal care ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2800.0, "discount_pct": 14.4, "discounted_price": 2396.0, "arabic": "متابعة الحمل (الشهور الثلاثة الأولى)", "category": "OB-GYN"}, {"code": "PK4109", "description": "Second Trimester Antenatal care  ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2200.0, "discount_pct": 13.8, "discounted_price": 1896.0, "arabic": "متابعة الحمل (الشهور الثلاثة الوسطى)", "category": "OB-GYN"}, {"code": "PK4110", "description": "Third Trimester Antenatal care  ( Low Risk Pregnancy )", "billgroup": "Package", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "متابعة الحمل (الشهور الثلاثة الأخيرة)", "category": "OB-GYN"}, {"code": "OB0182", "description": "Emsella Chiar One Session", "billgroup": "Procedure", "price": 400.0, "discount_pct": 26.0, "discounted_price": 296.0, "arabic": "جهاز إمسيلا لتقوية الحوض (جلسة واحدة)", "category": "OB-GYN"}, {"code": "OB0183", "description": "Emsella 6 sessions", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 20.2, "discounted_price": 1596.0, "arabic": "جهاز إمسيلا لتقوية الحوض (6 جلسات)", "category": "OB-GYN"}, {"code": "PK2001", "description": "General Medical Checkup - male below 40 y/o", "billgroup": "Package", "price": 4935.0, "discount_pct": 25.1, "discounted_price": 3696.0, "arabic": "فحص طبي شامل - للرجال (أقل من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2002", "description": "General Medical Checkup - male above 40 y/o", "billgroup": "Package", "price": 5250.0, "discount_pct": 25.8, "discounted_price": 3896.0, "arabic": "فحص طبي شامل - للرجال (أكبر من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2003", "description": "General Medical Checkup - female below 40 y/o", "billgroup": "Package", "price": 5250.0, "discount_pct": 25.8, "discounted_price": 3896.0, "arabic": "فحص طبي شامل - للنساء (أقل من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2004", "description": "General Medical Checkup - female above 40 y/o", "billgroup": "Package", "price": 6985.0, "discount_pct": 25.6, "discounted_price": 5196.0, "arabic": "فحص طبي شامل - للنساء (أكبر من 40 سنة)", "category": "FAMILY MEDICINE"}, {"code": "PK2012", "description": "Smoking cessation package 1 (3 Visits)", "billgroup": "Package", "price": 1365.0, "discount_pct": 63.7, "discounted_price": 496.0, "arabic": null, "category": "FAMILY MEDICINE"}, {"code": "PT0146", "description": "Shock Wave Session", "billgroup": "Allied Health", "price": 200.0, "discount_pct": 52.0, "discounted_price": 96.0, "arabic": "جلسة علاج بجهاز الموجات التصادمية", "category": "REHABILITATION"}, {"code": "PT0043", "description": "Physical Therapy Treatment / unlisted", "billgroup": "Allied Health", "price": 260.0, "discount_pct": 24.6, "discounted_price": 196.0, "arabic": "جلسة علاج طبيعي", "category": "REHABILITATION"}, {"code": "DM0338", "description": "Filler 1 ml injection (Promo)", "billgroup": "Procedure", "price": 1300.0, "discount_pct": 8.0, "discounted_price": 1196.0, "arabic": "فيلر 1 مل (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0339", "description": "Filler 2 ml injection (Promo)", "billgroup": "Procedure", "price": 2600.0, "discount_pct": 19.4, "discounted_price": 2096.0, "arabic": "فيلر 2 مل (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0722", "description": "Botox For wrinkles (Promo)", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 17.0, "discounted_price": 996.0, "arabic": "بوتوكس للتجاعيد (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0688", "description": "Botox for hyperhidrosis (Promo)", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "بوتوكس لعلاج فرط التعرق (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0813", "description": "Exosome session (Promo)", "billgroup": "Procedure", "price": 1200.0, "discount_pct": 17.0, "discounted_price": 996.0, "arabic": "جلسة إكسوزوم (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0723", "description": "Hydra Facial with Deep Clean (Promo)", "billgroup": "Procedure", "price": 450.0, "discount_pct": 12.0, "discounted_price": 396.0, "arabic": "هيدرافيشل مع تنظيف عميق (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0731", "description": "Hydra facial with mask (Promo)", "billgroup": "Procedure", "price": 500.0, "discount_pct": 0.8, "discounted_price": 496.0, "arabic": "هيدرافيشل مع ماسك (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0726", "description": "Cold peel -small area (Promo)", "billgroup": "Procedure", "price": 500.0, "discount_pct": 0.8, "discounted_price": 496.0, "arabic": "تقشير بارد - منطقة صغيرة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0188", "description": "Laser hair removal Bikini + Under Arm with retouch (Promo)", "billgroup": "Procedure", "price": 300.0, "discount_pct": 1.3, "discounted_price": 296.0, "arabic": "ليزر (بكيني + إبط) مع رتوش (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0872", "description": "Laser hair removal Bikini + Under Arm 3 session with retouch (Promo)", "billgroup": "Procedure", "price": 700.0, "discount_pct": 29.1, "discounted_price": 496.0, "arabic": "ليزر (بكيني + إبط) 3 جلسات مع رتوش (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0873", "description": "Laser hair removal Full body without retouch  session (Promo)", "billgroup": "Procedure", "price": 700.0, "discount_pct": 43.4, "discounted_price": 396.0, "arabic": "ليزر جسم كامل بدون رتوش - جلسة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0874", "description": "Laser hair removal Full body 3 session without retouch (Promo)", "billgroup": "Procedure", "price": 2100.0, "discount_pct": 47.8, "discounted_price": 1096.0, "arabic": "ليزر جسم كامل 3 جلسات بدون رتوش (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0875", "description": "Laser hair removal for chin (men) Promo", "billgroup": "Procedure", "price": 200.0, "discount_pct": 2.0, "discounted_price": 196.0, "arabic": "ليزر تحديد ذقن (للرجال) عرض خاص", "category": "DERMATOLOGY"}, {"code": "DM0793", "description": "PRP Classic 3 session (Promo)", "billgroup": "Procedure", "price": 2700.0, "discount_pct": 22.4, "discounted_price": 2096.0, "arabic": "بلازما (PRP) كلاسيك 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0691", "description": "PRP Gold + HA (Promo)", "billgroup": "Procedure", "price": 1400.0, "discount_pct": 14.6, "discounted_price": 1196.0, "arabic": "بلازما ذهبية + هيالورونيك أسيد (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0695", "description": "Mesotherapy Hair 3ml 3 sessions  (Promo)", "billgroup": "Procedure", "price": 1350.0, "discount_pct": 18.8, "discounted_price": 1096.0, "arabic": "ميزوثيرابي شعر 3 مل - 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0680", "description": "Mesotherapy face + derma pen 3 sessions (Promo)", "billgroup": "Procedure", "price": 2400.0, "discount_pct": 33.5, "discounted_price": 1596.0, "arabic": "ميزوثيرابي وجه + ديرما بن 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0876", "description": "Skin booster (Promo)", "billgroup": "Procedure", "price": 1700.0, "discount_pct": 23.8, "discounted_price": 1296.0, "arabic": "إبر نضارة - سكين بوستر (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0655", "description": "Hyalual skin booster (Promo)", "billgroup": "Procedure", "price": 1400.0, "discount_pct": 7.4, "discounted_price": 1296.0, "arabic": "إبر نضارة هيالوال - Hyalual (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0360", "description": "Dives Lip rejuvenation 3 sessions (Promo)", "billgroup": "Procedure", "price": 1600.0, "discount_pct": 19.0, "discounted_price": 1296.0, "arabic": "توريد وتجديد الشفايف 3 جلسات (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0877", "description": "Matrix Pro Face One Tip (Promo)", "billgroup": "Procedure", "price": 1500.0, "discount_pct": 26.9, "discounted_price": 1096.0, "arabic": "ماتريكس برو للوجه - رأس واحد (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0878", "description": "Matrix Pro Face and Neck (Promo)", "billgroup": "Procedure", "price": 2000.0, "discount_pct": 15.2, "discounted_price": 1696.0, "arabic": "ماتريكس برو للوجه والرقبة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0879", "description": "Crystal Pro Middle Area (Promo)", "billgroup": "Procedure", "price": 1750.0, "discount_pct": 8.8, "discounted_price": 1596.0, "arabic": "كريستال برو للمنطقة المتوسطة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0880", "description": "Crystal Pro Small Area (Promo)", "billgroup": "Procedure", "price": 999.0, "discount_pct": 10.3, "discounted_price": 896.0, "arabic": "كريستال برو للمنطقة الصغيرة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0881", "description": "Pico Small Aree (Promo)", "billgroup": "Procedure", "price": 800.0, "discount_pct": 13.0, "discounted_price": 696.0, "arabic": "بيكو ليزر لمنطقة صغيرة (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "DM0882", "description": "Fractinal laser (Promo)", "billgroup": "Procedure", "price": 900.0, "discount_pct": 44.9, "discounted_price": 496.0, "arabic": "فراكشنال ليزر (عرض خاص)", "category": "DERMATOLOGY"}, {"code": "PK1001", "description": "Sclerotherapy for varicose vein L.A. - one leg", "billgroup": "Package", "price": 1890.0, "discount_pct": 26.1, "discounted_price": 1396.0, "arabic": "العلاج بالتصليب للدوالي تحت التخدير الموضعي – لساق واحدة", "category": "VASCULAR"}]};
+const IMC_LABELS = {"imc_jeddah": {"en": "IMC Jeddah", "ar": "المركز الطبي الدولي"}, "imc_makkah": {"en": "IMC Makkah", "ar": "فرع مكة"}, "first_clinic": {"en": "The First Clinic", "ar": "مجمع العيادة الأولى"}};
+const CATEGORY_LABELS_AR = {"CONSULTATION": "استشارة", "PSYCHIATRY": "الطب النفسي", "IMAGING SERVICES": "الأشعة", "PAIN MANAGEMENT": "علاج الألم", "CARDIOLOGY": "أمراض القلب", "OPHTHALMOLOGY": "طب العيون", "DENTAL": "طب الأسنان", "OB-GYN": "النساء والولادة", "FAMILY MEDICINE": "طب الأسرة", "REHABILITATION": "التأهيل الطبي", "DERMATOLOGY": "الجلدية", "FUNCTIONAL MEDICINE": "الطب الوظيفي", "VASCULAR": "جراحة الأوعية الدموية"};
+const CALL_NUMBER = "920027778";
+
+const ENTITY_ORDER = ["imc_jeddah", "imc_makkah", "first_clinic"];
+
+const ICONS = {
+  "CONSULTATION": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="16" r="7" stroke="#0073BA" stroke-width="2.5"/><path d="M10 40c0-8 6-13 14-13s14 5 14 13" stroke="#0073BA" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  "PSYCHIATRY": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 8c-7 0-12 5-12 12 0 5 3 8 3 12v4h18v-4c0-4 3-7 3-12 0-7-5-12-12-12z" stroke="#0073BA" stroke-width="2.5"/><path d="M19 40h10" stroke="#0073BA" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  "IMAGING SERVICES": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="9" width="30" height="30" rx="4" stroke="#0073BA" stroke-width="2.5"/><path d="M9 19h30M19 9v30" stroke="#0073BA" stroke-width="2"/></svg>',
+  "PAIN MANAGEMENT": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 40s-14-8.4-14-18.5C10 15 14 11 19.5 11c2.4 0 4.5 1.2 4.5 1.2S26.1 11 28.5 11C34 11 38 15 38 21.5 38 31.6 24 40 24 40z" stroke="#0073BA" stroke-width="2.5"/></svg>',
+  "CARDIOLOGY": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 40s-14-8.4-14-18.5C10 15 14 11 19.5 11c2.4 0 4.5 1.2 4.5 1.2S26.1 11 28.5 11C34 11 38 15 38 21.5 38 31.6 24 40 24 40z" stroke="#0073BA" stroke-width="2.5"/><path d="M14 24h6l3-6 4 10 3-6h6" stroke="#004D8C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  "OPHTHALMOLOGY": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 24c5-9 13-14 20-14s15 5 20 14c-5 9-13 14-20 14S9 33 4 24z" stroke="#0073BA" stroke-width="2.5"/><circle cx="24" cy="24" r="6" stroke="#004D8C" stroke-width="2.5"/></svg>',
+  "DENTAL": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 10c-4 0-6 3-9 3s-6-3-6 3c0 8 3 22 6 22 3 0 3-10 9-10s6 10 9 10c3 0 6-14 6-22 0-6-3-3-6-3s-5-3-9-3z" stroke="#0073BA" stroke-width="2.2"/></svg>',
+  "OB-GYN": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="16" r="7" stroke="#0073BA" stroke-width="2.5"/><path d="M24 23v9M18 32h12" stroke="#0073BA" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="36" r="4" stroke="#004D8C" stroke-width="2"/></svg>',
+  "FAMILY MEDICINE": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="5" stroke="#0073BA" stroke-width="2.2"/><circle cx="32" cy="16" r="5" stroke="#0073BA" stroke-width="2.2"/><path d="M8 40c0-6 4-10 8-10s8 4 8 10M24 40c0-6 4-10 8-10s8 4 8 10" stroke="#0073BA" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  "REHABILITATION": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 34l8-10 6 6 8-12" stroke="#0073BA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="36" cy="18" r="3" stroke="#004D8C" stroke-width="2"/></svg>',
+  "DERMATOLOGY": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 8l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" stroke="#0073BA" stroke-width="2"/><circle cx="36" cy="36" r="3" stroke="#004D8C" stroke-width="2"/></svg>',
+  "FUNCTIONAL MEDICINE": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 6v8M24 34v8M6 24h8M34 24h8" stroke="#0073BA" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="24" r="9" stroke="#004D8C" stroke-width="2.2"/></svg>',
+  "VASCULAR": '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 24c6-10 10 10 16 0s10-10 16 0" stroke="#0073BA" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>'
+};
+const DEFAULT_ICON = '<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="15" stroke="#0073BA" stroke-width="2.5"/><path d="M24 17v14M17 24h14" stroke="#0073BA" stroke-width="2.5" stroke-linecap="round"/></svg>';
+
+let currentEntity = ENTITY_ORDER[0];
+let currentFilter = "ALL";
+
+function titleCase(s){
+  return s.replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase());
+}
+
+function catLabelAr(cat){
+  return CATEGORY_LABELS_AR[cat] || '';
+}
+
+function renderTabs(){
+  const el = document.getElementById('imcTabs');
+  el.innerHTML = ENTITY_ORDER.map(key => {
+    const label = IMC_LABELS[key].en;
+    const labelAr = IMC_LABELS[key].ar;
+    const active = key === currentEntity ? 'active' : '';
+    return `<button class="imc-tab-btn ${active}" data-entity="${key}">${label}<span class="tab-ar">${labelAr}</span></button>`;
+  }).join('');
+  el.querySelectorAll('.imc-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentEntity = btn.getAttribute('data-entity');
+      currentFilter = 'ALL';
+      renderTabs();
+      renderFilters();
+      renderGrid();
+    });
+  });
+}
+
+function renderFilters(){
+  const el = document.getElementById('imcFilters');
+  const items = IMC_DATA[currentEntity];
+  const cats = [...new Set(items.map(i => i.category))];
+  const chips = ["ALL", ...cats];
+  el.innerHTML = chips.map(c => {
+    const active = c === currentFilter ? 'active' : '';
+    if(c === "ALL"){
+      return `<button class="imc-chip ${active}" data-cat="${c}">All Offers <span class="chip-ar">جميع العروض</span></button>`;
+    }
+    const label = titleCase(c);
+    const labelAr = catLabelAr(c);
+    return `<button class="imc-chip ${active}" data-cat="${c}">${label} <span class="chip-ar">${labelAr}</span></button>`;
+  }).join('');
+  el.querySelectorAll('.imc-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      currentFilter = chip.getAttribute('data-cat');
+      renderFilters();
+      renderGrid();
+    });
+  });
+}
+
+function fmt(n){
+  return Math.round(n).toLocaleString('en-US');
+}
+
+function renderGrid(){
+  const grid = document.getElementById('imcGrid');
+  const countEl = document.getElementById('imcCount');
+  let items = IMC_DATA[currentEntity];
+  if(currentFilter !== 'ALL'){
+    items = items.filter(i => i.category === currentFilter);
+  }
+  countEl.textContent = `${items.length} offer${items.length === 1 ? '' : 's'}`;
+
+  if(items.length === 0){
+    grid.innerHTML = '<div class="imc-empty">No offers found in this category.</div>';
+    return;
+  }
+
+  grid.innerHTML = items.map(item => {
+    const icon = ICONS[item.category] || DEFAULT_ICON;
+    const hasOld = item.price !== null && item.discounted_price !== null && item.price > item.discounted_price;
+    const badge = (item.discount_pct !== null && hasOld) ? `<span class="imc-badge-discount">-${item.discount_pct}%</span>` : '';
+    const oldPriceHtml = hasOld ? `<span class="imc-price-old">SAR ${fmt(item.price)}</span>` : '';
+    const newPrice = item.discounted_price !== null ? item.discounted_price : item.price;
+    const arabicHtml = item.arabic ? `<p class="imc-card-ar">${item.arabic}</p>` : '';
+    const catAr = catLabelAr(item.category);
+    return `
+      <div class="imc-card">
+        <div class="imc-card-visual">${icon}${badge}</div>
+        <div class="imc-card-body">
+          <div class="imc-cat-label">${titleCase(item.category)}<span class="cat-sep">·</span><span class="cat-ar">${catAr}</span></div>
+          <h3 class="imc-card-title">${item.description}</h3>
+          ${arabicHtml}
+          <div class="imc-price-row">
+            ${oldPriceHtml}
+            <span class="imc-price-new">SAR ${fmt(newPrice)}</span>
+          </div>
+          <a class="imc-call-btn" href="tel:${CALL_NUMBER}">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.2 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.2 1.1L6.6 10.8z" fill="#fff"/></svg>
+            Call ${CALL_NUMBER}
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+renderTabs();
+renderFilters();
+renderGrid();
+</script>
+
+</body>
+</html>

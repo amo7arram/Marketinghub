@@ -54,6 +54,13 @@ The Worker only forwards requests whose `Origin` (or, as a fallback, `Referer`) 
 ├── landing.html           Public, no login, one reusable template for every admin-built landing
 │                          page (content fetched by slug from `landing_pages`) — see §4.6 for its
 │                          unauthenticated-write exception
+├── national-day-offers.html  A genuinely static, hand-authored one-off campaign page (Saudi
+│                          National Day 2026 pricing/offers) — no Firestore, no build step, no
+│                          admin UI; just an HTML file uploaded directly into the repo and served
+│                          by GitHub Pages as-is. Not part of the `landing_pages`/`landing.html`
+│                          system — a plain public page has no reason to route through that
+│                          machinery. Precedent for hosting a one-off static campaign page: drop it
+│                          in the repo root, no other changes needed.
 ├── logo.jpg               Shared logo asset
 └── docs/                  This documentation set
 ```
