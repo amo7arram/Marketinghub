@@ -103,7 +103,7 @@ The CRM core. Each document is **one interaction** — a person engaging with on
 | `assignedAgentName` | string | Denormalized display name, same convention as `campaign`/`campaignId`. |
 | `revenueValue` | number \| null | SAR — actual known revenue from this booking, feeds campaign ROI |
 | `notes` | string | For `source:"Landing Page"` leads, populated from that page's optional Comment field |
-| `email` | string \| null | Optional — most leads never had this (manual entry, Excel/Sheet import don't collect it), but every `source:"Landing Page"` lead does. Not yet added to the Excel/Sheet import column-detection — a natural, separate follow-up. |
+| `email` | string \| null | Optional everywhere, including on `source:"Landing Page"` leads — the landing page form only requires Name and Phone. Not yet added to the Excel/Sheet import column-detection — a natural, separate follow-up. |
 | `landingPageId` | string \| null | Set only when `source === "Landing Page"` — references the `landing_pages` doc (by slug) that generated this lead. Informational only, no live lookup renders against it the way `initiatives`-linking fields do elsewhere, so a deleted landing page leaves this harmlessly dangling. |
 | `createdAt`, `updatedAt` | Timestamp | |
 

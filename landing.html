@@ -47,6 +47,7 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .form-title-ar{font-size:14px;font-weight:600;color:var(--text-2);margin-bottom:16px;text-align:center}
 .field-group{margin-bottom:14px}
 .field-label{font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px;display:block}
+.field-label-ar{display:block;font-weight:500;color:var(--text-3);font-size:11px;margin-top:2px}
 .field-input,.field-textarea{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:14px}
 .field-textarea{min-height:70px;resize:vertical}
 .field-input:focus,.field-textarea:focus{outline:none;border-color:var(--navy)}
@@ -113,10 +114,10 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
       <div class="form-section" id="form-wrap">
         <div class="form-title">Fill the form to receive a call</div>
         <div class="form-title-ar ar">املأ النموذج لتلقي مكالمة</div>
-        <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span></label><input class="field-input" id="f-name" placeholder="Your name"></div>
-        <div class="field-group"><label class="field-label">Email<span style="color:var(--red)">*</span></label><input class="field-input" type="email" id="f-email" placeholder="you@example.com"></div>
-        <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span></label><input class="field-input" type="tel" id="f-phone" placeholder="05XXXXXXXX"></div>
-        <div class="field-group"><label class="field-label">Comment <span style="color:var(--text-3);font-weight:400">— optional</span></label><textarea class="field-textarea" id="f-comment" placeholder="Anything you'd like us to know?"></textarea></div>
+        <div class="field-group"><label class="field-label">Full Name<span style="color:var(--red)">*</span><span class="field-label-ar ar">الاسم الكامل</span></label><input class="field-input" id="f-name" placeholder="Your name"></div>
+        <div class="field-group"><label class="field-label">Email <span style="color:var(--text-3);font-weight:400">— optional</span><span class="field-label-ar ar">البريد الإلكتروني — اختياري</span></label><input class="field-input" type="email" id="f-email" placeholder="you@example.com"></div>
+        <div class="field-group"><label class="field-label">Phone<span style="color:var(--red)">*</span><span class="field-label-ar ar">رقم الجوال</span></label><input class="field-input" type="tel" id="f-phone" placeholder="05XXXXXXXX"></div>
+        <div class="field-group"><label class="field-label">Comment <span style="color:var(--text-3);font-weight:400">— optional</span><span class="field-label-ar ar">لديك استفسار محدد؟</span></label><textarea class="field-textarea" id="f-comment" placeholder="Anything you'd like us to know?"></textarea></div>
         <!-- Honeypot: real visitors never see or fill this. Any bot that
              blindly fills every field on the page will. -->
         <div class="honeypot-field" aria-hidden="true">
@@ -320,11 +321,11 @@ window.submitLead = async function() {
   const comment = document.getElementById('f-comment').value.trim();
   const honeypot = document.getElementById('f-website').value.trim();
 
-  if (!name || !email || !phoneRaw) {
-    showToast('Please fill in your name, email, and phone number', true);
+  if (!name || !phoneRaw) {
+    showToast('Please fill in your name and phone number', true);
     return;
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     showToast('Please enter a valid email address', true);
     return;
   }
