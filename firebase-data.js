@@ -950,6 +950,9 @@ export async function migrateLegacyLeadStatuses() {
 // exact phone string) has always silently depended on. Shared by every
 // phone-write site: admin.html's manual add/edit form, Excel import, Google
 // Sheet import, and call-center.html's edit modal.
+// ⚠️ Duplicated in landing.html (not imported) — that page deliberately
+// avoids the Firebase SDK entirely for load-time reasons (see its own
+// comment block). Mirror any logic change here into that copy too.
 export function normalizePhone(raw) {
   if (!raw) return '';
   let digits = String(raw).replace(/\D/g, '');

@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IMC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<!-- defer: only needed once page content actually renders (after the fetch
+     below resolves), so it must never block first paint. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -76,6 +81,11 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 .consent-btn{padding:8px 18px;border-radius:var(--radius);font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;border:none;white-space:nowrap}
 .consent-accept{background:var(--green);color:#fff}
 .consent-decline{background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4)}
+.skel{background:linear-gradient(90deg,var(--border) 25%,#EDEFF5 37%,var(--border) 63%);background-size:400% 100%;animation:skel-shimmer 1.4s ease infinite;border-radius:6px}
+@keyframes skel-shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.skel-title{height:26px;width:70%;margin:0 auto 14px}
+.skel-sub{height:14px;width:50%;margin:0 auto 26px}
+.skel-line{height:11px;width:100%;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -83,8 +93,16 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
 <div class="page">
   <div class="logo-row"><img src="logo.jpg" alt="IMC"></div>
 
-  <div class="card hidden" id="loading-state">
-    <div class="card-body" style="text-align:center;color:var(--text-3);padding:60px 32px">Loading…</div>
+  <!-- Visible by default (no "hidden" class) so the skeleton paints the
+       instant raw HTML/CSS loads — doesn't wait for any script to run. -->
+  <div class="card" id="loading-state">
+    <div class="card-body">
+      <div class="skel skel-title"></div>
+      <div class="skel skel-sub"></div>
+      <div class="skel skel-line"></div>
+      <div class="skel skel-line" style="width:85%"></div>
+      <div class="skel skel-line" style="width:60%"></div>
+    </div>
   </div>
 
   <div class="card hidden" id="unavailable-state">
@@ -168,8 +186,101 @@ body{display:flex;justify-content:center;padding:40px 20px;min-height:100vh}
   <button class="consent-btn consent-decline" onclick="handleConsent(false)">Decline</button>
 </div>
 
-<script type="module">
-import { getLandingPageBySlug, addLead, normalizePhone, getAnalyticsSettings } from './firebase-data.js';
+<script>
+// ── FIRESTORE VIA PLAIN REST, NOT THE SDK ──────────────────────────────────
+// This page used to import firebase-data.js like every other page in the
+// app, which pulls in the full Firebase Auth SDK alongside Firestore even
+// though a landing page visitor is never authenticated — real, unnecessary
+// weight on a page whose entire job is loading fast for a cold ad click,
+// often over a slow connection inside Meta's in-app browser. Real incident:
+// a visitor reported ~25s of blank "Loading…" before content appeared.
+// Firestore's REST API enforces the *exact same* Security Rules as the SDK
+// (rules are evaluated server-side regardless of transport) — a Published
+// page is still readable, a Draft still isn't, the leads anonymous-create
+// whitelist still applies unchanged — but a plain fetch() skips downloading,
+// parsing, and initializing an entire database client library first.
+// Deliberate, bounded duplication: normalizePhone() and the Firebase
+// project config are copied from firebase-data.js rather than imported, so
+// this page shares no code path with the SDK at all. If normalizePhone()'s
+// logic ever changes there, mirror the change here too.
+const FIREBASE_PROJECT_ID = 'imc-marketing-strategy-2-6905e';
+const FIREBASE_API_KEY = 'AIzaSyDLktYF2OOJ4XSF666eMuh2QGjropF-zfQ';
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+
+function normalizePhone(raw) {
+  if (!raw) return '';
+  let digits = String(raw).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0')) digits = '966' + digits.slice(1);
+  else if (digits.length === 9 && digits.startsWith('5')) digits = '966' + digits;
+  return digits;
+}
+
+// Unwraps Firestore REST's typed {stringValue:...}/{nullValue:...} field
+// format into plain JS values — only the types this app's config/landing
+// pages actually use are handled.
+function fsUnwrap(v) {
+  if (!v) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return parseInt(v.integerValue, 10);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('timestampValue' in v) return v.timestampValue;
+  return null; // nullValue, or a type this page never needs (map/array)
+}
+function fsUnwrapFields(fields) {
+  const out = {};
+  for (const k in (fields || {})) out[k] = fsUnwrap(fields[k]);
+  return out;
+}
+function fsString(v) { return { stringValue: String(v ?? '') }; }
+function fsStringOrNull(v) { return v ? { stringValue: String(v) } : { nullValue: null }; }
+
+async function getLandingPageBySlug(slug) {
+  const res = await fetch(`${FIRESTORE_BASE}/landing_pages/${encodeURIComponent(slug)}?key=${FIREBASE_API_KEY}`);
+  if (!res.ok) return null; // covers both "never existed" (404) and "not Published" (403) uniformly
+  const raw = await res.json();
+  return { id: slug, ...fsUnwrapFields(raw.fields) };
+}
+
+async function getAnalyticsSettings() {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE}/config/analytics_settings?key=${FIREBASE_API_KEY}`);
+    if (!res.ok) return {};
+    const raw = await res.json();
+    return fsUnwrapFields(raw.fields);
+  } catch (e) { return {}; }
+}
+
+async function addLead(data) {
+  const body = {
+    fields: {
+      name: fsString(data.name),
+      phone: fsString(data.phone),
+      email: fsString(data.email),
+      source: fsString(data.source),
+      landingPageId: fsString(data.landingPageId),
+      campaignId: fsStringOrNull(data.campaignId),
+      campaign: fsString(data.campaign),
+      department: fsString(data.department),
+      entity: fsString(data.entity),
+      dateCreated: fsString(data.dateCreated),
+      contactStatus: fsString(data.contactStatus),
+      outcome: fsString(data.outcome),
+      notes: fsString(data.notes),
+      createdAt: { timestampValue: new Date().toISOString() },
+    },
+  };
+  const res = await fetch(`${FIRESTORE_BASE}/leads?key=${FIREBASE_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody?.error?.message || `Request failed (${res.status})`);
+  }
+}
 
 const pageLoadedAt = Date.now();
 const MIN_SUBMIT_DELAY_MS = 2000; // faster than this after page load is treated as a bot
@@ -291,8 +402,13 @@ function renderPage(lp) {
   if (lp.bodyText) {
     // Sanitized here, at render time, never at write time (see firebase-data.js)
     // — strips scripts/event-handlers/unsafe URLs, keeps tables/formatting/links.
-    document.getElementById('p-body').innerHTML = DOMPurify.sanitize(lp.bodyText);
-    document.getElementById('p-body').classList.remove('hidden');
+    // DOMPurify loads with `defer` (never blocks first paint) — on the
+    // extremely unlikely chance it hasn't executed yet by the time a fetch
+    // this fast resolves, fall back to plain text rather than raw innerHTML.
+    const bodyEl = document.getElementById('p-body');
+    bodyEl.innerHTML = window.DOMPurify ? DOMPurify.sanitize(lp.bodyText) : '';
+    if (!window.DOMPurify) bodyEl.textContent = lp.bodyText;
+    bodyEl.classList.remove('hidden');
   }
   if (lp.heroImageUrl) {
     const img = document.getElementById('hero-img');
