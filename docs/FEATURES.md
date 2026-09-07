@@ -34,7 +34,9 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Per-type conditional fields (Event Scope, Website Update Type + Link, Physician Name, Print Type, Content Type)
 - AI Caption Generator — per-activity, generates bilingual (EN/AR) captions + on-image headline from the activity's own brief, respecting the saved Brand Voice
 - Validation: a `Published` activity with a caption-bearing type must have a Post Link before it can be saved
-- Filters: type, department, entity, status, search
+- **Month navigator** — the table defaults to one month (by Start Date), current month first, with ◀/▶ controls and a "Today" shortcut once you've navigated away — replaces the old default of showing every activity ever created, years-out entries included. A "Show All Time" checkbox drops the scope entirely when you need to browse or search everything.
+- **Overdue detection** — a `Planned` activity whose Start Date has already passed is highlighted (red row + "⚠ Overdue" badge) and computed live, never stored. An "Overdue only" filter deliberately bypasses the month scope entirely (and "Show All Time") — overdue items live in past months by definition, so it surfaces every one of them regardless of which month you're currently browsing. Change its status via the normal Edit flow once you've dealt with it.
+- Filters: type, department, entity, status, overdue-only, search
 
 ### Campaign Generator
 - One campaign-level brief → generates a **full content suite** in one AI call: multiple social posts (dates auto-spread across the campaign window), plus copy for any selected print formats (Flyer, Backdrop/Rollup, Brochure, Sticker, Booklet, Countertop, Signage)

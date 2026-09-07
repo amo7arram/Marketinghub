@@ -248,6 +248,23 @@ tr.row-overdue:hover td{background:#FFD6D6}
   <div class="content">
     <!-- INITIATIVES PAGE -->
     <div class="page active" id="page-initiatives">
+      <!-- Month navigator — default view scopes to one month (by Start Date) so
+           the list opens on what's actually relevant now, not sorted-in items
+           dated years out. "Overdue only" deliberately bypasses this scope
+           entirely (see isActivityOverdue()) — overdue items are by definition
+           sitting in past months, so hunting for them one month at a time
+           would defeat the point of the filter. -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px" id="activities-month-nav">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn btn-sm" onclick="shiftActivitiesMonth(-1)">◀</button>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--navy);min-width:150px;text-align:center" id="activities-month-label">—</div>
+          <button class="btn btn-sm" onclick="shiftActivitiesMonth(1)">▶</button>
+          <button class="btn btn-sm" onclick="jumpToCurrentActivitiesMonth()" id="activities-today-btn" style="display:none">Today</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer">
+          <input type="checkbox" id="activities-show-all" onchange="toggleActivitiesShowAll()"> Show All Time
+        </label>
+      </div>
       <div class="toolbar">
         <div class="filters">
           <select class="filter-select" id="f-type" onchange="renderTable()">
@@ -258,6 +275,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <select class="filter-select" id="f-status" onchange="renderTable()">
             <option value="">All Status</option><option>Planned</option><option>In Production</option><option>Ready</option><option>Published</option><option>Cancelled</option>
           </select>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2)">
+            <input type="checkbox" id="f-overdue" onchange="renderTable()"> ⚠ Overdue only
+          </label>
           <input class="filter-input" type="text" placeholder="Search..." id="f-search" oninput="renderTable()">
         </div>
         <button class="btn btn-primary" onclick="openForm()">+ New Activity</button>
@@ -1829,6 +1849,8 @@ let unsubMetricoolSettings = null;
 let unsubLeads = null;
 let dateSortDir = null; // null = no sort, 'asc', 'desc'
 let reqSortDir = 'desc'; // requests default newest-first
+let activitiesMonthOffset = 0; // 0 = current month, -1 = prev, +1 = next
+let activitiesShowAll = false;
 
 // ── AUTH ───────────────────────────────────────────────────────────────
 window.switchLoginMode = function(mode) {
@@ -2576,6 +2598,40 @@ function deptStyle(d) {
 // ── RENDER TABLE ──────────────────────────────────────────────────────
 const STATUS_CLASS = {'Planned':'b-planned','In Production':'b-production','Ready':'b-ready','Published':'b-published','Cancelled':'b-cancelled'};
 
+// A Planned activity whose own Start Date has already passed — surfaced so
+// planned-but-neglected work doesn't silently sit forgotten. Deliberately
+// scoped to Planned only (matches the exact complaint this was built for);
+// computed live, never stored, same convention as isActionOverdue().
+function isActivityOverdue(i) {
+  if (i.status !== 'Planned' || !i.startDate) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return new Date(i.startDate) < today;
+}
+
+function currentActivitiesPeriod() {
+  const d = new Date();
+  d.setDate(1); // avoid month-length overflow (e.g. Jan 31 + 1 month skipping to Mar)
+  d.setMonth(d.getMonth() + activitiesMonthOffset);
+  return d.toISOString().slice(0,7); // YYYY-MM
+}
+function activitiesPeriodLabel(period) {
+  const [y,m] = period.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString('en-US', {month:'long', year:'numeric'});
+}
+window.shiftActivitiesMonth = function(delta) {
+  activitiesMonthOffset += delta;
+  renderTable();
+}
+window.jumpToCurrentActivitiesMonth = function() {
+  activitiesMonthOffset = 0;
+  renderTable();
+}
+window.toggleActivitiesShowAll = function() {
+  activitiesShowAll = document.getElementById('activities-show-all').checked;
+  document.getElementById('activities-month-nav').style.opacity = activitiesShowAll ? '0.4' : '1';
+  renderTable();
+}
+
 window.toggleSort = function() {
   dateSortDir = dateSortDir==='asc' ? 'desc' : 'asc';
   document.getElementById('sort-arrow').textContent = dateSortDir==='asc' ? '↑' : '↓';
@@ -2587,13 +2643,26 @@ window.renderTable = function() {
   const deptF = document.getElementById('f-dept').value;
   const entityF = document.getElementById('f-entity').value;
   const statusF = document.getElementById('f-status').value;
+  const overdueOnly = document.getElementById('f-overdue').checked;
   const q = document.getElementById('f-search').value.toLowerCase();
+
+  const period = currentActivitiesPeriod();
+  document.getElementById('activities-month-label').textContent = activitiesPeriodLabel(period);
+  document.getElementById('activities-today-btn').style.display = activitiesMonthOffset !== 0 ? 'inline-block' : 'none';
 
   // Option B: every visible row is a peer. Campaign children (anything with
   // a parentCampaignId) are hidden from this flat list — they only appear
   // inside their parent campaign's drill-down panel.
   let filtered = ALL_INITIATIVES.filter(i=>{
     if(i.parentCampaignId) return false;
+    // "Overdue only" deliberately bypasses month-scoping and "Show All Time"
+    // entirely — an overdue item is by definition sitting in a past month,
+    // so hunting for it one month at a time would defeat the filter's point.
+    if(overdueOnly) {
+      if(!isActivityOverdue(i)) return false;
+    } else if(!activitiesShowAll && !(i.startDate||'').startsWith(period)) {
+      return false;
+    }
     if(typeF && i.type!==typeF) return false;
     if(deptF && i.department!==deptF) return false;
     if(entityF && !(i.entity||[]).includes(entityF)) return false;
@@ -2618,24 +2687,25 @@ window.renderTable = function() {
     ? filtered.map(i=>{
         const isCampaign = i.type === 'Campaign';
         const count = isCampaign ? childCount(i.id) : 0;
+        const overdue = isActivityOverdue(i);
         const typeCell = isCampaign
           ? `<span class="badge b-planned" style="cursor:pointer" onclick="openCampaignDrilldown('${i.id}')" title="View activities in this campaign">📦 Campaign${count?` · ${count}`:''}</span>`
           : `<span class="type-pill">${i.type||''}</span>`;
         return `
-      <tr>
+      <tr class="${overdue?'row-overdue':''}">
         <td>${typeCell}</td>
         <td style="font-weight:600">${i.title||''}</td>
         <td>${i.department||''}</td>
         <td>${(i.entity||[]).join(', ')}</td>
         <td style="font-size:11px;color:var(--text-3)">${i.startDate||'—'}${i.endDate?' → '+i.endDate:''}</td>
-        <td><span class="badge ${STATUS_CLASS[i.status]||'b-planned'}">${i.status||''}</span></td>
+        <td><span class="badge ${STATUS_CLASS[i.status]||'b-planned'}">${i.status||''}</span>${overdue?' <span class="badge b-cancelled">⚠ Overdue</span>':''}</td>
         <td class="row-actions">
           ${isCampaign?`<button class="btn btn-sm" onclick="openCampaignDrilldown('${i.id}')">View</button>`:''}
           <button class="btn btn-sm" onclick="editInitiative('${i.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="removeInitiative('${i.id}','${(i.title||'').replace(/'/g,"\\'")}')">Delete</button>
         </td>
       </tr>`;}).join('')
-    : '<tr><td colspan="7" class="empty">No activities found</td></tr>';
+    : `<tr><td colspan="7" class="empty">${overdueOnly ? 'No overdue activities — nice work' : activitiesShowAll ? 'No activities found' : `No activities found in ${activitiesPeriodLabel(period)}`}</td></tr>`;
 }
 
 // ── MARKETING ACTIONS ─────────────────────────────────────────────────
@@ -3133,7 +3203,7 @@ function renderBudgetTable(rows) {
     ? filtered.map(r => {
         const isInit = r.source === 'initiative';
         const srcBadge = isInit
-          ? `<span class="badge b-planned">Initiative</span>`
+          ? `<span class="badge b-planned">Activity</span>`
           : `<span class="badge b-ready">Expense</span>`;
         const actions = isInit ? '' :
           `<td class="row-actions">
