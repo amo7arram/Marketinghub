@@ -64,9 +64,9 @@ Standalone reference calendar of health awareness days, Saudi/Islamic occasions,
 
 ---
 
-## `promotions`
+## `promotions` — ⚠️ legacy, retired
 
-Sales/marketing promotions (discount packages, seasonal offers).
+Sales/marketing promotions (discount packages, seasonal offers), manually entered one at a time. **Superseded by `offers_catalog` below** — the admin.html Promotions tab, the public Promotions Calendar page, and the Well-span page's promotions integration were all removed. Existing documents are left in place untouched (same convention as the old `metrics` collection) — nothing reads or writes this collection anymore.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -77,9 +77,36 @@ Sales/marketing promotions (discount packages, seasonal offers).
 | `discountPct` | number | Auto-calculated from the two prices above |
 | `startDate`, `endDate` | string | |
 | `conditions` | string | Fine print |
-| `isWellspan` | boolean | Shows on the Well-span Program page if true |
+| `isWellspan` | boolean | Used to show on the Well-span Program page — no longer read anywhere |
 | `leadsGenerated`, `estimatedBookings` | number \| null | |
 | `createdAt` | Timestamp | |
+
+---
+
+## `offers_catalog`
+
+Excel-driven public price/discount catalog — replaces `promotions` above. Admin uploads Finance's master Excel sheet (`admin.html`'s "Offers Catalog" tab); each publish wholesale-replaces the entire catalog. Read by the public `offers.html` page and by `call-center.html`'s read-only Offers tab.
+
+**Doc ID = a slugified branch key** (e.g. `imc_jeddah`), sharded one document per branch rather than one collection-wide document — a deliberate scaling precaution, since Firestore documents cap at 1 MiB and the real ongoing catalog is very likely larger than the 287-row National Day campaign subset this was modeled on (see `national-day-offers.html`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `branchLabelEN`, `branchLabelAR` | string | Display name for this branch's tab |
+| `offers` | array of objects | One entry per Excel row for this branch: `{code, description, category, arabic, price, discountedPrice, discountPct}`. `discountPct` is always computed from `price`/`discountedPrice` at import time, never trusted from a sheet column, so it can't drift out of sync with the two prices. |
+| `updatedAt` | Timestamp | |
+
+**Column detection is a best guess** (see `admin.html`'s import function), informed by the National Day precedent's exact schema — **not yet verified against Finance's actual current sheet**. The import's preview step (per-branch/category counts) is the safety net before anything publishes.
+
+## `config/offers_catalog_meta`
+
+```
+config/offers_catalog_meta = {
+  branches: [ { id, labelEN, labelAR, count }, ... ],
+  rowCount: <total offers across all branches>,
+  updatedAt: Timestamp,
+}
+```
+Public-readable single document — lets `offers.html` and `call-center.html`'s Offers tab discover which branch documents exist (and render tab labels immediately) with one small read, instead of listing the whole `offers_catalog` collection.
 
 ---
 
@@ -372,10 +399,13 @@ team_members
 entities.name
   ├── referenced by initiatives.entity[]
   ├── referenced by bd_cards.entity
-  └── referenced by promotions.entity[]
+  └── referenced by promotions.entity[]              [⚠️ legacy collection, see above]
 
 marketing_actions
   └── initiatives (linkedInitiativeId → initiative)   [optional, admin-managed]
+
+offers_catalog (branch slug = doc ID)
+  └── config/offers_catalog_meta                      [lists which branch docs exist]
 ```
 
 None of these relationships are enforced by Firestore itself — every "reference" is just a string ID or name stored on the child document, validated only by application code at write time. A real relational (or rigorously-validated document) database would be a meaningful reliability improvement in any SaaS rebuild.

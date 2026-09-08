@@ -13,14 +13,13 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Dashboard** — period-navigable (last 3 months) KPI overview: social media performance (synced from Metricool, with month-over-month trend arrows), **Marketing Output** (quantified deliverable counts — Videos/Social Posts/Events/Print/Website Updates — for the selected month; see `deliverableTypeFor()` in `index.html` for exactly what counts), leads-by-department breakdown, activity-by-department-or-entity breakdown (toggle between the two; click a segment or legend entry for a per-deliverable-type breakdown of that department/entity, reusing the same shared detail panel used for campaign/event rows), this-month campaign/health-day list (shows a real thumbnail of the published post where Metricool has a match — see `initiatives.socialImageUrl` in `docs/DATA_MODEL.md` — falling back to a plain department-colored dot otherwise; click any campaign/event row to open the shared detail panel, which shows the same image full-size at the top when present), featured initiatives
 - **SM Analytics** — per-network (Instagram/TikTok/LinkedIn/X) stat tiles with trend deltas, plus a full-history trend chart per network, all synced from Metricool
 - **SM Calendar** — grid and full table view of scheduled social content and physician videos, filterable by department/entity/channel, click-through to full detail (captions, headline, assets)
-- **Promotions Calendar** — active/upcoming promotions with pricing and discount %
-- **Well-span Program** — wellness packages plus any promotion flagged `isWellspan`
+- **Well-span Program** — wellness packages only (its old promotions integration was removed along with the retired Promotions feature — see "Offers Catalog" below)
 - **Loyalty Program** — loyalty card tiers and benefits
 - **Business Development** — BD activity feed plus initiatives flagged `featuredBD`, with YTD KPI progress against BD targets
 - **Leads & Attribution** — aggregated (no-PII) lead funnel: total/reached/unreached/missed/booked, monthly trend, department & entity breakdowns, per-campaign CPL/CPA/ROI table. A "🔒 View Individual Leads (Agent Access)" link at the top opens `call-center.html` in a new tab — this page never reads raw lead records itself (see the PII boundary in `docs/ARCHITECTURE.md` §4), the link only points to where they're actually protected by that page's own agent/admin login gate
 - **All Campaigns / Events / Dept Campaigns / Health Days / Content Library / Print Materials** — browsable, filterable views of the initiatives collection sliced different ways
 - **Brand Resources** — downloadable brand assets
-- **Team Tools (sidebar)** — a "📝 Submit a Request ↗" link to `request.html`, opened in a new tab
+- **Team Tools (sidebar)** — a "🏷 Offers & Promotions ↗" link to `offers.html` and a "📝 Submit a Request ↗" link to `request.html`, both opened in a new tab
 
 ---
 
@@ -56,6 +55,13 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 ### Well-span / Loyalty
 - Package and loyalty card CRUD, shown on the corresponding public pages
+
+### Offers Catalog — replaces the retired Promotions feature
+- Excel-driven, not manually entered: upload Finance's master price/discount sheet, review a preview (detected columns, per-branch/category counts, skipped-row count), then publish — this wholesale-replaces the entire live catalog every time, so re-uploading whenever Finance's sheet changes is the entire maintenance workflow
+- Data is sharded one Firestore document per branch (not one giant document), grouped automatically from a Branch/Entity column in the sheet — no fixed list of branches, whatever the sheet contains becomes the catalog's tabs
+- Column detection is a best guess informed by this app's own `national-day-offers.html` (likely built from the same Finance data pipeline) — **not yet verified against Finance's real current sheet**; the preview step is the safety net before anything goes live
+- Shows last-updated timestamp, total offer count, and a live per-branch breakdown table at the top, so it's always obvious how current the public catalog is
+- Publishes to the public `offers.html` page (see below) and to Contact Center Control's read-only Offers tab
 
 ### Landing Pages
 - Build lead-capture pages entirely from the admin: Title, Slug (auto-generated from Title, editable until first save, then locked so a live campaign URL is never silently broken), Headline, Subheadline, Body Content, optional Hero Image URL (pasted link — no file upload exists anywhere in this app), CTA Button Text, linked Campaign (for attribution), Department, Entity, and a Draft/Published status
@@ -143,7 +149,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 ## Contact Center Control (`call-center.html`) — `role: agent` or `admin`
 
-Tab-based: **Leads** and **Promotions**. (A third Inbox tab — social media messages via Metricool — was investigated but skipped: every Metricool Inbox endpoint returns 401 for this account, pointing to Inbox not being enabled on the Metricool plan, not a code issue.)
+Tab-based: **Leads** and **Offers**. (A third Inbox tab — social media messages via Metricool — was investigated but skipped: every Metricool Inbox endpoint returns 401 for this account, pointing to Inbox not being enabled on the Metricool plan, not a code issue.)
 
 ### Leads tab
 - **My Leads / All Leads** — defaults to leads assigned to the logged-in agent (`assignedAgentUid`); admins default to All Leads. A filter toggle switches between the two — not a hard access boundary, just the default view. Assigned-agent shown read-only.
@@ -156,8 +162,8 @@ Tab-based: **Leads** and **Promotions**. (A third Inbox tab — social media mes
 - **Cannot:** delete leads, bulk-edit, import (Excel or Sheet), add new leads, reassign a lead to a different agent, or reassign Department/Entity/Campaign
 - Deliberately excludes campaign cost/budget data from view
 
-### Promotions tab
-- Read-only card grid of promotions (title, discount %, price, department/entity tags, Active/Upcoming/Expired status), filterable — lets agents reference current offers while on a call
+### Offers tab
+- Read-only, sourced from the same `offers_catalog` the public `offers.html` page reads — branch tabs, category chips, search, bilingual EN/AR cards with pricing — lets agents reference the exact current catalog while on a call, using the Firebase SDK (already loaded here for leads) rather than `offers.html`'s REST-only approach, since this authenticated internal tool has no public-load-time pressure
 
 ### Both tabs
 - **"📋 Process Reference"** link (topbar) to `docs/lead-management-process.html`
@@ -191,6 +197,18 @@ One reusable template serving every landing page an admin builds — the URL is 
 - Never imports the Firebase SDK or `firebase-data.js` at all (see above) — no read access to the `leads` collection at all, and no write access to anything else
 - Footer links to IMC's real Terms & Conditions and Privacy Policy & Cookie Notice pages (`imc.med.sa`), plus the full address/website/working hours
 - **Google Analytics, off by default, consent-gated**: if an admin has configured a Measurement ID (Settings → Google Analytics), a cookie-consent banner appears on first visit (per browser, remembered via `localStorage`) linking to the Privacy Policy; GA only loads after Accept. A `generate_lead` event (page slug, campaign, department — never name/email/phone) fires only on a genuine successful submission, not on a spam-caught one
+
+---
+
+## Offers Catalog (`offers.html`) — public, no login, full branded destination
+
+Unlike `landing.html`/`national-day-offers.html` (single-purpose, minimal), this page is meant to feel like a proper browsable public destination — since the intent is for `imcoffers.com` to eventually redirect here, replacing Finance's own standalone site.
+
+- **Full page shell**: a sticky nav bar (IMC logo + a link to IMC's official website), a hero/intro section with bilingual copy and a search box, and the same footer used on `landing.html` (address, hours, Terms & Privacy links) — not just a centered logo like the minimal public pages
+- Branch tabs (populated from `config/offers_catalog_meta`, not hardcoded to any fixed list) → category filter chips per branch → a bilingual EN/AR offer card grid (old/new price, discount badge, `tel:` call-to-book button) — the same tab/chip/card UX proven in `national-day-offers.html`, generalized to read from Firestore instead of a hardcoded constant
+- **Search box** filters the active branch's offers by description/category/Arabic text — the one interaction the National Day precedent didn't have, added specifically for the "browsable catalog" feel
+- **Fast-loading by design**, same reasoning and mechanism as `landing.html`: no Firebase SDK at all, plain REST calls against Firestore, which enforce the identical Security Rules regardless of transport
+- Only ever reads `config/offers_catalog_meta` and `offers_catalog/{branchId}` documents — no write capability anywhere on this page, no PII of any kind involved
 
 ---
 

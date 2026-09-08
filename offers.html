@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMC Offers & Promotions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#00539B;--gold:#C8A96E;--bg:#F0F2F7;--surface:#fff;--border:#E2E6F0;--border-strong:#C5CBD8;
+  --text:#0F1423;--text-2:#3D4460;--text-3:#8890A8;--green:#1DB87A;--red:#E0392B;
+  --radius:6px;--radius-lg:10px;--shadow:0 1px 4px rgba(15,20,35,0.07);--shadow-lg:0 8px 28px rgba(15,20,35,0.12);
+}
+html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.hidden{display:none !important}
+.ar{font-family:'IBM Plex Sans Arabic',sans-serif;direction:rtl}
+
+/* NAV */
+.site-nav{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.site-nav-inner{max-width:1100px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px}
+.site-nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.site-nav-logo img{height:32px}
+.site-nav-title{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--text);flex:1}
+.site-nav-link{font-size:12px;font-weight:600;color:var(--navy);text-decoration:none;white-space:nowrap}
+.site-nav-link:hover{text-decoration:underline}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#003766 100%);color:#fff;padding:44px 24px 60px;text-align:center}
+.hero-inner{max-width:700px;margin:0 auto}
+.hero h1{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;margin-bottom:8px}
+.hero p{font-size:14px;color:#D9E8F5;line-height:1.6;margin-bottom:22px}
+.search-box{width:100%;max-width:480px;padding:13px 18px;border-radius:30px;border:none;font-family:inherit;font-size:14px;box-shadow:var(--shadow-lg)}
+.search-box:focus{outline:2px solid var(--gold)}
+
+/* PAGE */
+.page-wrap{max-width:1100px;margin:-28px auto 0;padding:0 24px 40px;position:relative;z-index:2}
+.catalog-card{background:var(--surface);border-radius:16px;box-shadow:var(--shadow-lg);padding:24px}
+
+/* SKELETON */
+.skel{background:linear-gradient(90deg,var(--border) 25%,#EDEFF5 37%,var(--border) 63%);background-size:400% 100%;animation:skel-shimmer 1.4s ease infinite;border-radius:8px}
+@keyframes skel-shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+/* TABS + CHIPS */
+.branch-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.branch-tab{background:var(--bg);border:none;color:var(--text-2);font-weight:600;font-size:13px;padding:10px 20px;border-radius:10px;cursor:pointer;text-align:center;line-height:1.4}
+.branch-tab .branch-tab-ar{display:block;font-size:11px;font-weight:500;margin-top:1px}
+.branch-tab.active{background:var(--navy);color:#fff}
+.category-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+.chip{background:var(--surface);border:1px solid var(--border-strong);color:var(--navy);font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;cursor:pointer}
+.chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.offers-count{font-size:12px;color:var(--text-3);margin-bottom:14px}
+
+/* OFFERS GRID */
+.offers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.offer-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
+.offer-card-body{padding:16px}
+.offer-category{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:var(--navy);font-weight:700;margin-bottom:6px}
+.offer-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:3px}
+.offer-title-ar{font-size:12px;color:var(--text-3);margin-bottom:10px}
+.offer-price-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.offer-price-old{font-size:12px;color:var(--text-3);text-decoration:line-through}
+.offer-price-new{font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--navy)}
+.offer-discount-badge{background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+.offer-call-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--bg);color:var(--navy);text-decoration:none;font-size:12px;font-weight:700;padding:9px;border-radius:8px}
+.offer-call-btn:hover{background:var(--navy);color:#fff}
+.offers-empty{grid-column:1/-1;text-align:center;padding:50px 20px;color:var(--text-3);font-size:13px}
+
+/* FOOTER */
+.site-footer{text-align:center;margin:40px auto 0;padding:24px;max-width:1100px;border-top:1px solid var(--border);font-size:12px;color:var(--text-3);line-height:1.7}
+.site-footer a{color:var(--navy);text-decoration:none}
+.site-footer .footer-org{font-weight:700;color:var(--text-2)}
+.site-footer .footer-hours-title{font-weight:600;color:var(--text-2);margin-top:10px}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a class="site-nav-logo" href="https://imc.med.sa" target="_blank" rel="noopener"><img src="logo.jpg" alt="IMC"></a>
+    <div class="site-nav-title">Offers &amp; Promotions</div>
+    <a class="site-nav-link" href="https://imc.med.sa" target="_blank" rel="noopener">IMC Official Website ↗</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Offers &amp; Promotions</h1>
+    <p>Browse current prices and discounts across all IMC facilities.<br><span class="ar">تصفح الأسعار والعروض الحالية في جميع فروع المركز الطبي الدولي</span></p>
+    <input class="search-box" id="search-input" placeholder="Search offers... / ابحث عن عرض" oninput="renderOffersGrid()">
+  </div>
+</section>
+
+<main class="page-wrap">
+  <div class="catalog-card">
+    <div id="loading-state">
+      <div class="skel" style="height:38px;width:280px;margin-bottom:16px"></div>
+      <div class="skel" style="height:28px;width:100%;margin-bottom:18px"></div>
+      <div class="skel" style="height:120px;width:100%"></div>
+    </div>
+    <div id="content-state" class="hidden">
+      <div class="branch-tabs" id="branch-tabs"></div>
+      <div class="category-chips" id="category-chips"></div>
+      <div class="offers-count" id="offers-count"></div>
+      <div class="offers-grid" id="offers-grid"></div>
+    </div>
+    <div id="empty-state" class="hidden" style="text-align:center;padding:50px 20px;color:var(--text-3);font-size:13px">
+      No offers are published yet — please check back soon.
+    </div>
+  </div>
+</main>
+
+<div class="site-footer">
+  <div class="footer-org">International Medical Center</div>
+  <div>Hail Street, Al Ruwais, Jeddah 23214, Saudi Arabia</div>
+  <div><a href="https://imc.med.sa" target="_blank" rel="noopener">https://imc.med.sa</a></div>
+  <div class="footer-hours-title">Working Hours</div>
+  <div>Outpatient Clinics: Saturday – Thursday, 9:00 AM – 10:00 PM</div>
+  <div>Emergency: 24/7</div>
+  <div style="margin-top:10px">
+    <a href="https://www.imc.med.sa/terms-conditions" target="_blank" rel="noopener">Terms &amp; Conditions</a>
+    &nbsp;·&nbsp;
+    <a href="https://www.imc.med.sa/privacy-policy-cookie-notice" target="_blank" rel="noopener">Privacy Policy &amp; Cookie Notice</a>
+  </div>
+</div>
+
+<script>
+// ── FIRESTORE VIA PLAIN REST, NOT THE SDK ──────────────────────────────────
+// Same reasoning as landing.html: this page is "visited publicly by almost
+// everyone," so it never loads the Firebase SDK (Auth included) — just
+// plain fetch() against Firestore's REST API, which enforces the exact same
+// Security Rules as the SDK regardless of transport.
+const FIREBASE_PROJECT_ID = 'imc-marketing-strategy-2-6905e';
+const FIREBASE_API_KEY = 'AIzaSyDLktYF2OOJ4XSF666eMuh2QGjropF-zfQ';
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+const CALL_NUMBER = '920027778';
+
+// Full recursive unwrap (unlike landing.html's scalar-only version) — this
+// page's data is arrays of maps (branches, offers), not flat documents.
+function fsUnwrap(v) {
+  if (!v) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return parseInt(v.integerValue, 10);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('mapValue' in v) return fsUnwrapFields(v.mapValue.fields);
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fsUnwrap);
+  return null; // nullValue
+}
+function fsUnwrapFields(fields) {
+  const out = {};
+  for (const k in (fields || {})) out[k] = fsUnwrap(fields[k]);
+  return out;
+}
+
+async function getMeta() {
+  const res = await fetch(`${FIRESTORE_BASE}/config/offers_catalog_meta?key=${FIREBASE_API_KEY}`);
+  if (!res.ok) return null;
+  const raw = await res.json();
+  return fsUnwrapFields(raw.fields);
+}
+async function getBranch(id) {
+  const res = await fetch(`${FIRESTORE_BASE}/offers_catalog/${encodeURIComponent(id)}?key=${FIREBASE_API_KEY}`);
+  if (!res.ok) return null;
+  const raw = await res.json();
+  return fsUnwrapFields(raw.fields);
+}
+
+function show(id) {
+  ['loading-state','content-state','empty-state'].forEach(x =>
+    document.getElementById(x).classList.toggle('hidden', x !== id)
+  );
+}
+function fmtNum(n) { return Math.round(n||0).toLocaleString('en-US'); }
+
+const branchCache = {};
+let branchList = [];
+let currentBranchId = null;
+let currentCategory = 'ALL';
+
+async function init() {
+  show('loading-state');
+  try {
+    const meta = await getMeta();
+    if (!meta || !meta.branches || !meta.branches.length) { show('empty-state'); return; }
+    branchList = meta.branches;
+    renderBranchTabs();
+    await loadBranch(branchList[0].id);
+    show('content-state');
+  } catch (e) {
+    show('empty-state');
+  }
+}
+
+function renderBranchTabs() {
+  document.getElementById('branch-tabs').innerHTML = branchList.map(b =>
+    `<button class="branch-tab ${b.id===currentBranchId?'active':''}" onclick="selectBranch('${b.id}')">${b.labelEN}${b.labelAR?`<span class="branch-tab-ar ar">${b.labelAR}</span>`:''}</button>`
+  ).join('');
+}
+
+window.selectBranch = async function(id) {
+  await loadBranch(id);
+}
+
+async function loadBranch(id) {
+  if (!branchCache[id]) {
+    const data = await getBranch(id);
+    branchCache[id] = data || { offers: [] };
+  }
+  currentBranchId = id;
+  currentCategory = 'ALL';
+  renderBranchTabs();
+  renderCategoryChips();
+  renderOffersGrid();
+}
+
+function renderCategoryChips() {
+  const offers = branchCache[currentBranchId]?.offers || [];
+  const cats = [...new Set(offers.map(o => o.category).filter(Boolean))];
+  const chips = ['ALL', ...cats];
+  document.getElementById('category-chips').innerHTML = chips.map(c =>
+    `<button class="chip ${c===currentCategory?'active':''}" onclick="selectCategory(${JSON.stringify(c)})">${c==='ALL'?'All Offers':c}</button>`
+  ).join('');
+}
+window.selectCategory = function(cat) {
+  currentCategory = cat;
+  renderCategoryChips();
+  renderOffersGrid();
+}
+
+window.renderOffersGrid = function() {
+  const branch = branchCache[currentBranchId];
+  let offers = branch?.offers || [];
+  if (currentCategory !== 'ALL') offers = offers.filter(o => o.category === currentCategory);
+  const q = (document.getElementById('search-input').value || '').trim().toLowerCase();
+  if (q) offers = offers.filter(o =>
+    (o.description||'').toLowerCase().includes(q) ||
+    (o.arabic||'').includes(q) ||
+    (o.category||'').toLowerCase().includes(q)
+  );
+
+  const countEl = document.getElementById('offers-count');
+  if (countEl) countEl.textContent = `${offers.length} offer${offers.length===1?'':'s'}`;
+
+  const grid = document.getElementById('offers-grid');
+  if (!grid) return;
+  if (!offers.length) {
+    grid.innerHTML = '<div class="offers-empty">No offers found — try a different search or branch.</div>';
+    return;
+  }
+  grid.innerHTML = offers.map(o => {
+    const hasDiscount = o.discountPct > 0;
+    return `<div class="offer-card">
+      <div class="offer-card-body">
+        ${o.category?`<div class="offer-category">${o.category}</div>`:''}
+        <div class="offer-title">${o.description||''}</div>
+        ${o.arabic?`<div class="offer-title-ar ar">${o.arabic}</div>`:''}
+        <div class="offer-price-row">
+          ${hasDiscount?`<span class="offer-price-old">SAR ${fmtNum(o.price)}</span>`:''}
+          <span class="offer-price-new">SAR ${fmtNum(o.discountedPrice)}</span>
+          ${hasDiscount?`<span class="offer-discount-badge">-${o.discountPct}%</span>`:''}
+        </div>
+        <a class="offer-call-btn" href="tel:${CALL_NUMBER}">📞 Call ${CALL_NUMBER}</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>

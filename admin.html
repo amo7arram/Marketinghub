@@ -229,7 +229,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <div class="tab-group-label" onclick="toggleTabGroup('group-bd')">Business Dev <span class="tab-group-arrow">▾</span></div>
       <div class="tab-dropdown">
         <div class="tab-dropdown-item" onclick="switchTab('bd',this,'group-bd')">Business Dev</div>
-        <div class="tab-dropdown-item" onclick="switchTab('promotions',this,'group-bd')">Promotions</div>
+        <div class="tab-dropdown-item" onclick="switchTab('offerscatalog',this,'group-bd')">Offers Catalog</div>
         <div class="tab-dropdown-item" onclick="switchTab('wellspan',this,'group-bd')">Well-span</div>
         <div class="tab-dropdown-item" onclick="switchTab('loyalty',this,'group-bd')">Loyalty</div>
       </div>
@@ -288,26 +288,29 @@ tr.row-overdue:hover td{background:#FFD6D6}
       </table>
     </div>
 
-    <!-- PROMOTIONS PAGE -->
-    <div class="page" id="page-promotions">
+    <!-- OFFERS CATALOG PAGE — Excel-driven, replaces the retired Promotions tab -->
+    <div class="page" id="page-offerscatalog">
       <div class="toolbar">
-        <div class="filters">
-          <select class="filter-select" id="promo-dept-filter" onchange="renderPromotionsTable()"><option value="">All Departments</option></select>
-          <select class="filter-select" id="promo-entity-filter" onchange="renderPromotionsTable()"><option value="">All Entities</option></select>
-          <select class="filter-select" id="promo-status-filter" onchange="renderPromotionsTable()">
-            <option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option>
-          </select>
-        </div>
-        <button class="btn btn-primary" onclick="openPromoForm()">+ New Promotion</button>
+        <div style="font-size:12px;color:var(--text-3)" id="oc-meta-status">Loading catalog status…</div>
+        <label class="btn btn-primary" style="cursor:pointer">
+          📁 Upload Offers Excel
+          <input type="file" id="oc-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleOffersExcelUpload(this)">
+        </label>
       </div>
-      <table>
-        <thead><tr>
-          <th>Title</th><th>Department</th><th>Entity</th>
-          <th>Original (SAR)</th><th>Discounted (SAR)</th><th>Discount</th>
-          <th onclick="togglePromoSort()" style="cursor:pointer;user-select:none">Dates <span id="promo-sort-arrow">↓</span></th>
-          <th>Status</th><th>Actions</th>
-        </tr></thead>
-        <tbody id="promotions-table-body"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
+      <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:16px;line-height:1.6">
+        ℹ️ Publishing <strong>replaces the entire public catalog</strong> — re-upload Finance's sheet anytime it changes. The public page at <code>offers.html</code> always reflects whatever was last published here.
+      </div>
+      <div id="oc-preview-wrap" style="display:none">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Preview — review before publishing</div>
+        <div id="oc-preview-summary" style="font-size:12px;color:var(--text-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;line-height:1.8"></div>
+        <div style="display:flex;gap:8px;margin-bottom:24px">
+          <button class="btn" onclick="cancelOffersImport()">Cancel</button>
+          <button class="btn btn-primary" onclick="publishOffersImport()">✓ Publish Catalog</button>
+        </div>
+      </div>
+      <table id="oc-live-table" style="display:none">
+        <thead><tr><th>Branch</th><th>Offers</th></tr></thead>
+        <tbody id="oc-live-table-body"></tbody>
       </table>
     </div>
 
@@ -1276,58 +1279,6 @@ tr.row-overdue:hover td{background:#FFD6D6}
   </div>
 </div>
 
-<!-- ── PROMOTION FORM MODAL ── -->
-<div class="modal-overlay" id="promo-overlay">
-  <div class="modal" style="width:540px">
-    <div class="modal-header">
-      <div class="modal-title" id="promo-form-title">New Promotion</div>
-      <button class="modal-close" onclick="closePromoForm()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="field-group"><label class="field-label">Title<span style="color:var(--red)">*</span></label><input class="field-input" id="promo-title" placeholder="e.g. Ramadan Cardiology Check-up Package"></div>
-      <div class="field-group"><label class="field-label">Description</label><textarea class="field-textarea" id="promo-description" placeholder="What's included in this promotion?"></textarea></div>
-      <div class="field-row">
-        <div class="field-group"><label class="field-label">Department</label><select class="field-select" id="promo-department"></select></div>
-        <div class="field-group"><label class="field-label">Entity (select all that apply)</label><div class="chip-select" id="promo-entity"></div></div>
-      </div>
-      <div class="field-section-title">Pricing</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
-        <div class="field-group" style="margin:0">
-          <label class="field-label">Original Price (SAR)<span style="color:var(--red)">*</span></label>
-          <input class="field-input" type="number" id="promo-original" placeholder="0" min="0" oninput="calcDiscount()">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">Discounted Price (SAR)<span style="color:var(--red)">*</span></label>
-          <input class="field-input" type="number" id="promo-discounted" placeholder="0" min="0" oninput="calcDiscount()">
-        </div>
-        <div class="field-group" style="margin:0">
-          <label class="field-label">Discount %</label>
-          <div style="padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:18px;font-weight:800;color:var(--green);text-align:center" id="promo-pct">—</div>
-        </div>
-      </div>
-      <div class="field-section-title">Dates</div>
-      <div class="field-row">
-        <div class="field-group"><label class="field-label">Start Date<span style="color:var(--red)">*</span></label><input class="field-input" type="date" id="promo-start"></div>
-        <div class="field-group"><label class="field-label">End Date</label><input class="field-input" type="date" id="promo-end"></div>
-      </div>
-      <div class="field-group"><label class="field-label">Special Conditions</label><textarea class="field-textarea" style="min-height:50px" id="promo-conditions" placeholder="e.g. Valid for new patients only. Not combinable with other offers."></textarea></div>
-      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--border);margin-top:6px">
-        <input type="checkbox" id="promo-iswellspan" style="width:16px;height:16px;cursor:pointer;accent-color:var(--green)">
-        <label for="promo-iswellspan" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer;flex:1">💚 Include in Well-span Program page</label>
-      </div>
-      <div class="field-section-title">Results (optional — fill after campaign ends)</div>
-      <div class="field-row">
-        <div class="field-group"><label class="field-label">Leads Generated</label><input class="field-input" type="number" id="promo-leads" placeholder="0" min="0"></div>
-        <div class="field-group"><label class="field-label">Estimated Bookings</label><input class="field-input" type="number" id="promo-bookings" placeholder="0" min="0"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closePromoForm()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePromotion()">Save Promotion</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── HEALTH DAY FORM MODAL ── -->
 <div class="modal-overlay" id="healthday-overlay">
   <div class="modal" style="width:460px">
@@ -1760,7 +1711,7 @@ import {
   getLandingPageBySlug, slugify, LANDING_PAGE_STATUSES,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
   getAnnualBudget, setAnnualBudget,
-  watchPromotions, addPromotion, updatePromotion, deletePromotion, promoStatus,
+  watchOffersCatalogMeta, publishOffersCatalog,
   watchBdCards, addBdCard, updateBdCard, deleteBdCard,
   watchBdTargets, setBdTargets,
   getBrandVoice, setBrandVoice, watchBrandVoice,
@@ -1803,7 +1754,9 @@ let ALL_LANDING_PAGES = [];
 let editingLandingPageSlug = null; // null = creating; non-null = editing (slug locked)
 let unsubLandingPages = null;
 let ALL_EXPENSES = [];
-let ALL_PROMOTIONS = [];
+let OFFERS_CATALOG_META = null;
+let pendingOffersBranches = null; // parsed-but-not-yet-published Excel import
+let unsubOffersCatalogMeta = null;
 let ALL_BD_CARDS = [];
 let ALL_WELLSPAN = [];
 let ALL_LOYALTY = [];
@@ -1824,10 +1777,7 @@ let currentType = 'Campaign';
 let editingId = null;
 let editingResourceId = null;
 let editingExpenseId = null;
-let editingPromoId = null;
 let expSortDir = 'desc';
-let promoSortDir = 'desc';
-let selectedPromoEntities = [];
 let selectedEntities = [];
 let selectedChannels = [];
 let unsubInitiatives = null;
@@ -1837,7 +1787,6 @@ let unsubDeptRevenue = null;
 let unsubResources = null;
 let unsubRequests = null;
 let unsubExpenses = null;
-let unsubPromotions = null;
 let unsubBdCards = null;
 let unsubWellspan = null;
 let unsubLoyalty = null;
@@ -1968,7 +1917,7 @@ watchAuth(async user => {
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
     if(unsubExpenses) unsubExpenses();
-    if(unsubPromotions) unsubPromotions();
+    if(unsubOffersCatalogMeta) unsubOffersCatalogMeta();
     if(unsubBdCards) unsubBdCards();
     if(unsubWellspan) unsubWellspan();
     if(unsubLoyalty) unsubLoyalty();
@@ -1993,7 +1942,7 @@ function initData() {
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
-  unsubPromotions   = watchPromotions(data   => { ALL_PROMOTIONS  = data; renderPromotionsTable(); });
+  unsubOffersCatalogMeta = watchOffersCatalogMeta(data => { OFFERS_CATALOG_META = data; renderOffersCatalogStatus(); });
   unsubBdCards      = watchBdCards(data      => { ALL_BD_CARDS    = data; renderBdTable(); });
   unsubWellspan     = watchWellspanPackages(data => { ALL_WELLSPAN = data; renderWellspanTable(); });
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
@@ -2051,7 +2000,6 @@ function populateEntitySelects() {
   const optionsHtml = '<option value="">All / General</option>' + names.map(e=>`<option>${e}</option>`).join('');
   const filterOptionsHtml = '<option value="">All Entities</option>' + names.map(e=>`<option>${e}</option>`).join('');
   const chipsHtml = names.map(e=>`<div class="chip" data-val="${e}" onclick="toggleChip(this,'entity')">${e}</div>`).join('');
-  const promoChipsHtml = names.map(e=>`<div class="chip" data-val="${e}" onclick="togglePromoChip(this)">${e}</div>`).join('');
 
   const fEntity = document.getElementById('f-entity');
   if(fEntity) fEntity.innerHTML = filterOptionsHtml;
@@ -2064,19 +2012,6 @@ function populateEntitySelects() {
 
   const expEntityFilter = document.getElementById('exp-entity-filter');
   if(expEntityFilter) expEntityFilter.innerHTML = filterOptionsHtml;
-
-  const promoEntity = document.getElementById('promo-entity');
-  if(promoEntity) {
-    // Preserve any already-selected chips (e.g. mid-edit) where possible
-    const prevSelected = [...promoEntity.querySelectorAll('.chip.active')].map(c=>c.dataset.val);
-    promoEntity.innerHTML = promoChipsHtml;
-    promoEntity.querySelectorAll('.chip').forEach(c=>{
-      if(prevSelected.includes(c.dataset.val)) c.classList.add('active');
-    });
-  }
-
-  const promoEntityFilter = document.getElementById('promo-entity-filter');
-  if(promoEntityFilter) promoEntityFilter.innerHTML = filterOptionsHtml;
 
   const fldEntity = document.getElementById('fld-entity');
   if(fldEntity) {
@@ -2194,10 +2129,6 @@ function populateStaticSelects() {
   // Expense form
   document.getElementById('exp-type').innerHTML = EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
 
-  // Promotion form
-  document.getElementById('promo-department').innerHTML = DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  // Promotion filters
-  document.getElementById('promo-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   // Budget table filters
   document.getElementById('exp-type-filter').innerHTML += EXPENSE_TYPES.map(t=>`<option>${t}</option>`).join('');
   const now = new Date();
@@ -2942,138 +2873,129 @@ window.renderMarketingActionsTable = function() {
     : '<tr><td colspan="7" class="empty">No marketing actions found</td></tr>';
 }
 
-// ── PROMOTIONS ────────────────────────────────────────────────────────────
-const PROMO_STATUS_CLASS = {'Active':'b-published','Upcoming':'b-planned','Expired':'b-cancelled'};
-let promoSortAsc = false;
-
-window.togglePromoChip = function(el) {
-  el.classList.toggle('active');
-  const val = el.dataset.val;
-  const idx = selectedPromoEntities.indexOf(val);
-  if(el.classList.contains('active') && idx===-1) selectedPromoEntities.push(val);
-  if(!el.classList.contains('active') && idx>-1) selectedPromoEntities.splice(idx,1);
-}
-
-window.calcDiscount = function() {
-  const orig = parseFloat(document.getElementById('promo-original').value)||0;
-  const disc = parseFloat(document.getElementById('promo-discounted').value)||0;
-  const pctEl = document.getElementById('promo-pct');
-  if(orig > 0 && disc >= 0 && disc < orig) {
-    const pct = Math.round((orig-disc)/orig*100);
-    pctEl.textContent = pct + '%';
-    pctEl.style.color = 'var(--green)';
-  } else {
-    pctEl.textContent = '—';
-    pctEl.style.color = 'var(--text-3)';
+// ── OFFERS CATALOG (Excel-driven, replaces the retired Promotions above) ──
+// Column detection is a best guess informed by this app's own
+// national-day-offers.html (a real static page very likely built from the
+// same Finance data pipeline: code/description/billgroup/price/
+// discount_pct/discounted_price/arabic/category, per branch) — it has not
+// been tested against Finance's actual live sheet. The preview step below
+// is the safety net: nothing publishes without a human confirming the
+// detected columns and per-branch counts look right.
+function offersColNorm(h) { return h.toLowerCase().replace(/[^a-z0-9]/g,''); }
+function findOffersCol(headers, used, ...candidates) {
+  for (const c of candidates) {
+    const h = headers.find(h => !used.has(h) && offersColNorm(h).includes(c));
+    if (h) { used.add(h); return h; }
   }
+  return null;
 }
 
-window.openPromoForm = function(p=null) {
-  editingPromoId = p ? p.id : null;
-  document.getElementById('promo-form-title').textContent = p ? 'Edit Promotion' : 'New Promotion';
-  selectedPromoEntities = p ? [...(p.entity||[])] : [];
-  document.getElementById('promo-title').value       = p?.title || '';
-  document.getElementById('promo-description').value = p?.description || '';
-  document.getElementById('promo-department').value  = p?.department || DEPARTMENTS[0];
-  document.getElementById('promo-original').value    = p?.originalPrice ?? '';
-  document.getElementById('promo-discounted').value  = p?.discountedPrice ?? '';
-  document.getElementById('promo-start').value       = p?.startDate || '';
-  document.getElementById('promo-end').value         = p?.endDate || '';
-  document.getElementById('promo-conditions').value  = p?.conditions || '';
-  document.getElementById('promo-iswellspan').checked = p?.isWellspan || false;
-  document.getElementById('promo-leads').value        = p?.leadsGenerated??'';
-  document.getElementById('promo-bookings').value     = p?.estimatedBookings??'';
-  document.querySelectorAll('#promo-entity .chip').forEach(c=>
-    c.classList.toggle('active', selectedPromoEntities.includes(c.dataset.val))
-  );
-  calcDiscount();
-  document.getElementById('promo-overlay').classList.add('open');
-}
-window.closePromoForm = function() {
-  document.getElementById('promo-overlay').classList.remove('open');
-}
-window.savePromotion = async function() {
-  const title = document.getElementById('promo-title').value.trim();
-  const orig  = parseFloat(document.getElementById('promo-original').value);
-  const disc  = parseFloat(document.getElementById('promo-discounted').value);
-  const start = document.getElementById('promo-start').value;
-  if(!title || isNaN(orig) || isNaN(disc) || !start) {
-    showToast('Title, prices and start date are required', true); return;
-  }
-  const discountPct = orig>0 ? Math.round((orig-disc)/orig*100) : 0;
-  const data = {
-    title,
-    description:    document.getElementById('promo-description').value.trim(),
-    department:     document.getElementById('promo-department').value,
-    entity:         selectedPromoEntities,
-    originalPrice:  orig,
-    discountedPrice:disc,
-    discountPct,
-    startDate:      start,
-    endDate:        document.getElementById('promo-end').value,
-    conditions:        document.getElementById('promo-conditions').value.trim(),
-    isWellspan:        document.getElementById('promo-iswellspan').checked,
-    leadsGenerated:    parseInt(document.getElementById('promo-leads').value)||0,
-    estimatedBookings: parseInt(document.getElementById('promo-bookings').value)||0,
+window.handleOffersExcelUpload = function(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length) { showToast('No data found in the file', true); return; }
+
+      const headers = Object.keys(rows[0]);
+      const used = new Set();
+      // Order matters: more specific "discounted price" / "original price"
+      // candidates are matched before the bare "price" fallback, so a sheet
+      // with both columns doesn't have "price" greedily match either one.
+      const discountedCol = findOffersCol(headers, used, 'discountedprice','offerprice','finalprice','netprice','saleprice','specialprice');
+      const priceCol      = findOffersCol(headers, used, 'originalprice','listprice','regularprice','price');
+      const categoryCol   = findOffersCol(headers, used, 'billgroup','category','department','specialty');
+      const descCol       = findOffersCol(headers, used, 'description','servicename','service','itemname','name');
+      const arabicCol     = findOffersCol(headers, used, 'arabic','namear','descriptionar','servicear');
+      const branchCol     = findOffersCol(headers, used, 'branch','entity','location','facility','center');
+      const codeCol       = findOffersCol(headers, used, 'code','itemcode','sku');
+
+      if(!descCol || !priceCol) {
+        showToast('Could not find Description or Price columns — check the file headers', true);
+        return;
+      }
+
+      const branches = {};
+      let skipped = 0;
+      rows.forEach(r => {
+        const description = String(r[descCol]||'').trim();
+        const price = parseFloat(r[priceCol]);
+        if(!description || isNaN(price)) { skipped++; return; }
+        const discountedRaw = discountedCol ? parseFloat(r[discountedCol]) : NaN;
+        const discountedPrice = isNaN(discountedRaw) ? price : discountedRaw;
+        const discountPct = (price > 0 && discountedPrice < price) ? Math.round((price-discountedPrice)/price*100) : 0;
+        const branchRaw = branchCol ? String(r[branchCol]||'').trim() : '';
+        const branchId = slugify(branchRaw) || 'all-branches';
+        if(!branches[branchId]) branches[branchId] = { branchLabelEN: branchRaw || 'All Branches', branchLabelAR: '', offers: [] };
+        branches[branchId].offers.push({
+          code: codeCol ? String(r[codeCol]||'') : '',
+          description,
+          category: categoryCol ? String(r[categoryCol]||'').trim() : '',
+          arabic: arabicCol ? String(r[arabicCol]||'').trim() : '',
+          price, discountedPrice, discountPct,
+        });
+      });
+
+      pendingOffersBranches = branches;
+      renderOffersImportPreview({descCol,priceCol,discountedCol,categoryCol,arabicCol,branchCol,codeCol}, skipped);
+      document.getElementById('oc-preview-wrap').style.display = 'block';
+    } catch(err) {
+      showToast('Failed to read file: ' + err.message, true);
+    }
   };
+  reader.readAsBinaryString(file);
+  input.value = '';
+}
+
+function renderOffersImportPreview(detected, skipped) {
+  const branchEntries = Object.entries(pendingOffersBranches);
+  const totalRows = branchEntries.reduce((s,[,b]) => s + b.offers.length, 0);
+  const detectedList = Object.values(detected).filter(Boolean).join(', ') || '—';
+  const perBranch = branchEntries.map(([id,b]) => {
+    const cats = new Set(b.offers.map(o=>o.category).filter(Boolean));
+    return `<div>• <strong>${b.branchLabelEN}</strong> — ${b.offers.length} offer${b.offers.length===1?'':'s'}${cats.size?` across ${cats.size} categor${cats.size===1?'y':'ies'}`:''}</div>`;
+  }).join('');
+  document.getElementById('oc-preview-summary').innerHTML = `
+    <div style="margin-bottom:8px">Detected columns: ${detectedList}</div>
+    <div style="margin-bottom:8px"><strong>${totalRows}</strong> offer(s) across <strong>${branchEntries.length}</strong> branch(es)${skipped?`, ${skipped} row(s) skipped (missing description or price)`:''}</div>
+    ${perBranch}
+  `;
+}
+
+window.cancelOffersImport = function() {
+  pendingOffersBranches = null;
+  document.getElementById('oc-preview-wrap').style.display = 'none';
+}
+
+window.publishOffersImport = async function() {
+  if(!pendingOffersBranches) return;
+  const branches = Object.entries(pendingOffersBranches).map(([id,b]) => ({ id, ...b }));
+  if(!confirm(`Publish ${branches.reduce((s,b)=>s+b.offers.length,0)} offers across ${branches.length} branch(es)? This replaces the entire live catalog.`)) return;
   try {
-    if(editingPromoId) { await updatePromotion(editingPromoId, data); showToast('Promotion updated'); }
-    else               { await addPromotion(data);                    showToast('Promotion created'); }
-    closePromoForm();
-  } catch(e) { showToast('Save failed: '+e.message, true); }
-}
-window.editPromo = function(id) {
-  const p = ALL_PROMOTIONS.find(x=>x.id===id);
-  if(p) openPromoForm(p);
-}
-window.removePromo = async function(id, title) {
-  if(!confirm(`Delete promotion "${title}"?`)) return;
-  try { await deletePromotion(id); showToast('Promotion deleted'); }
-  catch(e) { showToast('Delete failed: '+e.message, true); }
+    await publishOffersCatalog(branches);
+    showToast('Offers Catalog published');
+    cancelOffersImport();
+  } catch(e) { showToast('Publish failed: ' + e.message, true); }
 }
 
-window.togglePromoSort = function() {
-  promoSortAsc = !promoSortAsc;
-  document.getElementById('promo-sort-arrow').textContent = promoSortAsc ? '↑' : '↓';
-  renderPromotionsTable();
-}
-
-window.renderPromotionsTable = function() {
-  const deptF   = document.getElementById('promo-dept-filter').value;
-  const entityF = document.getElementById('promo-entity-filter').value;
-  const statusF = document.getElementById('promo-status-filter').value;
-
-  let data = ALL_PROMOTIONS.filter(p=>{
-    if(deptF   && p.department !== deptF) return false;
-    if(entityF && !(p.entity||[]).includes(entityF)) return false;
-    if(statusF && promoStatus(p.startDate, p.endDate) !== statusF) return false;
-    return true;
-  });
-  data = [...data].sort((a,b)=> promoSortAsc
-    ? (a.startDate||'').localeCompare(b.startDate||'')
-    : (b.startDate||'').localeCompare(a.startDate||'')
-  );
-
-  document.getElementById('promotions-table-body').innerHTML = data.length
-    ? data.map(p=>{
-        const status = promoStatus(p.startDate, p.endDate);
-        const ds = deptStyle(p.department);
-        return `<tr>
-          <td style="font-weight:600;max-width:200px">${p.title||''}</td>
-          <td><span class="badge" style="background:${ds.bg};color:${ds.t}">${p.department||''}</span></td>
-          <td style="font-size:11px">${(p.entity||[]).map(e=>`<span class="badge ent-${e.toLowerCase()}" style="margin-right:2px">${e}</span>`).join('')||'—'}</td>
-          <td style="font-size:12px">${p.originalPrice?.toLocaleString()||'—'}</td>
-          <td style="font-size:12px;font-weight:600;color:var(--green)">${p.discountedPrice?.toLocaleString()||'—'}</td>
-          <td><span style="font-size:14px;font-weight:800;color:var(--green)">${p.discountPct||0}%</span></td>
-          <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${p.startDate||'—'}${p.endDate?' → '+p.endDate:''}</td>
-          <td><span class="badge ${PROMO_STATUS_CLASS[status]||'b-planned'}">${status}</span></td>
-          <td class="row-actions">
-            <button class="btn btn-sm" onclick="editPromo('${p.id}')">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="removePromo('${p.id}','${(p.title||'').replace(/'/g,"\\'")}')">Delete</button>
-          </td>
-        </tr>`;
-      }).join('')
-    : '<tr><td colspan="9" class="empty">No promotions yet — click "+ New Promotion" to add one</td></tr>';
+window.renderOffersCatalogStatus = function() {
+  const statusEl = document.getElementById('oc-meta-status');
+  const tableEl = document.getElementById('oc-live-table');
+  const bodyEl = document.getElementById('oc-live-table-body');
+  const meta = OFFERS_CATALOG_META;
+  if(!meta || !meta.branches?.length) {
+    statusEl.textContent = 'No catalog published yet — upload Finance\'s Excel sheet to get started.';
+    tableEl.style.display = 'none';
+    return;
+  }
+  const updated = meta.updatedAt?.toDate ? meta.updatedAt.toDate().toLocaleString('en-GB') : '—';
+  statusEl.innerHTML = `<strong>${meta.rowCount||0}</strong> offers live across <strong>${meta.branches.length}</strong> branch(es) — last updated ${updated}`;
+  tableEl.style.display = 'table';
+  bodyEl.innerHTML = meta.branches.map(b => `<tr><td style="font-weight:600">${b.labelEN}</td><td>${b.count}</td></tr>`).join('');
 }
 
 // ── BUDGET ────────────────────────────────────────────────────────────────

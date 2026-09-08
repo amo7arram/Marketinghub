@@ -46,7 +46,8 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .page{display:none}
 .page.active{display:block}
 
-/* PROMOTIONS */
+/* OFFERS — class names kept as "promo-*" from the retired Promotions tab
+   this replaced; renaming is cosmetic-only so left as-is */
 .badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.03em;white-space:nowrap}
 .promotions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .promo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
@@ -130,7 +131,7 @@ tr:hover td{background:var(--bg)}
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('leads',this)">Leads</div>
-    <div class="tab" onclick="switchTab('promotions',this)">Promotions</div>
+    <div class="tab" onclick="switchTab('offers',this)">Offers</div>
   </div>
 
   <div class="content">
@@ -164,13 +165,13 @@ tr:hover td{background:var(--bg)}
       <div class="pagination" id="pagination"></div>
     </div>
 
-    <div class="page" id="page-promotions">
+    <div class="page" id="page-offers">
       <div class="filters-bar">
-        <select class="filter-select" id="p-status" onchange="renderPromotionsTab()"><option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option></select>
-        <select class="filter-select" id="p-dept" onchange="renderPromotionsTab()"><option value="">All Departments</option></select>
-        <select class="filter-select" id="p-entity" onchange="renderPromotionsTab()"><option value="">All Entities</option></select>
+        <div class="branch-tabs" id="offers-branch-tabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div class="category-chips" id="offers-category-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <input class="filter-input" type="text" id="offers-search" placeholder="Search offers..." oninput="renderOffersGrid()" style="min-width:200px">
       </div>
-      <div class="promotions-grid" id="promotions-grid"></div>
+      <div class="promotions-grid" id="offers-grid"></div>
     </div>
   </div>
 </div>
@@ -221,13 +222,16 @@ tr:hover td{background:var(--bg)}
 import {
   login, logout, watchAuth, getUserRole,
   watchLeads, updateLead, watchInitiatives,
-  watchPromotions, promoStatus, getDeptColor, normalizePhone,
-  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS, ENTITIES
+  watchOffersCatalogMeta, getOffersCatalogBranch, normalizePhone,
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS
 } from './firebase-data.js';
 
 let ALL_LEADS = [];
 let ALL_CAMPAIGNS = [];
-let ALL_PROMOTIONS = [];
+let OFFERS_META = null;
+const offersBranchCache = {};
+let currentOffersBranchId = null;
+let currentOffersCategory = 'ALL';
 let editingLeadId = null;
 let currentPage = 1;
 const PER_PAGE = 50;
@@ -273,7 +277,7 @@ watchAuth(async user => {
       document.getElementById('f-scope').value = role === 'admin' ? 'all' : 'mine';
       watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); renderTable(); });
       watchLeads(data => { ALL_LEADS = data; renderStats(); renderTable(); });
-      watchPromotions(data => { ALL_PROMOTIONS = data; renderPromotionsTab(); });
+      watchOffersCatalogMeta(data => { OFFERS_META = data; renderOffersTab(); });
     } catch(e) {
       const errEl = document.getElementById('login-error');
       errEl.textContent = 'Could not verify access: ' + e.message;
@@ -292,8 +296,6 @@ function populateFilters() {
   document.getElementById('f-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('f-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('f-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('p-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('p-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────
@@ -302,7 +304,7 @@ window.switchTab = function(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('page-'+id).classList.add('active');
-  if(id==='promotions') renderPromotionsTab();
+  if(id==='offers') renderOffersTab();
 }
 
 function campaignTitleFor(id) {
@@ -481,58 +483,76 @@ window.saveEdit = async function() {
   } catch(e) { showToast('Save failed: '+e.message, true); }
 }
 
-// ── PROMOTIONS (read-only) ──────────────────────────────────────────────
-const PROMO_STATUS_COLOR = {
-  Active:   {bg:'#D4F0E2', t:'#0D6E44'},
-  Upcoming: {bg:'#F0F2F7', t:'#8890A8'},
-  Expired:  {bg:'#FDE4E4', t:'#B0234A'},
-};
-window.renderPromotionsTab = function() {
-  const grid = document.getElementById('promotions-grid');
+// ── OFFERS (read-only, sourced from the Excel-driven public catalog) ────
+// Mirrors offers.html's tab/chip/card logic, but via the Firebase SDK
+// (already loaded for this authenticated tool's leads work) rather than the
+// REST-only approach offers.html uses for public load-time reasons.
+window.renderOffersTab = async function() {
+  const grid = document.getElementById('offers-grid');
   if(!grid) return;
-  const statusF = document.getElementById('p-status')?.value || '';
-  const deptF   = document.getElementById('p-dept')?.value || '';
-  const entityF = document.getElementById('p-entity')?.value || '';
-
-  const data = ALL_PROMOTIONS.filter(p=>{
-    if(statusF && promoStatus(p.startDate,p.endDate)!==statusF) return false;
-    if(deptF   && p.department!==deptF) return false;
-    if(entityF && !(p.entity||[]).includes(entityF)) return false;
-    return true;
-  });
-
-  if(!data.length) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No promotions match the current filters</div>';
+  if(!OFFERS_META || !OFFERS_META.branches?.length) {
+    document.getElementById('offers-branch-tabs').innerHTML = '';
+    document.getElementById('offers-category-chips').innerHTML = '';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No offers catalog published yet</div>';
     return;
   }
+  if(!currentOffersBranchId || !OFFERS_META.branches.some(b=>b.id===currentOffersBranchId)) {
+    currentOffersBranchId = OFFERS_META.branches[0].id;
+    currentOffersCategory = 'ALL';
+  }
+  if(!offersBranchCache[currentOffersBranchId]) {
+    offersBranchCache[currentOffersBranchId] = await getOffersCatalogBranch(currentOffersBranchId) || {offers:[]};
+  }
 
-  grid.innerHTML = data.map(p=>{
-    const status = promoStatus(p.startDate, p.endDate);
-    const sc = PROMO_STATUS_COLOR[status] || PROMO_STATUS_COLOR.Upcoming;
-    const dc = getDeptColor(p.department);
-    return `<div class="promo-card ${status==='Active'?'active-promo':status==='Expired'?'expired-promo':''}">
+  document.getElementById('offers-branch-tabs').innerHTML = OFFERS_META.branches.map(b =>
+    `<button class="btn btn-sm${b.id===currentOffersBranchId?' btn-primary':''}" onclick="selectOffersBranch('${b.id}')">${b.labelEN}</button>`
+  ).join('');
+
+  const offers = offersBranchCache[currentOffersBranchId]?.offers || [];
+  const cats = ['ALL', ...new Set(offers.map(o=>o.category).filter(Boolean))];
+  document.getElementById('offers-category-chips').innerHTML = cats.map(c =>
+    `<button class="btn btn-sm${c===currentOffersCategory?' btn-primary':''}" onclick="selectOffersCategory(${JSON.stringify(c)})">${c==='ALL'?'All':c}</button>`
+  ).join('');
+
+  renderOffersGrid();
+}
+window.selectOffersBranch = async function(id) {
+  currentOffersBranchId = id;
+  currentOffersCategory = 'ALL';
+  await renderOffersTab();
+}
+window.selectOffersCategory = function(cat) {
+  currentOffersCategory = cat;
+  renderOffersTab();
+}
+window.renderOffersGrid = function() {
+  const grid = document.getElementById('offers-grid');
+  if(!grid) return;
+  let offers = offersBranchCache[currentOffersBranchId]?.offers || [];
+  if(currentOffersCategory !== 'ALL') offers = offers.filter(o=>o.category===currentOffersCategory);
+  const q = (document.getElementById('offers-search')?.value||'').trim().toLowerCase();
+  if(q) offers = offers.filter(o => (o.description||'').toLowerCase().includes(q) || (o.category||'').toLowerCase().includes(q));
+
+  if(!offers.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No offers match the current filters</div>';
+    return;
+  }
+  grid.innerHTML = offers.map(o=>{
+    const hasDiscount = o.discountPct > 0;
+    return `<div class="promo-card">
       <div class="promo-card-header">
-        <div class="promo-card-title">${p.title||''}</div>
-        <div class="promo-discount-badge">${p.discountPct||0}%</div>
+        <div class="promo-card-title">${o.description||''}</div>
+        ${hasDiscount?`<div class="promo-discount-badge">${o.discountPct}%</div>`:''}
       </div>
       <div class="promo-card-body">
-        <div>${p.description ? p.description.substring(0,110)+(p.description.length>110?'...':'') : ''}</div>
+        ${o.category?`<div style="font-size:10px;text-transform:uppercase;color:var(--navy);font-weight:700;margin-bottom:4px">${o.category}</div>`:''}
+        ${o.arabic?`<div dir="rtl" style="margin-bottom:6px">${o.arabic}</div>`:''}
         <div class="promo-price-row">
           <div>
-            <div class="promo-price-orig">${p.originalPrice?.toLocaleString()||''} SAR</div>
-            <div class="promo-price-new">${p.discountedPrice?.toLocaleString()||''}</div>
+            ${hasDiscount?`<div class="promo-price-orig">${o.price?.toLocaleString()||''} SAR</div>`:''}
+            <div class="promo-price-new">${o.discountedPrice?.toLocaleString()||''}</div>
             <div class="promo-price-sar">SAR</div>
           </div>
-        </div>
-      </div>
-      <div class="promo-card-footer">
-        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-          <span class="badge" style="background:${dc.bg};color:${dc.t}">${p.department||''}</span>
-          ${(p.entity||[]).map(e=>`<span class="badge" style="background:var(--bg);color:var(--text-2)">${e}</span>`).join('')}
-        </div>
-        <div style="text-align:right">
-          <span class="badge" style="background:${sc.bg};color:${sc.t}">${status}</span>
-          <div style="margin-top:2px">${p.endDate?'Ends '+p.endDate:'Open-ended'}</div>
         </div>
       </div>
     </div>`;

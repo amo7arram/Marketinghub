@@ -35,7 +35,18 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null;
     }
+    match /offers_catalog/{doc} {
+      // Excel-driven public price/discount catalog — replaces the retired
+      // promotions feature below. Only an authenticated admin ever writes
+      // (via the admin.html import), so this needs none of landing.html's
+      // anonymous-create complexity — plain public-read/authenticated-write.
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
     match /promotions/{doc} {
+      // ⚠️ Legacy — retired, superseded by offers_catalog above. Rule left
+      // in place only so existing historical documents remain readable by
+      // an authenticated admin if ever needed; no UI writes here anymore.
       allow read: if true;
       allow write: if request.auth != null;
     }
@@ -149,6 +160,12 @@ service cloud.firestore {
     match /config/analytics_settings {
       // Public-read like the two above — a GA4 Measurement ID isn't a
       // secret, landing.html (unauthenticated) needs to read it.
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /config/offers_catalog_meta {
+      // Public-readable — lists which offers_catalog branch documents exist
+      // so offers.html can fetch them without listing the whole collection.
       allow read: if true;
       allow write: if request.auth != null;
     }

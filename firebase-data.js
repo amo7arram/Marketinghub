@@ -288,7 +288,13 @@ export function deleteExpense(id) {
   return deleteDoc(doc(db, EXPENSES, id));
 }
 
-// ── PROMOTIONS CRUD ───────────────────────────────────────────────────────
+// ── PROMOTIONS CRUD — ⚠️ legacy, retired ──────────────────────────────────
+// Superseded by the Excel-driven OFFERS CATALOG below. No UI writes or reads
+// this anymore (admin.html's Promotions tab was removed, index.html's
+// Promotions Calendar and Well-span integration were removed) — existing
+// `promotions` documents are left in place untouched, exports kept only so
+// this history isn't silently lost, same convention as the old `metrics`
+// collection elsewhere in this file.
 export function watchPromotions(callback) {
   return onSnapshot(collection(db, PROMOTIONS), snap => {
     const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -318,6 +324,57 @@ export function promoStatus(startDate, endDate) {
   return 'Active';
 }
 
+// ── OFFERS CATALOG (Excel-driven, replaces the retired Promotions above) ──
+// Sharded one document per branch (not one collection-wide document) — a
+// deliberate scaling precaution: Firestore documents cap at 1 MiB, and the
+// real ongoing catalog is very likely larger than the 287-row National Day
+// campaign subset this was modeled on. Doc ID = a slugified branch key
+// (e.g. "imc_jeddah"), matching whatever branches the uploaded sheet
+// actually contains — never hardcoded to a fixed list of branches.
+const OFFERS_CATALOG = "offers_catalog";
+
+export function watchOffersCatalogMeta(callback) {
+  return onSnapshot(doc(db, CONFIG, "offers_catalog_meta"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchOffersCatalogMeta:', err.code); callback(null); }
+  );
+}
+
+// One-time fetch — used by the admin import UI to show what's currently live
+// before overwriting it, and by call-center.html's read-only Offers tab.
+export async function getOffersCatalogBranch(branchId) {
+  const snap = await getDoc(doc(db, OFFERS_CATALOG, branchId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// Wholesale-replaces the entire catalog from a fresh Excel upload: one
+// setDoc per branch, reconciling away any branch document that existed in
+// the previous publish but isn't present in this one (e.g. a closed
+// location), then a meta document listing which branches now exist so
+// consumers (the public offers.html, call-center.html) know what to fetch
+// without needing to list the whole collection.
+export async function publishOffersCatalog(branches) {
+  const metaSnap = await getDoc(doc(db, CONFIG, "offers_catalog_meta"));
+  const oldBranchIds = metaSnap.exists() ? (metaSnap.data().branches || []).map(b => b.id) : [];
+  const newBranchIds = branches.map(b => b.id);
+  const staleIds = oldBranchIds.filter(id => !newBranchIds.includes(id));
+
+  await Promise.all([
+    ...branches.map(b => setDoc(doc(db, OFFERS_CATALOG, b.id), {
+      branchLabelEN: b.branchLabelEN, branchLabelAR: b.branchLabelAR || '',
+      offers: b.offers, updatedAt: Timestamp.now(),
+    })),
+    ...staleIds.map(id => deleteDoc(doc(db, OFFERS_CATALOG, id))),
+  ]);
+  // Per-branch label + count, not just bare IDs — lets both the admin status
+  // view and the public page's tab bar render immediately from this one
+  // small read, before fetching any branch's full offer list.
+  await setDoc(doc(db, CONFIG, "offers_catalog_meta"), {
+    branches: branches.map(b => ({ id: b.id, labelEN: b.branchLabelEN, labelAR: b.branchLabelAR || '', count: b.offers.length })),
+    rowCount: branches.reduce((s,b) => s + b.offers.length, 0),
+    updatedAt: Timestamp.now(),
+  });
+}
 
 // ── BRAND VOICE CONFIG ───────────────────────────────────────────────────
 // Stored as config/brand_voice — editable from admin, feeds every AI caption
