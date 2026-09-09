@@ -265,6 +265,16 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .camp-month-row:last-child{border:none;padding-bottom:0}
 .featured-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);transition:all var(--transition)}
 .featured-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+
+/* RECENT POSTS GRID — image-forward cards pulled from Metricool-synced
+   initiatives (socialImageUrl/postLink), see index.html's renderRecentPosts() */
+.recent-posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
+.recent-post-card{display:block;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);transition:all var(--transition);text-decoration:none;color:inherit}
+.recent-post-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.recent-post-img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:var(--bg)}
+.recent-post-body{padding:10px 12px}
+.recent-post-title{font-size:11px;font-weight:700;color:var(--text);line-height:1.35;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.recent-post-meta{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
 .featured-card-header{padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .featured-card-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.3;flex:1}
 .featured-card-body{padding:0 16px 10px;font-size:11px;color:var(--text-3);line-height:1.55}
@@ -372,8 +382,9 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
       <div class="nav-item" onclick="nav('smcalendar',this)"><span class="nav-icon">▤</span> SM Calendar</div>
       <div class="nav-item" onclick="nav('timeline',this)" style="display:none"><span class="nav-icon">◎</span> Timeline</div>
       <div class="nav-section">Programs</div>
-      <div class="nav-item" onclick="nav('wellspan',this)"><span class="nav-icon">💚</span> Well-span Program</div>
-      <div class="nav-item" onclick="nav('loyalty',this)"><span class="nav-icon">🏅</span> Loyalty Program</div>
+      <!-- Well-span Program and Loyalty Program links removed from the nav per
+           request (2026-09) — pages/functions left intact, just not linked to
+           for now. Restore by re-adding the two nav-item lines above if needed. -->
       <div class="nav-item" onclick="nav('bd',this)"><span class="nav-icon">🤝</span> Business Development</div>
       <div class="nav-item" onclick="nav('leadsdash',this)"><span class="nav-icon">📈</span> Leads & Attribution</div>
       <div class="nav-section">Campaigns</div>
@@ -442,23 +453,38 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="chart-container"><canvas id="webChart"></canvas></div>
         </div>
 
+        <!-- Recent Posts — visual pull from Metricool-synced content (see the
+             socialImageUrl note in renderCampMonthList below) so the dashboard
+             isn't just numbers and tables. Only items admin.html's syncMetricool
+             actually matched to a live post get a card here; that's expected,
+             not every published item will have one. -->
+        <div class="dash-section-title">Recent Posts</div>
+        <div class="recent-posts-grid" id="recent-posts-grid" style="margin-bottom:24px"><div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📷</div>No synced posts with images yet</div></div>
+
         <!-- Marketing Output — quantified deliverables, not just social metrics.
              Counts real work only: excludes Cancelled items and Campaign
              container records (their children are counted individually by
-             their own type, so a campaign isn't double-counted). -->
+             their own type, so a campaign isn't double-counted). Website
+             Updates is still tracked internally (see deliverableTypeFor /
+             openGroupBreakdown) but dropped from this top row per request
+             (2026-09); the 5th slot now shows the live Offers Catalog count
+             instead. -->
         <div class="dash-section-title">Marketing Output</div>
         <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px">
           <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-videos">—</div><div class="sm-kpi-label">🎬 Videos</div></div>
           <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-posts">—</div><div class="sm-kpi-label">📱 Social Posts</div></div>
           <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-events">—</div><div class="sm-kpi-label">🎪 Events</div></div>
           <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-print">—</div><div class="sm-kpi-label">🖨 Print Pieces</div></div>
-          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-web">—</div><div class="sm-kpi-label">🌐 Website Updates</div></div>
+          <div class="sm-kpi-card"><div class="sm-kpi-val" id="mo-offers">—</div><div class="sm-kpi-label">🏷 Live Offers</div></div>
         </div>
 
         <!-- Leads by Department + Department Activity -->
         <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:24px">
           <div class="card">
-            <div class="card-header"><div class="card-title">Leads by Department — <span id="leads-dept-month-label"></span></div></div>
+            <div class="card-header">
+              <div class="card-title">Leads by Department — <span id="leads-dept-month-label"></span></div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-2)" id="leads-dept-total"></div>
+            </div>
             <div class="chart-container">
               <canvas id="leadsDeptChart"></canvas>
               <div id="leadsDeptChart-empty" style="display:none;align-items:center;justify-content:center;height:200px;font-size:12px;color:var(--text-3)">No department-level lead data for this month</div>
@@ -700,7 +726,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 import {
   watchInitiatives, watchResources, watchMetrics,
   watchBdCards, watchWellspanPackages, watchLoyaltyCards, watchBdTargets, watchEntities, watchHealthDays,
-  watchLeadStats, watchMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
+  watchLeadStats, watchMetricoolStats, watchOffersCatalogMeta, METRICOOL_SERIES, metricoolMonthlyValue,
   getAccessGate, hashPassword,
   DEPARTMENTS, DEPT_COLORS, DEPT_BG, RESOURCE_TYPES, METRIC_NAMES, getDeptColor
 } from './firebase-data.js';
@@ -709,6 +735,7 @@ let ALL_ENTITIES = [];
 let HEALTH_DAYS = [];
 let LEAD_STATS = null;
 let METRICOOL_STATS = null;
+let OFFERS_META = null;
 
 let RESOURCES   = [];
 let METRICS     = [];
@@ -1049,6 +1076,7 @@ function renderFeatured() {
 window.renderDashboard = function() {
   renderDashboardKPIs();
   renderWebChart();
+  renderRecentPosts();
   renderMarketingOutput();
   renderLeadsCharts();
   renderDeptActivityBar();
@@ -1129,9 +1157,12 @@ function renderLeadsCharts() {
 
     const dc = document.getElementById('leadsDeptChart');
     const emptyEl = document.getElementById('leadsDeptChart-empty');
+    const totalEl = document.getElementById('leads-dept-total');
     if(dc) {
       const deptLabels = Object.keys(byDept);
       const deptData   = Object.values(byDept);
+      const total      = deptData.reduce((s,n)=>s+n, 0);
+      if(totalEl) totalEl.textContent = total ? `${total} total` : '';
       const colors     = deptLabels.map(d=>getDeptColor(d).t);
       if(leadsDeptChart) { leadsDeptChart.destroy(); leadsDeptChart = null; }
       if(!deptLabels.length) {
@@ -1186,8 +1217,41 @@ function renderMarketingOutput() {
     document.getElementById('mo-posts').textContent  = counts['Social Posts'];
     document.getElementById('mo-events').textContent = counts['Events'];
     document.getElementById('mo-print').textContent  = counts['Print'];
-    document.getElementById('mo-web').textContent    = counts['Website Updates'];
+    // Not period-filtered — this is the live Offers Catalog total, not a
+    // deliverable produced "this month", so it doesn't come from `counts`.
+    const offersEl = document.getElementById('mo-offers');
+    if(offersEl) offersEl.textContent = (OFFERS_META && typeof OFFERS_META.rowCount === 'number') ? OFFERS_META.rowCount : '—';
   } catch(e) { console.error('Marketing output error:', e); }
+}
+
+// ── RECENT POSTS (dashboard) ────────────────────────────────────────────
+// Pulls real published-post images synced from Metricool (see the
+// socialImageUrl note in renderCampMonthList above) so the dashboard leads
+// with visuals instead of only numbers/tables. Not every published item has
+// one — only those admin.html's syncMetricool() matched to a live post.
+function renderRecentPosts() {
+  try {
+    const el = document.getElementById('recent-posts-grid');
+    if(!el) return;
+    const posts = ALL
+      .filter(i => i.socialImageUrl && i.postLink)
+      .sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''))
+      .slice(0, 8);
+    if(!posts.length) {
+      el.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📷</div>No synced posts with images yet</div>';
+      return;
+    }
+    el.innerHTML = posts.map(i => {
+      const ds = deptStyle(i.department);
+      return `<a class="recent-post-card" href="${i.postLink}" target="_blank" rel="noopener">
+        <img class="recent-post-img" src="${i.socialImageUrl}" loading="lazy" alt="">
+        <div class="recent-post-body">
+          <div class="recent-post-title">${i.title||''}</div>
+          <div class="recent-post-meta"><span style="color:${ds.t}">${i.department||''}</span><span>${i.startDate||''}</span></div>
+        </div>
+      </a>`;
+    }).join('');
+  } catch(e) { console.error('Recent posts error:', e); }
 }
 
 // Last-rendered groups (name -> array of matching initiatives), stashed so
@@ -2225,6 +2289,7 @@ async function initPortal() {
   watchHealthDays(data => { HEALTH_DAYS = data; renderAll(); });
   watchLeadStats(data => { LEAD_STATS = data; renderAll(); });
   watchMetricoolStats(data => { METRICOOL_STATS = data; renderAll(); });
+  watchOffersCatalogMeta(data => { OFFERS_META = data; renderAll(); });
   initPortalData();
 }
 
