@@ -3328,15 +3328,18 @@ window.syncMetricool = async function() {
     } catch(e) { failures++; console.error('Metricool follower snapshot failed:', e); }
 
     // Match published initiatives' postLink to Metricool's own scheduled
-    // posts, pulling the real published image (or video, skipped — a
-    // dashboard can't usefully show a raw .mp4) for use on the public
-    // dashboard. Coverage is partial by nature, not a bug: only content
-    // actually scheduled/published THROUGH Metricool can match at all, and
-    // LinkedIn posts specifically almost never will, since the postLink
-    // pasted from LinkedIn's own "Share" link (urn:li:activity:...) uses a
-    // different URL scheme than the one Metricool records (urn:li:ugcPost:...)
-    // for the same post. Unmatched initiatives simply keep no socialImageUrl
-    // — no error, no dataGaps entry, this is expected steady-state behavior.
+    // posts, pulling the real published media for use on the public
+    // dashboard. Prefers a still image, but falls back to the raw .mp4 for
+    // reels/video posts — the public dashboard (index.html's socialThumbHtml)
+    // renders those as a muted, seeked video frame instead of an <img>, so a
+    // reel/video post still gets a visual card rather than being skipped.
+    // Coverage is partial by nature, not a bug: only content actually
+    // scheduled/published THROUGH Metricool can match at all, and LinkedIn
+    // posts specifically almost never will, since the postLink pasted from
+    // LinkedIn's own "Share" link (urn:li:activity:...) uses a different URL
+    // scheme than the one Metricool records (urn:li:ugcPost:...) for the same
+    // post. Unmatched initiatives simply keep no socialImageUrl — no error,
+    // no dataGaps entry, this is expected steady-state behavior.
     try {
       const schedStart = encodeURIComponent(`${METRICOOL_BACKFILL_START}T00:00:00`);
       const schedEnd   = encodeURIComponent(`${new Date().toISOString().slice(0,10)}T23:59:59`);
@@ -3351,7 +3354,8 @@ window.syncMetricool = async function() {
         ALL_INITIATIVES.filter(i => i.status==='Published' && i.postLink).forEach(init => {
           const match = postsByUrl[airNormalizeUrl(init.postLink)];
           if(!match) return;
-          const imageUrl = (match.media||[]).find(u => !u.toLowerCase().endsWith('.mp4')) || null;
+          const media = match.media||[];
+          const imageUrl = media.find(u => !u.toLowerCase().endsWith('.mp4')) || media[0] || null;
           if(imageUrl && imageUrl !== init.socialImageUrl) imageUpdates.push(updateInitiative(init.id, { socialImageUrl: imageUrl }));
         });
         if(imageUpdates.length) await Promise.all(imageUpdates);

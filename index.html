@@ -434,7 +434,7 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
           <div class="period-nav-label" id="period-nav-label">Loading...</div>
           <button class="period-nav-btn" id="period-next" onclick="shiftPeriod(1)">→</button>
         </div>
-        <div style="font-size:10px;color:var(--text-3);margin-top:-14px;margin-bottom:20px">Applies to Social Media Performance, Marketing Output, Leads by Department, and Department Activity below</div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:-14px;margin-bottom:20px">Applies to Social Media Performance, Recent Posts, Marketing Output, Leads by Department, and Department Activity below</div>
 
         <!-- Social Media Performance — synced from Metricool -->
         <div class="dash-section-title">Social Media Performance</div>
@@ -980,6 +980,7 @@ window.shiftPeriod = function(dir) {
   dashPeriodIdx = Math.max(0, Math.min(periods.length-1, dashPeriodIdx - dir));
   renderDashboardKPIs();
   renderMarketingOutput();
+  renderRecentPosts();
   renderDeptActivityBar();
   renderLeadsCharts();
 }
@@ -1027,7 +1028,7 @@ function renderCampMonthList() {
     // Metricool, so most rows fall back to the plain dot, not every row gets
     // a thumbnail. That's expected, not a bug.
     const thumb = i.socialImageUrl
-      ? `<img src="${i.socialImageUrl}" loading="lazy" style="width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0" alt="">`
+      ? socialThumbHtml(i.socialImageUrl, 'width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0;aspect-ratio:unset')
       : `<div class="camp-dot" style="background:${ds.t}"></div>`;
     // Health Day items are lightweight placeholder objects (no id, no brief,
     // no captions) — not worth opening the full detail panel for those.
@@ -1229,22 +1230,37 @@ function renderMarketingOutput() {
 // socialImageUrl note in renderCampMonthList above) so the dashboard leads
 // with visuals instead of only numbers/tables. Not every published item has
 // one — only those admin.html's syncMetricool() matched to a live post.
+// Scoped to the dashboard's selected period (same month the KPIs/Marketing
+// Output/Leads charts above are showing) so it isn't a frozen top-8-ever list.
+function isVideoUrl(url) {
+  return /\.mp4($|\?)/i.test(url||'');
+}
+// A muted, controls-less <video> seeked to its first frame doubles as a
+// thumbnail — Metricool gives us the raw media file, not a separate poster
+// image, so this is how reels/video posts get a visual card at all.
+function socialThumbHtml(url, sizeStyle) {
+  return isVideoUrl(url)
+    ? `<video class="recent-post-img" style="${sizeStyle}" src="${url}#t=0.1" muted playsinline preload="metadata"></video>`
+    : `<img class="recent-post-img" style="${sizeStyle}" src="${url}" loading="lazy" alt="">`;
+}
 function renderRecentPosts() {
   try {
     const el = document.getElementById('recent-posts-grid');
     if(!el) return;
+    const periods = getAvailablePeriods();
+    const selectedPeriod = periods[dashPeriodIdx] || periods[0];
     const posts = ALL
-      .filter(i => i.socialImageUrl && i.postLink)
+      .filter(i => i.socialImageUrl && i.postLink && i.startDate?.startsWith(selectedPeriod))
       .sort((a,b) => (b.startDate||'').localeCompare(a.startDate||''))
       .slice(0, 8);
     if(!posts.length) {
-      el.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📷</div>No synced posts with images yet</div>';
+      el.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📷</div>No synced posts with images for this month</div>';
       return;
     }
     el.innerHTML = posts.map(i => {
       const ds = deptStyle(i.department);
       return `<a class="recent-post-card" href="${i.postLink}" target="_blank" rel="noopener">
-        <img class="recent-post-img" src="${i.socialImageUrl}" loading="lazy" alt="">
+        ${socialThumbHtml(i.socialImageUrl, 'width:100%')}
         <div class="recent-post-body">
           <div class="recent-post-title">${i.title||''}</div>
           <div class="recent-post-meta"><span style="color:${ds.t}">${i.department||''}</span><span>${i.startDate||''}</span></div>
@@ -1712,7 +1728,9 @@ window.openDetail = function(c) {
   document.getElementById('dp-badges').innerHTML = statusBadge(c.status)+' '+entityBadge(c.entity)+` <span class="badge" style="background:${ds.bg};color:${ds.t}">${c.department||''}</span>`;
   document.getElementById('dp-body').innerHTML = `
     ${c.socialImageUrl?`<div class="dp-section">
-      <img src="${c.socialImageUrl}" alt="" style="width:100%;max-height:420px;object-fit:cover;border-radius:10px;display:block">
+      ${isVideoUrl(c.socialImageUrl)
+        ? `<video src="${c.socialImageUrl}#t=0.1" muted playsinline controls preload="metadata" style="width:100%;max-height:420px;object-fit:cover;border-radius:10px;display:block"></video>`
+        : `<img src="${c.socialImageUrl}" alt="" style="width:100%;max-height:420px;object-fit:cover;border-radius:10px;display:block">`}
     </div>`:''}
     <div class="dp-section">
       <div class="dp-section-title">Campaign Brief</div>
