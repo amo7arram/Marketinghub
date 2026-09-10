@@ -143,6 +143,13 @@ service cloud.firestore {
     // removed once every admin had an individual email/password account
     // (see docs/ARCHITECTURE.md §4.4). No rule is defined, so the abandoned
     // document (if still present in Firestore) is now default-deny.
+    match /config/advisor_brief {
+      // Authenticated-only — the AI advisor briefing is derived from leads
+      // (PII-adjacent) and internal performance data; never public-read.
+      // Any admin can regenerate it.
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
     match /config/lead_stats {
       // Public-readable aggregate, zero PII by design (see DATA_MODEL.md).
       allow read: if true;

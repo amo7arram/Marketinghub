@@ -164,6 +164,42 @@ tr.row-overdue:hover td{background:#FFD6D6}
   .cgen-card { box-shadow: none; break-inside: avoid; }
   .air-insight-card { break-inside: avoid; }
 }
+
+/* ── ADVISOR TAB — deliberately calmer/roomier than the operational tables ── */
+.adv-wrap{max-width:760px;margin:0 auto;padding:8px 4px 60px}
+.adv-greeting{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--text);letter-spacing:-0.01em}
+.adv-sub{font-size:13px;color:var(--text-3);margin:6px 0 22px;line-height:1.6}
+.adv-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.adv-stamp{font-size:11px;color:var(--text-3)}
+.adv-status{font-size:12px;color:var(--text-3);margin-top:12px;text-align:center}
+.adv-muted{font-size:12px;color:var(--text-3);line-height:1.6}
+.adv-section-label{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.09em;color:var(--text-3);margin:30px 0 12px}
+.adv-pulse{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.adv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;box-shadow:var(--shadow)}
+.adv-card-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:6px}
+.adv-card-value{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;color:var(--text);line-height:1.15}
+.adv-card-note{font-size:11px;color:var(--text-3);margin-top:6px;line-height:1.5}
+.adv-card-note .up{color:var(--green,#0E7A55);font-weight:600}
+.adv-card-note .down{color:var(--red);font-weight:600}
+.adv-brief-headline{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--navy);line-height:1.35;margin-bottom:10px}
+.adv-brief-body{font-size:13px;color:var(--text-2);line-height:1.7;margin-bottom:18px}
+.adv-rec{background:var(--bg);border-left:3px solid var(--navy);border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:10px}
+.adv-rec-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.adv-rec-title .pri{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;padding:1px 6px;border-radius:4px;margin-left:8px;vertical-align:middle}
+.adv-rec-title .pri.high{background:#FFE8E8;color:#9B2020}
+.adv-rec-title .pri.medium{background:#FFF0D4;color:#9B5800}
+.adv-rec-title .pri.low{background:#E4EDFF;color:#1649A3}
+.adv-rec-line{font-size:12px;color:var(--text-3);line-height:1.6}
+.adv-rec-line b{color:var(--text-2);font-weight:600}
+.adv-watch{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}
+.adv-watch span{font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:4px 11px;color:var(--text-2)}
+.adv-provocation{font-style:italic;font-size:13px;color:var(--text-2);background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius-lg);padding:14px 18px;margin-top:8px;line-height:1.6}
+.adv-chat-log{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;max-height:420px;overflow-y:auto}
+.adv-msg{font-size:12.5px;line-height:1.65;padding:10px 14px;border-radius:12px;max-width:88%}
+.adv-msg.user{align-self:flex-end;background:var(--navy);color:#fff;border-bottom-right-radius:4px}
+.adv-msg.advisor{align-self:flex-start;background:var(--bg);color:var(--text-2);border:1px solid var(--border);border-bottom-left-radius:4px;white-space:pre-wrap}
+.adv-chat-row{display:flex;gap:8px}
+.adv-chat-row .field-input{flex:1}
 </style>
 </head>
 <body>
@@ -226,7 +262,8 @@ tr.row-overdue:hover td{background:#FFD6D6}
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
     <div class="tab" onclick="switchTab('contentgen',this)" style="display:none">✨ Content Generator</div>
     <div class="tab" onclick="switchTab('campaigngen',this)">🎬 Campaign Generator</div>
-    <div class="tab" onclick="switchTab('aireports',this)">📊 AI Reports</div>
+    <div class="tab" onclick="switchTab('advisor',this)">🧭 Advisor</div>
+    <div class="tab" onclick="switchTab('aireports',this)" style="display:none">📊 AI Reports</div>
     <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
   </div>
 
@@ -830,6 +867,38 @@ tr.row-overdue:hover td{background:#FFD6D6}
             <button class="btn btn-primary" onclick="downloadAiReport()">🖨️ Download (Print to PDF)</button>
           </div>
           <div id="air-report-output"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVISOR PAGE — a personal briefing over your own data, deliberately
+         calmer than the operational tables. Layer 1 (in-browser) of the
+         planned advisor: computed pulse + one AI briefing + a chat box.
+         Doctor-roster / competitor scan (needs the GitHub Action) come later. -->
+    <div class="page" id="page-advisor">
+      <div class="adv-wrap">
+        <div class="adv-greeting" id="adv-greeting">Advisor</div>
+        <div class="adv-sub" id="adv-sub">A read on where things stand this month — and what I'd pay attention to.</div>
+
+        <div class="adv-toolbar">
+          <div class="adv-stamp" id="adv-stamp">No briefing generated yet.</div>
+          <button class="btn btn-primary btn-sm" id="adv-refresh-btn" onclick="generateAdvisorBrief()">Generate briefing</button>
+        </div>
+        <div class="adv-status" id="adv-status" style="display:none"></div>
+
+        <div class="adv-section-label">At a glance</div>
+        <div class="adv-pulse" id="adv-pulse"><div class="adv-muted">Loading your numbers…</div></div>
+
+        <div id="adv-brief-wrap" style="display:none">
+          <div class="adv-section-label">The briefing</div>
+          <div id="adv-brief"></div>
+        </div>
+
+        <div class="adv-section-label">Ask your advisor</div>
+        <div class="adv-chat-log" id="adv-chat-log"><div class="adv-muted">Ask a question about the numbers above — "why did Dermatology leads drop?", "what would you cut if the budget halved?"</div></div>
+        <div class="adv-chat-row">
+          <input class="field-input" id="adv-chat-input" placeholder="Ask your advisor…" onkeydown="if(event.key==='Enter')askAdvisor()">
+          <button class="btn btn-sm" id="adv-chat-btn" onclick="askAdvisor()">Send</button>
         </div>
       </div>
     </div>
@@ -1705,6 +1774,7 @@ import {
   getMetricoolStats, setMetricoolStats, METRICOOL_SERIES, metricoolMonthlyValue,
   saveMonthMetrics as saveLegacyMonthMetrics, getMetricsForPeriod as getLegacyMetricsForPeriod, getAllMetrics,
   getAccessGate, setAccessGate, hashPassword,
+  watchAdvisorBrief, saveAdvisorBrief,
   watchTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember, createTeamMemberWithLogin,
   watchEntities, addEntity, deleteEntity, checkEntityUsage,
   watchHealthDays, addHealthDay, updateHealthDay, deleteHealthDay, migrateHealthDaysFromInitiatives,
@@ -1738,6 +1808,10 @@ let ALL_LANDING_PAGES = [];
 let editingLandingPageSlug = null; // null = creating; non-null = editing (slug locked)
 let unsubLandingPages = null;
 let ALL_EXPENSES = [];
+let ADVISOR_BRIEF = null;          // cached { json, generatedAt, generatedByName, coverageNote }
+let unsubAdvisorBrief = null;
+let advisorChat = [];             // in-memory chat turns [{role:'user'|'assistant', content}]
+let advisorPulseCache = null;     // last computed pulse object (reused by the chat calls)
 let OFFERS_CATALOG_META = null;
 let pendingOffersBranches = null; // parsed-but-not-yet-published Excel import
 let unsubOffersCatalogMeta = null;
@@ -1864,6 +1938,7 @@ watchAuth(async user => {
     if(unsubMarketingActions) unsubMarketingActions();
     if(unsubLandingPages) unsubLandingPages();
     if(unsubAnalyticsSettings) unsubAnalyticsSettings();
+    if(unsubAdvisorBrief) unsubAdvisorBrief();
   }
 });
 
@@ -1889,6 +1964,7 @@ function initData() {
   unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); renderLandingPagesTable(); });
   unsubMarketingActions = watchMarketingActions(data => { ALL_MARKETING_ACTIONS = data; renderMarketingActionsTable(); });
   unsubLandingPages = watchLandingPages(data => { ALL_LANDING_PAGES = data; renderLandingPagesTable(); });
+  unsubAdvisorBrief = watchAdvisorBrief(data => { ADVISOR_BRIEF = data; if(document.getElementById('page-advisor')?.classList.contains('active')) renderAdvisorBrief(); });
   initMetricsTab();
   initBudgetTab();
 }
@@ -1908,6 +1984,7 @@ window.switchTab = function(id, el, groupId) {
   if(id==='contentgen') initContentGenTab();
   if(id==='campaigngen') initCampaignGenTab();
   if(id==='aireports') initAiReportsTab();
+  if(id==='advisor') initAdvisorTab();
   if(id==='settings') initSettingsTab();
 }
 
@@ -4824,6 +4901,435 @@ window.downloadAiReport = function() {
   document.title = `IMC AI Report — ${monthLabel}`;
   window.onafterprint = () => { document.title = prevTitle; window.onafterprint = null; };
   window.print();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ADVISOR TAB — a personal briefing over your own data (Phase 1, in-browser).
+// Layer 0: a pulse computed entirely client-side from data already loaded.
+// Layer 1: one Claude call turning that pulse + redacted call-centre notes
+//          into a briefing, cached in config/advisor_brief.
+// Layer 2: an in-memory "ask your advisor" chat over the same snapshot.
+// Doctor-roster / competitor-scan (need the GitHub Action) are Phase 2.
+// ══════════════════════════════════════════════════════════════════════════
+const ADVISOR_MODEL = 'claude-opus-5';
+const ADVISOR_PERSONA =
+  'You are the marketing advisor for IMC, a private healthcare group in Saudi Arabia. ' +
+  'You are talking one to one with a marketing admin. Be candid and specific, use their ' +
+  'numbers, skip corporate throat-clearing. Short sentences. A little informal is fine, and ' +
+  'so is pushing back. You are looking at a snapshot of this month vs last — treat it as ' +
+  'directional, not exact, and say so when a figure looks thin.';
+
+function advEsc(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function advPeriods() {
+  const now = new Date();
+  const thisP = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const l = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastP = `${l.getFullYear()}-${String(l.getMonth()+1).padStart(2,'0')}`;
+  return { thisP, lastP, now };
+}
+function advPeriodLabel(p) {
+  const [y,m] = p.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleString('en', { month:'long', year:'numeric' });
+}
+function advPct(n) { return Math.round(n * 100); }
+function advAgo(iso) {
+  const then = new Date(iso).getTime();
+  if(isNaN(then)) return '';
+  const mins = Math.round((Date.now() - then) / 60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if(hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+// ── LAYER 0: the computed pulse ────────────────────────────────────────────
+function buildAdvisorPulse() {
+  const { thisP, lastP, now } = advPeriods();
+  const inMonth = (d, p) => (d || '').startsWith(p);
+
+  // busiest team member — by activities assigned this month
+  const assignCounts = {};
+  ALL_INITIATIVES.forEach(i => {
+    if(i.type === 'Campaign' || !inMonth(i.startDate, thisP) || !i.assignedTo) return;
+    assignCounts[i.assignedTo] = (assignCounts[i.assignedTo] || 0) + 1;
+  });
+  const busiest = Object.entries(assignCounts).sort((a,b)=>b[1]-a[1]).slice(0,3)
+    .map(([name,count]) => ({ name, count }));
+
+  // leads this month vs last
+  const lThis = ALL_LEADS.filter(l => inMonth(l.dateCreated, thisP));
+  const lLast = ALL_LEADS.filter(l => inMonth(l.dateCreated, lastP));
+  const reached = arr => arr.filter(l => l.contactStatus === 'Reached').length;
+  const booked  = arr => arr.filter(l => l.outcome === 'Booked').length;
+  const convThis = lThis.length ? booked(lThis) / lThis.length : 0;
+  const convLast = lLast.length ? booked(lLast) / lLast.length : 0;
+  const closures = {};
+  lThis.filter(l => l.outcome === 'Closed - Unsuccessful' && l.closureReason)
+       .forEach(l => closures[l.closureReason] = (closures[l.closureReason] || 0) + 1);
+  const topClosure = Object.entries(closures).sort((a,b)=>b[1]-a[1])[0] || null;
+  const bySource = {};
+  lThis.forEach(l => { const s = l.source || 'Unknown'; (bySource[s] = bySource[s] || []).push(l); });
+  let slowestSource = null;
+  Object.entries(bySource).forEach(([s, arr]) => {
+    if(arr.length < 4) return;
+    const r = reached(arr) / arr.length;
+    if(!slowestSource || r < slowestSource.rate) slowestSource = { source: s, rate: r, n: arr.length };
+  });
+
+  // spend — this month to date vs last month total
+  const spendIn = p =>
+    ALL_EXPENSES.filter(e => inMonth(e.date, p)).reduce((s,e)=>s+(e.cost||0),0) +
+    ALL_INITIATIVES.filter(i => inMonth(i.startDate, p)).reduce((s,i)=>s+(i.cost||0),0);
+  const spendThis = spendIn(thisP), spendLast = spendIn(lastP);
+  const monthlyPace = ANNUAL_BUDGET ? ANNUAL_BUDGET / 12 : 0;
+  const biggestItem = [
+    ...ALL_EXPENSES.filter(e => inMonth(e.date, thisP)).map(e => ({ label: e.title || e.type || 'Expense', cost: e.cost || 0 })),
+    ...ALL_INITIATIVES.filter(i => inMonth(i.startDate, thisP) && i.cost).map(i => ({ label: i.title || 'Activity', cost: i.cost })),
+  ].sort((a,b)=>b.cost-a.cost)[0] || null;
+
+  // social — biggest month-over-month mover / decliner
+  const moves = [];
+  Object.keys(METRICOOL_SERIES).forEach(key => {
+    const t = metricoolMonthlyValue(METRICOOL_STATS, key, thisP);
+    const l = metricoolMonthlyValue(METRICOOL_STATS, key, lastP);
+    if(t == null || l == null || l === 0) return;
+    moves.push({ label: METRICOOL_SERIES[key].label, change: (t - l) / l });
+  });
+  moves.sort((a,b)=>b.change-a.change);
+  const topMover = moves[0] || null;
+  const topDecliner = moves.length ? moves[moves.length - 1] : null;
+
+  // hygiene
+  const overdue = ALL_INITIATIVES.filter(isActivityOverdue).length;
+  const stuck = ALL_INITIATIVES.filter(i =>
+    i.status === 'In Production' && i.startDate && (now - new Date(i.startDate)) > 30*24*3600*1000).length;
+  const unassigned = ALL_INITIATIVES.filter(i =>
+    i.type !== 'Campaign' && inMonth(i.startDate, thisP) && !i.assignedTo).length;
+
+  // calendar — health days in the next 60 days
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in60 = new Date(today.getTime() + 60*24*3600*1000);
+  const calendar = ALL_HEALTH_DAYS
+    .filter(h => { const d = new Date(h.date); return d >= today && d <= in60; })
+    .sort((a,b) => (a.date||'').localeCompare(b.date||''))
+    .slice(0, 8)
+    .map(h => ({ name: h.name, date: h.date, department: h.department || null, category: h.category || null }));
+
+  // campaign gaps — demand (leads this month) vs supply (campaigns this quarter)
+  const q0 = new Date(today.getTime() - 90*24*3600*1000);
+  const campaignGaps = DEPARTMENTS.map(d => ({
+    department: d,
+    leads: lThis.filter(l => l.department === d).length,
+    campaignsThisQuarter: ALL_INITIATIVES.filter(i =>
+      i.type === 'Campaign' && i.department === d && i.startDate && new Date(i.startDate) >= q0).length,
+  })).filter(x => x.leads > 0).sort((a,b) => b.leads - a.leads).slice(0, 6);
+
+  return {
+    period: { thisMonth: advPeriodLabel(thisP), lastMonth: advPeriodLabel(lastP) },
+    busiest,
+    leads: {
+      total: lThis.length, totalPrev: lLast.length,
+      reachedPct: lThis.length ? advPct(reached(lThis) / lThis.length) : null,
+      bookedPct: lThis.length ? advPct(convThis) : null,
+      conversionDeltaPts: advPct(convThis - convLast),
+      topClosureReason: topClosure ? { reason: topClosure[0], count: topClosure[1] } : null,
+      slowestSource: slowestSource ? { source: slowestSource.source, reachedPct: advPct(slowestSource.rate), n: slowestSource.n } : null,
+    },
+    spend: {
+      thisMonthToDate: Math.round(spendThis), lastMonthTotal: Math.round(spendLast),
+      monthlyBudgetPace: Math.round(monthlyPace),
+      overPace: monthlyPace ? spendThis > monthlyPace : null,
+      biggestItem: biggestItem ? { label: biggestItem.label, cost: Math.round(biggestItem.cost) } : null,
+    },
+    social: {
+      biggestMover: topMover ? { metric: topMover.label, changePct: advPct(topMover.change) } : null,
+      biggestDecliner: (topDecliner && topDecliner.change < 0) ? { metric: topDecliner.label, changePct: advPct(topDecliner.change) } : null,
+    },
+    hygiene: { overdue, stuckInProduction: stuck, unassignedThisMonth: unassigned },
+    calendar,
+    campaignGaps,
+  };
+}
+
+function renderAdvisorPulse(p) {
+  const el = document.getElementById('adv-pulse');
+  if(!el) return;
+  const card = (label, value, note) =>
+    `<div class="adv-card"><div class="adv-card-label">${advEsc(label)}</div>` +
+    `<div class="adv-card-value">${advEsc(value)}</div>` +
+    `${note ? `<div class="adv-card-note">${note}</div>` : ''}</div>`;
+  const cards = [];
+
+  if(p.busiest.length) {
+    cards.push(card('Busiest this month', p.busiest[0].name,
+      `${p.busiest[0].count} activities${p.busiest[1] ? ` · then ${advEsc(p.busiest[1].name)} (${p.busiest[1].count})` : ''}`));
+  }
+  if(p.leads.total != null) {
+    const d = p.leads.conversionDeltaPts;
+    const dTxt = d === 0 ? 'conversion flat vs last month'
+      : d > 0 ? `<span class="up">▲ ${d}pts</span> conversion vs last month`
+      : `<span class="down">▼ ${Math.abs(d)}pts</span> conversion vs last month`;
+    cards.push(card('Leads', String(p.leads.total),
+      `${p.leads.totalPrev} last month · ${p.leads.bookedPct ?? 0}% booked · ${dTxt}`));
+  }
+  if(p.leads.topClosureReason) {
+    cards.push(card('Top reason leads are lost', p.leads.topClosureReason.reason,
+      `${p.leads.topClosureReason.count} closed-unsuccessful this month`));
+  }
+  if(p.leads.slowestSource) {
+    cards.push(card('Slowest-contacted source', p.leads.slowestSource.source,
+      `only ${p.leads.slowestSource.reachedPct}% reached (${p.leads.slowestSource.n} leads)`));
+  }
+  cards.push(card('Spend this month so far', 'SAR ' + fmtSAR(p.spend.thisMonthToDate),
+    p.spend.monthlyBudgetPace
+      ? (p.spend.overPace
+          ? `<span class="down">above</span> the SAR ${fmtSAR(p.spend.monthlyBudgetPace)}/mo pace`
+          : `under the SAR ${fmtSAR(p.spend.monthlyBudgetPace)}/mo pace`)
+      : `SAR ${fmtSAR(p.spend.lastMonthTotal)} all of last month`));
+  if(p.spend.biggestItem) {
+    cards.push(card('Biggest line item', p.spend.biggestItem.label, 'SAR ' + fmtSAR(p.spend.biggestItem.cost)));
+  }
+  if(p.social.biggestDecliner) {
+    cards.push(card('Sliding', p.social.biggestDecliner.metric,
+      `<span class="down">▼ ${Math.abs(p.social.biggestDecliner.changePct)}%</span> vs last month`));
+  } else if(p.social.biggestMover) {
+    const m = p.social.biggestMover;
+    cards.push(card('Biggest social move', m.metric,
+      `${m.changePct >= 0 ? '<span class="up">▲' : '<span class="down">▼'} ${Math.abs(m.changePct)}%</span> vs last month`));
+  }
+  const h = p.hygiene;
+  if(h.overdue || h.stuckInProduction || h.unassignedThisMonth) {
+    cards.push(card('Needs a nudge', `${h.overdue} overdue`,
+      `${h.stuckInProduction} stuck in production · ${h.unassignedThisMonth} unassigned this month`));
+  }
+  const gap = p.campaignGaps.find(g => g.leads >= 3 && g.campaignsThisQuarter === 0);
+  if(gap) {
+    cards.push(card('Under-served', gap.department,
+      `${gap.leads} leads this month, 0 campaigns this quarter`));
+  }
+  if(p.calendar.length) {
+    const n = p.calendar[0];
+    cards.push(card('Next on the calendar', n.name, `${n.date}${n.department ? ' · ' + advEsc(n.department) : ''}`));
+  }
+
+  el.innerHTML = cards.join('') || '<div class="adv-muted">Not enough data yet this month.</div>';
+}
+
+// ── Redacted call-centre notes for the briefing ───────────────────────────
+function advRedact(text, lead) {
+  if(!text) return '';
+  let s = String(text);
+  [lead.name, lead.phone, lead.email].forEach(v => {
+    if(v && String(v).length > 2) s = s.split(String(v)).join('[redacted]');
+  });
+  s = s.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]');
+  s = s.replace(/\+?\d[\d\s().-]{7,}\d/g, '[number]');
+  return s.trim();
+}
+function advCollectNotes() {
+  const { thisP, lastP } = advPeriods();
+  const pool = ALL_LEADS.filter(l =>
+    ((l.dateCreated || '').startsWith(thisP) || (l.dateCreated || '').startsWith(lastP)) &&
+    ((l.notes && l.notes.trim()) || l.closureReason));
+  const capped = pool.slice()
+    .sort((a,b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+    .slice(0, 80);
+  return {
+    total: pool.length,
+    used: capped.length,
+    items: capped.map(l => ({
+      department: l.department || null,
+      source: l.source || null,
+      outcome: l.outcome || null,
+      closureReason: l.closureReason || null,
+      note: advRedact(l.notes, l),
+    })),
+  };
+}
+
+// ── Claude call (mirrors the existing direct-from-browser pattern) ────────
+async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJson = false }) {
+  if(!ANTHROPIC_API_KEY) throw new Error('No API key configured — set it in Campaign Generator → AI Setup');
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({ model: ADVISOR_MODEL, max_tokens: maxTokens, system, messages }),
+  });
+  if(!res.ok) {
+    const t = await res.text().catch(() => '');
+    if(res.status === 401) throw new Error('Invalid API key');
+    if(res.status === 429) throw new Error('Rate limit — wait a moment and retry');
+    throw new Error(`API error ${res.status}: ${t.substring(0,150)}`);
+  }
+  const data = await res.json();
+  const text = data.content?.find(b => b.type === 'text')?.text || '';
+  if(!expectJson) return text;
+  try { return JSON.parse(text.replace(/```json|```/g, '').trim()); }
+  catch(e) { throw new Error('Could not parse the advisor response — try again'); }
+}
+
+window.generateAdvisorBrief = async function() {
+  const btn = document.getElementById('adv-refresh-btn');
+  const statusEl = document.getElementById('adv-status');
+  if(!ANTHROPIC_API_KEY) { showToast('No API key configured — set it in Campaign Generator → AI Setup', true); return; }
+  btn.disabled = true; btn.textContent = 'Thinking…';
+  statusEl.style.display = 'block'; statusEl.textContent = 'Reading your numbers…';
+  try {
+    const pulse = buildAdvisorPulse();
+    advisorPulseCache = pulse;
+    const notes = advCollectNotes();
+    statusEl.textContent = 'Writing your briefing…';
+    const payload = {
+      pulse,
+      callNotesSample: notes.items,
+      callNotesCoverage: `${notes.used} of ${notes.total} recent leads carried a note or closure reason`,
+      departments: DEPARTMENTS,
+    };
+    const shape = `Return ONLY JSON in this exact shape:
+{
+  "headline": "one line — the single most important thing right now",
+  "whatStandsOut": "2-4 sentences, conversational",
+  "phoneRoomSignal": "1-2 sentences on what the call notes reveal, or null if the sample is too thin",
+  "recommendations": [ { "title": "verb-first, short", "why": "1 sentence", "do": "1 concrete next action", "priority": "high|medium|low" } ],
+  "watchList": [ "short phrases, 2 to 5 of them" ],
+  "campaignIdeas": [ { "idea": "1 sentence", "timing": "tie to a health day or season if one fits, else null", "department": "one of the given departments or null" } ],
+  "provocation": "one contrarian what-if question to leave them thinking"
+}`;
+    const json = await advisorClaudeCall({
+      system: ADVISOR_PERSONA + '\n\n' + shape,
+      messages: [{ role: 'user', content: 'Here is the snapshot:\n\n' + JSON.stringify(payload, null, 2) }],
+      maxTokens: 3500,
+      expectJson: true,
+    });
+    const record = {
+      json,
+      generatedAt: new Date().toISOString(),
+      generatedByName: myMemberName() || currentAdminEmail || 'an admin',
+      coverageNote: payload.callNotesCoverage,
+    };
+    await saveAdvisorBrief(record);
+    ADVISOR_BRIEF = record;
+    renderAdvisorBrief();
+    showToast('✓ Briefing updated');
+  } catch(e) {
+    showToast('Briefing failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = ADVISOR_BRIEF ? 'Regenerate briefing' : 'Generate briefing';
+    statusEl.style.display = 'none';
+  }
+};
+
+function renderAdvisorBrief() {
+  const stamp = document.getElementById('adv-stamp');
+  const wrap = document.getElementById('adv-brief-wrap');
+  const el = document.getElementById('adv-brief');
+  const btn = document.getElementById('adv-refresh-btn');
+  if(!stamp || !wrap || !el) return;
+  if(!ADVISOR_BRIEF || !ADVISOR_BRIEF.json) {
+    wrap.style.display = 'none';
+    stamp.textContent = 'No briefing generated yet.';
+    if(btn) btn.textContent = 'Generate briefing';
+    return;
+  }
+  const b = ADVISOR_BRIEF.json;
+  const when = ADVISOR_BRIEF.generatedAt ? advAgo(ADVISOR_BRIEF.generatedAt) : '';
+  stamp.textContent = `Generated by ${ADVISOR_BRIEF.generatedByName || 'an admin'}` +
+    `${when ? ' · ' + when : ''}${ADVISOR_BRIEF.coverageNote ? ' · call notes: ' + ADVISOR_BRIEF.coverageNote : ''}`;
+  if(btn) btn.textContent = 'Regenerate briefing';
+
+  let html = '';
+  if(b.headline) html += `<div class="adv-brief-headline">${advEsc(b.headline)}</div>`;
+  if(b.whatStandsOut) html += `<div class="adv-brief-body">${advEsc(b.whatStandsOut)}</div>`;
+  if(b.phoneRoomSignal) html += `<div class="adv-brief-body"><b>What the phones are hearing —</b> ${advEsc(b.phoneRoomSignal)}</div>`;
+  (b.recommendations || []).forEach(r => {
+    const pri = String(r.priority || 'medium').toLowerCase();
+    html += `<div class="adv-rec">
+      <div class="adv-rec-title">${advEsc(r.title || '')}<span class="pri ${['high','medium','low'].includes(pri) ? pri : 'medium'}">${advEsc(pri)}</span></div>
+      <div class="adv-rec-line"><b>Why:</b> ${advEsc(r.why || '')}</div>
+      <div class="adv-rec-line"><b>Do:</b> ${advEsc(r.do || '')}</div>
+    </div>`;
+  });
+  if((b.watchList || []).length) {
+    html += `<div class="adv-watch">${b.watchList.map(w => `<span>${advEsc(w)}</span>`).join('')}</div>`;
+  }
+  if((b.campaignIdeas || []).length) {
+    html += `<div class="adv-section-label" style="margin-top:20px">Campaign ideas</div>`;
+    b.campaignIdeas.forEach(c => {
+      const meta = [c.department, c.timing].filter(Boolean).map(advEsc).join(' · ');
+      html += `<div class="adv-rec"><div class="adv-rec-line">${advEsc(c.idea || '')}</div>` +
+        `${meta ? `<div class="adv-rec-line" style="margin-top:4px;color:var(--text-3)">${meta}</div>` : ''}</div>`;
+    });
+  }
+  if(b.provocation) html += `<div class="adv-provocation">${advEsc(b.provocation)}</div>`;
+  el.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+window.askAdvisor = async function() {
+  const input = document.getElementById('adv-chat-input');
+  const q = (input.value || '').trim();
+  if(!q) return;
+  if(!ANTHROPIC_API_KEY) { showToast('No API key configured — set it in Campaign Generator → AI Setup', true); return; }
+  input.value = '';
+  advisorChat.push({ role: 'user', content: q });
+  renderAdvisorChat(true);
+  const btn = document.getElementById('adv-chat-btn');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    if(!advisorPulseCache) advisorPulseCache = buildAdvisorPulse();
+    const sys = ADVISOR_PERSONA +
+      '\n\nAnswer in plain prose, a few sentences, no headers or JSON. Current data snapshot ' +
+      'you can reason over:\n\n' + JSON.stringify(advisorPulseCache, null, 2);
+    const reply = await advisorClaudeCall({
+      system: sys,
+      messages: advisorChat.slice(-10).map(m => ({ role: m.role, content: m.content })),
+      maxTokens: 1200,
+    });
+    advisorChat.push({ role: 'assistant', content: reply });
+  } catch(e) {
+    advisorChat.push({ role: 'assistant', content: "(couldn't answer: " + e.message + ')' });
+  } finally {
+    btn.disabled = false; btn.textContent = 'Send';
+    renderAdvisorChat(true);
+  }
+};
+
+function renderAdvisorChat(scroll) {
+  const log = document.getElementById('adv-chat-log');
+  if(!log) return;
+  if(!advisorChat.length) {
+    log.innerHTML = '<div class="adv-muted">Ask a question about the numbers above — “why did Dermatology leads drop?”, “what would you cut if the budget halved?”</div>';
+    return;
+  }
+  log.innerHTML = advisorChat.map(m =>
+    `<div class="adv-msg ${m.role === 'user' ? 'user' : 'advisor'}">${advEsc(m.content)}</div>`).join('');
+  if(scroll) log.scrollTop = log.scrollHeight;
+}
+
+function initAdvisorTab() {
+  const hr = new Date().getHours();
+  const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+  const first = (myMemberName() || '').split(' ')[0];
+  const gEl = document.getElementById('adv-greeting');
+  if(gEl) gEl.textContent = first ? `${greet}, ${first}` : greet;
+  try {
+    advisorPulseCache = buildAdvisorPulse();
+    renderAdvisorPulse(advisorPulseCache);
+  } catch(e) {
+    console.error('Advisor pulse error:', e);
+    const pEl = document.getElementById('adv-pulse');
+    if(pEl) pEl.innerHTML = '<div class="adv-muted">Could not compute the pulse — check the console.</div>';
+  }
+  renderAdvisorBrief();
+  renderAdvisorChat(false);
 }
 
 // ── SETTINGS TAB — Department Revenue Estimates ──────────────────────────

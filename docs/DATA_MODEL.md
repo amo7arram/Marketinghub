@@ -345,6 +345,7 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 | `ai_settings` | Anthropic API key (⚠️ stored here, visible client-side — see `ARCHITECTURE.md` §4) |
 | `access_gate` | Public portal password gate settings |
 | ~~`admin_passcode`~~ | **Removed** — held the "Magic Word" shared admin-login passcode hash; that login path was retired once every admin had an individual account (`ARCHITECTURE.md` §4.4). The document may still exist in Firestore but has no rule and is read/written by nothing. |
+| `advisor_brief` | **Authenticated-only** (never public — lead-derived). The AI-written briefing for `admin.html`'s Advisor tab: `{ json: {headline, whatStandsOut, phoneRoomSignal, recommendations[], watchList[], campaignIdeas[], provocation}, generatedAt, generatedByName, coverageNote }`. One org-wide doc; any admin can regenerate it (overwrites). The pulse it's built from is computed client-side and not stored. Becomes `/orgs/{id}/config/advisor_brief` under multi-tenancy. |
 | `lead_stats` | **Public-readable** aggregated leads funnel snapshot — written by admin, read by `index.html`. Contains zero PII by design. |
 | `department_revenue_estimates` | Per-department average revenue, used as the ROI fallback when actual `leads.revenueValue` isn't entered |
 | `metricool_settings` | Metricool API token + userId/blogId (⚠️ stored here, visible client-side — same tradeoff as `ai_settings`, see `ARCHITECTURE.md` §4). Needs an authenticated-only Firestore rule, same sensitivity class as `ai_settings`. |

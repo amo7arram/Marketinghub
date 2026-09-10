@@ -517,6 +517,21 @@ export function setAccessGate(data) {
   return setDoc(doc(db, CONFIG, "access_gate"), data, { merge: true });
 }
 
+// ── ADVISOR BRIEF ───────────────────────────────────────────────────────
+// Stored as config/advisor_brief → { json, generatedAt, generatedByName,
+// coverageNote }. The AI-written briefing shown on admin.html's Advisor tab.
+// Authenticated-only (never public-read) — it's derived from leads and
+// internal performance data. One org-wide document today; when multi-tenant
+// lands this becomes /orgs/{id}/config/advisor_brief.
+export function watchAdvisorBrief(callback) {
+  return onSnapshot(doc(db, CONFIG, "advisor_brief"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchAdvisorBrief:', err.code); callback(null); });
+}
+export function saveAdvisorBrief(data) {
+  return setDoc(doc(db, CONFIG, "advisor_brief"), data);
+}
+
 
 // ── ENTITIES (admin-manageable, replaces the old hardcoded list) ─────────
 // Auto-seeds the original 5 entities on first load if the collection is
