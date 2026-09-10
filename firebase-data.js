@@ -498,24 +498,11 @@ export async function createTeamMemberWithLogin({ name, email, department, passw
   return { id: docRef.id, authUid: newUid };
 }
 
-// ── ADMIN LOGIN PASSCODE ("Magic Word") ───────────────────────────────────
-// A temporary, parallel login path alongside real email/password auth —
-// not a replacement for it. Entering the correct passcode triggers a real,
-// silent Firebase Auth login behind the scenes (see admin.html), so nothing
-// about Firestore security rules changes; this is purely a faster front door
-// for trusted staff during a transitional period.
-// Stored as config/admin_passcode → { passwordHash: string }
-// Auto-seeds the default passcode "openIMC@123admin" on first use.
-export async function getAdminPasscode() {
-  const snap = await getDoc(doc(db, CONFIG, "admin_passcode"));
-  if (snap.exists()) return snap.data().passwordHash;
-  const defaultHash = await hashPassword("openIMC@123admin");
-  await setDoc(doc(db, CONFIG, "admin_passcode"), { passwordHash: defaultHash });
-  return defaultHash;
-}
-export function setAdminPasscode(passwordHash) {
-  return setDoc(doc(db, CONFIG, "admin_passcode"), { passwordHash }, { merge: true });
-}
+// The admin "Magic Word" passcode login (config/admin_passcode +
+// getAdminPasscode/setAdminPasscode) was removed once every admin had an
+// individual email/password account — see docs/ARCHITECTURE.md §4.4. The
+// abandoned config/admin_passcode document may still exist in Firestore; it
+// is no longer read or written by any code and its rule has been dropped.
 
 // ── PUBLIC ACCESS GATE ───────────────────────────────────────────────────
 // Stored as config/access_gate → { enabled: bool, passwordHash: string }

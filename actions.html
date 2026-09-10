@@ -72,37 +72,22 @@ tr.row-overdue td{background:#FFF5F5}
 </head>
 <body>
 
-<!-- ── LOGIN — dual-mode, identical to admin.html's gate ── -->
+<!-- ── LOGIN — email/password, same gate as admin.html ── -->
 <div class="login-wrap" id="login-wrap">
   <div class="login-card">
     <img class="login-logo-img" src="logo.jpg" alt="IMC">
     <div class="login-sub">Marketing Actions — Leadership View</div>
     <div class="login-error" id="login-error"></div>
 
-    <div style="display:flex;background:var(--bg);border-radius:8px;padding:3px;gap:2px;margin-bottom:18px">
-      <button type="button" class="login-mode-btn active" id="mode-btn-password" onclick="switchLoginMode('password')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:inherit;background:var(--navy);color:#fff">Password</button>
-      <button type="button" class="login-mode-btn" id="mode-btn-magic" onclick="switchLoginMode('magic')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-family:inherit;background:transparent;color:var(--text-3)">✨ Magic Word</button>
+    <div class="login-field">
+      <label class="login-label">Email</label>
+      <input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-
-    <div id="login-mode-password">
-      <div class="login-field">
-        <label class="login-label">Email</label>
-        <input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa">
-      </div>
-      <div class="login-field">
-        <label class="login-label">Password</label>
-        <input class="login-input" type="password" id="login-password" placeholder="••••••••">
-      </div>
-      <button class="login-btn" id="password-login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-field">
+      <label class="login-label">Password</label>
+      <input class="login-input" type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
     </div>
-
-    <div id="login-mode-magic" style="display:none">
-      <div class="login-field">
-        <label class="login-label">What's the magic word?</label>
-        <input class="login-input" type="password" id="login-magicword" placeholder="Enter passcode" onkeydown="if(event.key==='Enter')doMagicWordLogin()">
-      </div>
-      <button class="login-btn" id="magic-login-btn" onclick="doMagicWordLogin()">Unlock</button>
-    </div>
+    <button class="login-btn" id="password-login-btn" onclick="doLogin()">Sign In</button>
   </div>
 </div>
 
@@ -138,7 +123,7 @@ tr.row-overdue td{background:#FFF5F5}
 
 <script type="module">
 import {
-  login, logout, watchAuth, getUserRole, getAdminPasscode, hashPassword,
+  login, logout, watchAuth, getUserRole,
   watchMarketingActions, watchInitiatives, ACTION_STATUSES
 } from './firebase-data.js';
 // Deliberately NOT imported: addMarketingAction/updateMarketingAction/
@@ -147,66 +132,13 @@ import {
 
 const ACTION_STATUS_CLASS = {'Not Started':'b-planned','In Progress':'b-production','Blocked':'b-cancelled','Completed':'b-published'};
 
-// The one account used for the silent background login when someone signs
-// in via the Magic Word passcode instead of email/password — identical
-// mechanism to admin.html's own Magic Word (same account, same passcode).
-// Real Firebase Auth still runs underneath; this is a parallel front door,
-// not a bypass. See docs/ARCHITECTURE.md §4.4 for the wider-reach tradeoff
-// this deliberately accepts (this page shares admin.html's exact session).
-const MAGIC_WORD_ACCOUNT_EMAIL = 'anaggar@imc.med.sa';
-const MAGIC_WORD_ACCOUNT_PASSWORD = 'openIMC@123admin';
-
 let ALL_ACTIONS = [];
 let ALL_INITIATIVES = [];
 let unsubActions = null, unsubInitiatives = null;
 
-window.switchLoginMode = function(mode) {
-  const isPassword = mode === 'password';
-  document.getElementById('login-mode-password').style.display = isPassword ? 'block' : 'none';
-  document.getElementById('login-mode-magic').style.display = isPassword ? 'none' : 'block';
-  const pwBtn = document.getElementById('mode-btn-password');
-  const mgBtn = document.getElementById('mode-btn-magic');
-  pwBtn.style.background = isPassword ? 'var(--navy)' : 'transparent';
-  pwBtn.style.color = isPassword ? '#fff' : 'var(--text-3)';
-  mgBtn.style.background = isPassword ? 'transparent' : 'var(--navy)';
-  mgBtn.style.color = isPassword ? 'var(--text-3)' : '#fff';
-  document.getElementById('login-error').style.display = 'none';
-}
-
 function resetLoginButtons() {
   const pwBtn = document.getElementById('password-login-btn');
-  const mgBtn = document.getElementById('magic-login-btn');
   if(pwBtn) { pwBtn.textContent = 'Sign In'; pwBtn.disabled = false; }
-  if(mgBtn) { mgBtn.textContent = 'Unlock'; mgBtn.disabled = false; }
-}
-
-window.doMagicWordLogin = async function() {
-  const entered = document.getElementById('login-magicword').value;
-  const errEl = document.getElementById('login-error');
-  const btn = document.getElementById('magic-login-btn');
-  errEl.style.display = 'none';
-  if(!entered) return;
-  btn.textContent = 'Checking...';
-  btn.disabled = true;
-  try {
-    const storedHash = await getAdminPasscode();
-    const enteredHash = await hashPassword(entered);
-    if(enteredHash !== storedHash) {
-      errEl.textContent = 'Incorrect passcode — try again.';
-      errEl.style.display = 'block';
-      document.getElementById('login-magicword').value = '';
-      btn.textContent = 'Unlock';
-      btn.disabled = false;
-      return;
-    }
-    await login(MAGIC_WORD_ACCOUNT_EMAIL, MAGIC_WORD_ACCOUNT_PASSWORD);
-    // watchAuth's callback below handles everything from here.
-  } catch(e) {
-    errEl.textContent = 'Sign-in failed: ' + e.message;
-    errEl.style.display = 'block';
-    btn.textContent = 'Unlock';
-    btn.disabled = false;
-  }
 }
 
 window.doLogin = async function() {

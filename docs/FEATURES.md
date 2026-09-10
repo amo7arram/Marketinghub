@@ -36,7 +36,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Month navigator** — the table defaults to one month (by Start Date), current month first, with ◀/▶ controls and a "Today" shortcut once you've navigated away — replaces the old default of showing every activity ever created, years-out entries included. A "Show All Time" checkbox drops the scope entirely when you need to browse or search everything.
 - **Overdue detection** — a `Planned` activity whose Start Date has already passed is highlighted (red row + "⚠ Overdue" badge) and computed live, never stored. An "Overdue only" filter deliberately bypasses the month scope entirely (and "Show All Time") — overdue items live in past months by definition, so it surfaces every one of them regardless of which month you're currently browsing. Change its status via the normal Edit flow once you've dealt with it.
 - **Assignment & collaboration**
-  - The table shows an **Assigned To** column (also on the campaign drill-down rows), and a **"👤 Mine only"** filter that scopes to activities assigned to the signed-in user (matched by `assignedToUid`, with a name fallback for older rows). Only works for people on real email/password logins — a Magic Word session is the shared account.
+  - The table shows an **Assigned To** column (also on the campaign drill-down rows), and a **"👤 Mine only"** filter that scopes to activities assigned to the signed-in user (matched by `assignedToUid`, with a name fallback for older rows). The assignee needs their own login account for the UID match to work.
   - Every new activity records **who created it** (`createdByName`), shown as a "Created by" line on the Edit form and on the public `openDetail()` panel.
   - **Creator-locked reassignment** — once an activity exists, its "Assigned To" field is editable only by the person who created it, or by the **Super Admin** (see Settings → Team Members). Everyone else sees it disabled with a "Only X can reassign this" hint. This is a UI guard, not a Firestore rule. Activities created before this feature (no recorded creator) stay reassignable by any admin.
 - Filters: type, department, entity, status, overdue-only, mine-only, search
@@ -113,7 +113,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - CRUD for action items agreed between executive leadership and marketing in meetings — title, description, accountable person (free text, not a team-member lookup), date agreed, meeting context, deadline, status (`Not Started`/`In Progress`/`Blocked`/`Completed`)
 - **Overdue is computed live** (past deadline + not Completed), never stored — shown as a red row + "⚠ Overdue" badge
 - **Link to a real Activity** — either check "Create a new linked initiative now" (a small sub-form: title/type/department/status/start date — creates a real `initiatives` document immediately, findable right away in the normal Activities tab) or link to an initiative that already exists, via a searchable dropdown. Mutually exclusive with each other; an already-linked action shows its live title+status with an Unlink option
-- Read-only, live view for executive leadership at **`actions.html`** (see below) — reuses the exact same login gate as `admin.html`, including the Magic Word
+- Read-only, live view for executive leadership at **`actions.html`** (see below) — reuses the exact same email/password login gate as `admin.html`
 
 ### Brand Resources
 - CRUD for the public resource library
@@ -134,7 +134,6 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - **Metricool Setup** — API token + brand/profile selection (via "Fetch My Profiles"), stored in `config/metricool_settings`; powers Dashboard Metrics syncing
 - **Google Analytics** — a single GA4 Measurement ID, stored in `config/analytics_settings`, adds analytics to every Landing Page (page views + a "lead submitted" conversion event per page). Blank by default (no tracking); see the Landing Pages entry above and `docs/ARCHITECTURE.md` §4.6 for the consent-gating mechanism
 - **Public Access Gate** — enable/disable + set the password gate on the public portal
-- **Admin Login Passcode ("Magic Word")** — set a shared passcode as an alternative login path; changing it force-logs-out the current session
 - **Brand Voice** — AI generation tone, formality, closing hashtag, CTA text, banned words — feeds every AI caption/content generation call system-wide
 
 ### Content Generator *(currently hidden from nav, code intact)*
@@ -179,7 +178,7 @@ Tab-based: **Leads** and **Offers**. (A third Inbox tab — social media message
 
 A live, read-only dashboard for executive leadership to track marketing action items agreed in meetings — no add/edit/delete controls anywhere on this page, enforced both in the UI and by which functions the page imports from `firebase-data.js` at all.
 
-- Login gate is a byte-for-byte copy of `admin.html`'s own dual-mode gate (password or the same Magic Word passcode) — this page shares `admin.html`'s exact `role==='admin'` session rather than getting a new, narrower role. See `ARCHITECTURE.md` §4.4 for the access-model tradeoff this accepts.
+- Login gate is a copy of `admin.html`'s own email/password gate — this page shares `admin.html`'s exact `role==='admin'` session rather than getting a new, narrower role. See `ARCHITECTURE.md` §4.4 for the access-model tradeoff this accepts.
 - Summary strip up top: total actions, and an overdue count that turns the whole strip red the moment anything is late — meant to answer "are we on track" in the first second, before reading the table.
 - Table sorted **overdue-first, then by ascending deadline** — nothing needs filtering to surface what's late.
 - Each row's linked initiative (if any) shows its **live** current title + status, not a stale snapshot — both this page and `admin.html` read the same real-time `initiatives` data, so a status change made in `admin.html` appears here immediately, no refresh needed.
