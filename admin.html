@@ -278,13 +278,16 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2)">
             <input type="checkbox" id="f-overdue" onchange="renderTable()"> ⚠ Overdue only
           </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2)">
+            <input type="checkbox" id="f-mine" onchange="renderTable()"> 👤 Mine only
+          </label>
           <input class="filter-input" type="text" placeholder="Search..." id="f-search" oninput="renderTable()">
         </div>
         <button class="btn btn-primary" onclick="openForm()">+ New Activity</button>
       </div>
       <table>
-        <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="table-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Assigned To</th><th>Actions</th></tr></thead>
+        <tbody id="table-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -1109,7 +1112,12 @@ tr.row-overdue:hover td{background:#FFD6D6}
       </div>
       <div class="field-group" id="fld-eng-wrap"><label class="field-label">Engagements</label><input class="field-input" type="number" id="fld-engagements"></div>
 
-      <div class="field-group"><label class="field-label">Assigned To</label><select class="field-select" id="fld-assignedTo"><option value="">— Unassigned —</option></select></div>
+      <div class="field-group">
+        <label class="field-label">Assigned To</label>
+        <select class="field-select" id="fld-assignedTo"><option value="">— Unassigned —</option></select>
+        <div id="fld-assignedTo-lock" style="display:none;font-size:10px;color:var(--text-3);margin-top:3px"></div>
+      </div>
+      <div id="fld-created-meta" style="display:none;font-size:10px;color:var(--text-3);margin-top:-4px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeForm()">Cancel</button>
@@ -1324,6 +1332,14 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div class="field-group"><label class="field-label">Role</label>
           <select class="field-select" id="tm-role"><option value="admin">Admin — full access</option><option value="coordinator">Coordinator — request form only</option><option value="agent">Agent — call center leads page only, no delete</option></select>
         </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 0 0;border-top:1px solid var(--border);margin-top:6px">
+        <input type="checkbox" id="tm-superadmin" style="width:16px;height:16px;cursor:pointer;margin-top:1px">
+        <label for="tm-superadmin" style="font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer">
+          ★ Super Admin
+          <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);margin-top:2px">Can reassign any activity regardless of who created it. Intended for one person; requires login access to have any effect.</span>
+        </label>
       </div>
     </div>
     <div class="modal-footer">
@@ -1749,6 +1765,7 @@ let DEPT_REVENUE_ESTIMATES = {};
 let ALL_RESOURCES = [];
 let ALL_REQUESTS = [];
 let currentAdminEmail = '';
+let currentAdminUid = '';
 let editingRequestAcceptId = null, pendingRequestUnlink = false;
 let ALL_LANDING_PAGES = [];
 let editingLandingPageSlug = null; // null = creating; non-null = editing (slug locked)
@@ -1897,6 +1914,7 @@ watchAuth(async user => {
       document.getElementById('app').classList.add('active');
       document.getElementById('user-email').textContent = user.email;
       currentAdminEmail = user.email;
+      currentAdminUid = user.uid;
       initData();
     } catch(e) {
       console.error('Role check failed:', e);
@@ -2278,6 +2296,25 @@ window.openForm = function(initiative=null) {
   document.getElementById('fld-engagements').value = initiative?.engagements || '';
   document.getElementById('fld-assignedTo').value = initiative?.assignedTo || '';
 
+  // "Created by" line + creator-locked reassignment (UI guard only).
+  const createdMeta = document.getElementById('fld-created-meta');
+  const assignedSel = document.getElementById('fld-assignedTo');
+  const lockHint = document.getElementById('fld-assignedTo-lock');
+  if(initiative && initiative.createdByName) {
+    createdMeta.textContent = `Created by ${initiative.createdByName}`;
+    createdMeta.style.display = 'block';
+  } else {
+    createdMeta.style.display = 'none';
+  }
+  const locked = initiative && !canReassign(initiative);
+  assignedSel.disabled = !!locked;
+  if(locked) {
+    lockHint.textContent = `Only ${initiative.createdByName || 'the creator'} can reassign this activity.`;
+    lockHint.style.display = 'block';
+  } else {
+    lockHint.style.display = 'none';
+  }
+
   // sync chips
   document.querySelectorAll('#fld-entity .chip').forEach(c=>c.classList.toggle('active', selectedEntities.includes(c.dataset.val)));
   document.querySelectorAll('#fld-channels .chip').forEach(c=>c.classList.toggle('active', selectedChannels.includes(c.dataset.val)));
@@ -2343,6 +2380,25 @@ window.saveInitiative = async function() {
     engagements: Number(document.getElementById('fld-engagements').value) || null,
     assignedTo: document.getElementById('fld-assignedTo').value,
   };
+
+  // Resolve the picked name to a UID so "My Activities" and the reassignment
+  // guard can key off a stable id (name lookup — collisions unlikely in a
+  // small directory; the name string stays the display source of truth).
+  const existing = editingId ? ALL_INITIATIVES.find(i=>i.id===editingId) : null;
+  if(existing && !canReassign(existing)) {
+    // Field was shown disabled; re-clamp both so a tampered DOM can't slip a
+    // reassignment through.
+    data.assignedTo = existing.assignedTo || '';
+    data.assignedToUid = existing.assignedToUid || null;
+  } else {
+    const picked = ALL_TEAM_MEMBERS.find(m => m.name === data.assignedTo);
+    data.assignedToUid = picked?.authUid || null;
+  }
+
+  if(!editingId) {
+    data.createdByUid = currentAdminUid || null;
+    data.createdByName = myMemberName() || currentAdminEmail || 'Unknown';
+  }
 
   try {
     if(editingId) {
@@ -2491,6 +2547,7 @@ function renderCampaignDrilldown() {
         <span class="type-pill">${c.type||''}</span>
         <span class="cdd-child-title">${c.title||''}</span>
         <span style="font-size:10px;color:var(--text-3)">${c.startDate||'—'}</span>
+        ${c.assignedTo?`<span style="font-size:10px;color:var(--text-3)">👤 ${c.assignedTo}</span>`:''}
         <span class="badge ${STATUS_CLASS[c.status]||'b-planned'}">${c.status||''}</span>
         <button class="btn btn-sm" onclick="editChildFromDrilldown('${c.id}')">Edit</button>
         <button class="btn btn-sm btn-danger" onclick="removeInitiative('${c.id}','${(c.title||'').replace(/'/g,"\\'")}')">Delete</button>
@@ -2524,6 +2581,29 @@ window.editCampaignFromDrilldown = function() {
 function deptStyle(d) {
   const c = getDeptColor(d);
   return { bg: c.bg, t: c.t };
+}
+
+// ── CURRENT-USER / ASSIGNMENT HELPERS ────────────────────────────────────
+// "Who am I" resolves through the team directory by Firebase Auth UID (more
+// stable than email, and the same link leads/assignedAgentUid already use).
+// Note: a Magic Word login is the shared anaggar@imc.med.sa account, so all
+// Magic Word sessions resolve to whichever directory row (if any) owns that
+// UID — an accepted limitation of the shared passcode door.
+function myTeamMember() {
+  return currentAdminUid ? ALL_TEAM_MEMBERS.find(m => m.authUid === currentAdminUid) || null : null;
+}
+function myMemberName() {
+  return myTeamMember()?.name || '';
+}
+function iAmSuperAdmin() {
+  return myTeamMember()?.superAdmin === true;
+}
+// UI-level guard only (no Firestore rule backs this — see the plan): who may
+// change an activity's "Assigned To". Legacy activities with no recorded
+// creator stay reassignable by any admin.
+function canReassign(i) {
+  if(!i || !i.createdByUid) return true;
+  return i.createdByUid === currentAdminUid || iAmSuperAdmin();
 }
 
 // ── RENDER TABLE ──────────────────────────────────────────────────────
@@ -2575,6 +2655,9 @@ window.renderTable = function() {
   const entityF = document.getElementById('f-entity').value;
   const statusF = document.getElementById('f-status').value;
   const overdueOnly = document.getElementById('f-overdue').checked;
+  const mineOnly = document.getElementById('f-mine').checked;
+  const myUid = currentAdminUid;
+  const myName = myMemberName();
   const q = document.getElementById('f-search').value.toLowerCase();
 
   const period = currentActivitiesPeriod();
@@ -2598,6 +2681,11 @@ window.renderTable = function() {
     if(deptF && i.department!==deptF) return false;
     if(entityF && !(i.entity||[]).includes(entityF)) return false;
     if(statusF && i.status!==statusF) return false;
+    if(mineOnly) {
+      const mine = (i.assignedToUid && i.assignedToUid === myUid) ||
+                   (!i.assignedToUid && myName && i.assignedTo === myName);
+      if(!mine) return false;
+    }
     if(q && !JSON.stringify(i).toLowerCase().includes(q)) return false;
     return true;
   });
@@ -2630,13 +2718,14 @@ window.renderTable = function() {
         <td>${(i.entity||[]).join(', ')}</td>
         <td style="font-size:11px;color:var(--text-3)">${i.startDate||'—'}${i.endDate?' → '+i.endDate:''}</td>
         <td><span class="badge ${STATUS_CLASS[i.status]||'b-planned'}">${i.status||''}</span>${overdue?' <span class="badge b-cancelled">⚠ Overdue</span>':''}</td>
+        <td style="font-size:11px;color:var(--text-3)">${i.assignedTo||'—'}</td>
         <td class="row-actions">
           ${isCampaign?`<button class="btn btn-sm" onclick="openCampaignDrilldown('${i.id}')">View</button>`:''}
           <button class="btn btn-sm" onclick="editInitiative('${i.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="removeInitiative('${i.id}','${(i.title||'').replace(/'/g,"\\'")}')">Delete</button>
         </td>
       </tr>`;}).join('')
-    : `<tr><td colspan="7" class="empty">${overdueOnly ? 'No overdue activities — nice work' : activitiesShowAll ? 'No activities found' : `No activities found in ${activitiesPeriodLabel(period)}`}</td></tr>`;
+    : `<tr><td colspan="8" class="empty">${overdueOnly ? 'No overdue activities — nice work' : mineOnly ? 'Nothing assigned to you in this view' : activitiesShowAll ? 'No activities found' : `No activities found in ${activitiesPeriodLabel(period)}`}</td></tr>`;
 }
 
 // ── MARKETING ACTIONS ─────────────────────────────────────────────────
@@ -4871,7 +4960,7 @@ window.renderTeamMembersTable = function() {
         <td style="font-weight:600">${m.name||''}</td>
         <td style="font-size:11px;color:var(--text-3)">${m.email||''}</td>
         <td style="font-size:11px;color:var(--text-3)">${m.department||'—'}</td>
-        <td>${m.hasLoginAccount?`<span class="badge b-published">✓ ${m.role||'admin'}</span>`:`<span class="badge b-planned">Directory only</span>`}</td>
+        <td>${m.hasLoginAccount?`<span class="badge b-published">✓ ${m.role||'admin'}</span>`:`<span class="badge b-planned">Directory only</span>`}${m.superAdmin?` <span class="badge b-ready" title="Can reassign any activity">★ Super Admin</span>`:''}</td>
         <td class="row-actions">
           <button class="btn btn-sm" onclick="editTeamMember('${m.id}')">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="removeTeamMember('${m.id}','${m.authUid||''}','${(m.name||'').replace(/'/g,"\\'")}')">Delete</button>
@@ -4889,6 +4978,7 @@ window.openTeamMemberForm = function(member=null) {
   document.getElementById('tm-give-login').checked = false;
   document.getElementById('tm-password').value = '';
   document.getElementById('tm-role').value = 'admin';
+  document.getElementById('tm-superadmin').checked = member?.superAdmin === true;
   toggleTeamMemberLoginFields();
 
   // Login access, once granted, isn't changeable from this form in this
@@ -4919,14 +5009,26 @@ window.saveTeamMember = async function() {
   const department = document.getElementById('tm-department').value;
   if(!name || !email) { showToast('Name and email are required', true); return; }
 
+  const superAdmin = document.getElementById('tm-superadmin').checked;
+  // Soft "one Super Admin" guard — no Firestore rule enforces this, it's a
+  // deterrent against ending up with several people holding the override.
+  if(superAdmin) {
+    const other = ALL_TEAM_MEMBERS.find(m => m.superAdmin === true && m.id !== editingTeamMemberId);
+    if(other) {
+      showToast(`${other.name} is already the Super Admin — clear that first`, true);
+      return;
+    }
+  }
+
   const btn = document.getElementById('tm-save-btn');
   btn.disabled = true; btn.textContent = 'Saving...';
 
   try {
     if(editingTeamMemberId) {
-      // Editing an existing entry — name/department/email only (login
-      // access, if any, was already granted at creation and isn't changed here).
-      await updateTeamMember(editingTeamMemberId, { name, email, department });
+      // Editing an existing entry — name/department/email + the Super Admin
+      // flag. Login access / role, if any, was granted at creation and still
+      // isn't changed here.
+      await updateTeamMember(editingTeamMemberId, { name, email, department, superAdmin });
       showToast('✓ Team member updated');
     } else {
       const giveLogin = document.getElementById('tm-give-login').checked;
@@ -4938,10 +5040,10 @@ window.saveTeamMember = async function() {
           btn.disabled = false; btn.textContent = 'Save Team Member';
           return;
         }
-        await createTeamMemberWithLogin({ name, email, department, password, role });
+        await createTeamMemberWithLogin({ name, email, department, password, role, superAdmin });
         showToast(`✓ ${name} added with ${role} login access`);
       } else {
-        await addTeamMember({ name, email, department });
+        await addTeamMember({ name, email, department, superAdmin });
         showToast(`✓ ${name} added to team directory`);
       }
     }

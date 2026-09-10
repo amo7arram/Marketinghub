@@ -474,7 +474,7 @@ export async function deleteTeamMember(id, authUid) {
 // Creates a REAL Firebase Auth login account for a team member, using a
 // secondary app instance so the admin's own current session is untouched.
 // Then writes their role and saves the team member record together.
-export async function createTeamMemberWithLogin({ name, email, department, password, role }) {
+export async function createTeamMemberWithLogin({ name, email, department, password, role, superAdmin = false }) {
   const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
   const secondaryAuth = getAuth(secondaryApp);
   let newUid;
@@ -492,7 +492,7 @@ export async function createTeamMemberWithLogin({ name, email, department, passw
 
   // Save the team member directory entry, linked to their new auth account.
   const docRef = await addDoc(collection(db, TEAM_MEMBERS), {
-    name, email, department: department || '', role,
+    name, email, department: department || '', role, superAdmin: !!superAdmin,
     hasLoginAccount: true, authUid: newUid, active: true, createdAt: Timestamp.now(),
   });
   return { id: docRef.id, authUid: newUid };

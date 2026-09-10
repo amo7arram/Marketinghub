@@ -41,7 +41,9 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `featuredBD` | boolean | Shows on the Business Development page |
 | `parentCampaignId` | string \| null | **Critical field** — links a single activity to a parent `Campaign`-type initiative. Absence means the activity is standalone. |
 | `googleSheetUrl` | string | Only on `type: "Campaign"` — optional linked Google Sheet for live lead import |
-| `assignedTo` | string | Team member name, sourced from `team_members` — **who's working on producing this content**, unrelated to `leads.assignedAgentUid`/`assignedAgentName` (which lead a call-center agent should follow up on). Two different assignment concepts that happen to share a similar name. |
+| `assignedTo` | string | Team member name, sourced from `team_members` — **who's working on producing this content**, unrelated to `leads.assignedAgentUid`/`assignedAgentName` (which lead a call-center agent should follow up on). Two different assignment concepts that happen to share a similar name. Still the display source of truth; `assignedToUid` is the stable companion. |
+| `assignedToUid` | string \| null | Firebase Auth UID of the assignee, resolved from the picked name against `team_members.authUid` at save time. Drives the Activities page's "👤 Mine only" filter (`i.assignedToUid === currentAdminUid`, with a name fallback for pre-existing rows). Null when the assignee has no login account, or on legacy documents. |
+| `createdByUid` / `createdByName` | string \| null | Stamped once, on create, from the signed-in admin (`createdByName` falls back to their login email, then `"Unknown"`, when they have no `team_members` row — e.g. a Magic Word session). Powers the **creator-locked reassignment** UI guard: the "Assigned To" field on an existing activity is editable only by the creator or the Super Admin (`admin.html`'s `canReassign()`). **UI-level only — no Firestore rule enforces it**, consistent with the app's other soft boundaries. Legacy documents with no `createdByUid` stay reassignable by any admin. `createdByName` is also shown on the public `openDetail()` panel. |
 | `reach` / `impressions` / `engagements` | number \| null | Manually entered performance figures |
 | `createdAt` / `updatedAt` | Firestore Timestamp | |
 
@@ -183,6 +185,8 @@ Directory of staff, used for the "Assigned To" dropdown and optionally linked to
 | `department` | string | Optional |
 | `hasLoginAccount` | boolean | |
 | `authUid` | string \| null | The Firebase Auth UID, if a login account was created |
+| `role` | string | Mirror of the `roles/{authUid}` value, set at login-account creation (`admin` / `coordinator` / `agent`) — display convenience only; `roles` is the auth source of truth |
+| `superAdmin` | boolean | UI-level flag (**not** a `roles` value): this person can reassign any activity regardless of who created it. Intended for exactly one person — `admin.html` soft-blocks setting a second one. Only meaningful for a member with a login account. Editable on the member's row in Settings → Team Members. |
 | `active` | boolean | |
 | `createdAt` | Timestamp | |
 

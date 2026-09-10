@@ -35,7 +35,11 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Validation: a `Published` activity with a caption-bearing type must have a Post Link before it can be saved
 - **Month navigator** — the table defaults to one month (by Start Date), current month first, with ◀/▶ controls and a "Today" shortcut once you've navigated away — replaces the old default of showing every activity ever created, years-out entries included. A "Show All Time" checkbox drops the scope entirely when you need to browse or search everything.
 - **Overdue detection** — a `Planned` activity whose Start Date has already passed is highlighted (red row + "⚠ Overdue" badge) and computed live, never stored. An "Overdue only" filter deliberately bypasses the month scope entirely (and "Show All Time") — overdue items live in past months by definition, so it surfaces every one of them regardless of which month you're currently browsing. Change its status via the normal Edit flow once you've dealt with it.
-- Filters: type, department, entity, status, overdue-only, search
+- **Assignment & collaboration**
+  - The table shows an **Assigned To** column (also on the campaign drill-down rows), and a **"👤 Mine only"** filter that scopes to activities assigned to the signed-in user (matched by `assignedToUid`, with a name fallback for older rows). Only works for people on real email/password logins — a Magic Word session is the shared account.
+  - Every new activity records **who created it** (`createdByName`), shown as a "Created by" line on the Edit form and on the public `openDetail()` panel.
+  - **Creator-locked reassignment** — once an activity exists, its "Assigned To" field is editable only by the person who created it, or by the **Super Admin** (see Settings → Team Members). Everyone else sees it disabled with a "Only X can reassign this" hint. This is a UI guard, not a Firestore rule. Activities created before this feature (no recorded creator) stay reassignable by any admin.
+- Filters: type, department, entity, status, overdue-only, mine-only, search
 
 ### Campaign Generator
 - One campaign-level brief → generates a **full content suite** in one AI call: multiple social posts (dates auto-spread across the campaign window), plus copy for any selected print formats (Flyer, Backdrop/Rollup, Brochure, Sticker, Booklet, Countertop, Signage)
@@ -125,7 +129,7 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 
 ### Settings
 - **Entities** — add/remove business entities (blocked from deletion if still referenced anywhere)
-- **Team Members** — directory + optional real login account creation (Admin / Agent / Coordinator role), using a secondary Firebase app instance so creating a user doesn't sign out the admin
+- **Team Members** — directory + optional real login account creation (Admin / Agent / Coordinator role), using a secondary Firebase app instance so creating a user doesn't sign out the admin. Each member's row also carries a **★ Super Admin** toggle (editable after creation) — a UI-level flag, not a `roles` value, that lets one designated person reassign any activity regardless of creator. Setting a second Super Admin is soft-blocked.
 - **Department Revenue Estimates** — per-department average revenue, used as an ROI fallback
 - **Metricool Setup** — API token + brand/profile selection (via "Fetch My Profiles"), stored in `config/metricool_settings`; powers Dashboard Metrics syncing
 - **Google Analytics** — a single GA4 Measurement ID, stored in `config/analytics_settings`, adds analytics to every Landing Page (page views + a "lead submitted" conversion event per page). Blank by default (no tracking); see the Landing Pages entry above and `docs/ARCHITECTURE.md` §4.6 for the consent-gating mechanism

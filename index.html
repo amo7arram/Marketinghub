@@ -1737,6 +1737,7 @@ window.openDetail = function(c) {
       <div class="dp-row"><span class="dp-label">Objective</span><span class="dp-val">${c.objective||'—'}</span></div>
       <div class="dp-row"><span class="dp-label">Channels</span><span class="dp-val">${(c.channels||[]).join(', ')||'—'}</span></div>
       <div class="dp-row"><span class="dp-label">Assigned To</span><span class="dp-val">${c.assignedTo||'—'}</span></div>
+      ${c.createdByName?`<div class="dp-row"><span class="dp-label">Created By</span><span class="dp-val">${c.createdByName}</span></div>`:''}
     </div>
     ${(c.captionEN||c.captionAR)?`<div class="dp-section">
       <div class="dp-section-title">✨ AI-Generated Content</div>
