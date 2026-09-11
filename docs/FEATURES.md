@@ -70,9 +70,13 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 - Package and loyalty card CRUD, shown on the corresponding public pages
 
 ### Offers Catalog — replaces the retired Promotions feature
-- Excel-driven, not manually entered: upload Finance's master price/discount sheet, review a preview (detected columns, per-branch/category counts, skipped-row count), then publish — this wholesale-replaces the entire live catalog every time, so re-uploading whenever Finance's sheet changes is the entire maintenance workflow
-- Data is sharded one Firestore document per branch (not one giant document), grouped automatically from a Branch/Entity column in the sheet — no fixed list of branches, whatever the sheet contains becomes the catalog's tabs
-- Column detection is a best guess informed by this app's own `national-day-offers.html` (likely built from the same Finance data pipeline) — **not yet verified against Finance's real current sheet**; the preview step is the safety net before anything goes live
+- Excel-driven, not manually entered: upload Finance's master price/discount sheet, review a preview, then publish — this wholesale-replaces the entire live catalog every time, so re-uploading whenever Finance's sheet changes is the entire maintenance workflow
+- Data is sharded one Firestore document per branch (not one giant document), grouped automatically from Finance's `Provider` column — a code (`IMC`/`FC`/`MC`/`RS`) mapped to a real branch name; a cell can list several branches at once (comma-separated) and the offer is pushed to each one
+- **Only `Status: Active` rows are imported** — Finance's sheet carries a large volume of `Inactive` (retired/previously-used) codes plus `Approved`/`Pending` (not yet live) rows that must never reach the public catalog
+- **`Campaign Title` doubles as the category** for the per-branch filter chips (the sheet has no separate specialty/department column)
+- **Arabic is AI-drafted from the English description** at import time when the sheet doesn't supply its own — the preview shows a sample of English→Arabic pairs to spot-check before publishing; degrades to English-only if no AI key is configured
+- If `Gross Price` is blank but `Net Price` + the sheet's discount % are both present, the gross price is back-calculated rather than the row being dropped; a row with no usable price at all is skipped and listed in the preview
+- The preview reports: detected columns, rows excluded by status, price-skip count with examples, any unrecognized branch code, the Arabic sample, and a per-branch/category breakdown — the safety net before anything goes live
 - Shows last-updated timestamp, total offer count, and a live per-branch breakdown table at the top, so it's always obvious how current the public catalog is
 - Publishes to the public `offers.html` page (see below) and to Contact Center Control's read-only Offers tab
 

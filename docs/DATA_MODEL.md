@@ -94,10 +94,17 @@ Excel-driven public price/discount catalog — replaces `promotions` above. Admi
 | Field | Type | Notes |
 |---|---|---|
 | `branchLabelEN`, `branchLabelAR` | string | Display name for this branch's tab |
-| `offers` | array of objects | One entry per Excel row for this branch: `{code, description, category, arabic, price, discountedPrice, discountPct}`. `discountPct` is always computed from `price`/`discountedPrice` at import time, never trusted from a sheet column, so it can't drift out of sync with the two prices. |
+| `offers` | array of objects | One entry per Excel row for this branch: `{code, description, category, arabic, price, discountedPrice, discountPct}`. `discountPct` is always computed from `price`/`discountedPrice` at import time, never trusted from a sheet column (with one exception — see below), so it can't drift out of sync with the two prices. |
 | `updatedAt` | Timestamp | |
 
-**Column detection is a best guess** (see `admin.html`'s import function), informed by the National Day precedent's exact schema — **not yet verified against Finance's actual current sheet**. The import's preview step (per-branch/category counts) is the safety net before anything publishes.
+**Column detection is now verified against Finance's real "Promotional Campaigns" sheet** (confirmed with the user, not a guess). That sheet's actual columns are `Status, Provider, Year, Campaign Title, Code, Description, Gross Price, Proposed Discount, Net Price, Starting Date, End Date, Payor, Notes` — several real-world quirks this shapes the import around:
+- **`Status` gates what's imported.** Only rows marked `Active` are live offers. The sheet's own "Reference" tab defines `Inactive` as "code & discount previously approved in system" (i.e. retired, not current) and `Approved`/`Pending` as not-yet-live — in the real sheet, 520 of 840 rows were `Inactive`, so this filter is load-bearing, not cosmetic.
+- **`Provider` is the branch column**, mapped through a small hardcoded table (`OFFERS_BRANCH_CODE_MAP` in `admin.html`, confirmed with the user): `IMC`→IMC Jeddah, `FC`→The First Clinic, `MC`→IMC Makkah Branch, `RS`→Red Sea Mall Clinic. A cell can list several comma-separated (`"FC, IMC"`) — the same offer is then pushed into every branch named, not treated as one combined branch. An unrecognized code is used as-is and flagged in the preview rather than dropped.
+- **`Gross Price` can be blank.** When it is, and `Net Price` + `Proposed Discount` are both present, `price` is back-calculated (`Net ÷ (1 − discount)`) rather than skipping the row — verified against real rows where both figures were present that this relationship holds exactly. If nothing usable is present at all, the row is skipped (reported in the preview, with examples) rather than publishing a broken price.
+- **`Campaign Title` is used as `category`** (there's no dedicated specialty/department column) — an explicit product decision, not a fallback.
+- **No Arabic column exists.** `arabic` is AI-drafted from `description` at import time (`claude-sonnet-4-6`, batched) when the sheet doesn't supply one — degrades to English-only if no API key is configured or the call fails. The preview shows a sample of English→Arabic pairs for a spot-check; full manual review of every line isn't practical at typical row counts (a few hundred), so this is a "reviewable draft," not a guarantee.
+
+The import's preview step (per-branch/category counts, status-excluded counts, price-skip examples, unrecognized-branch warnings, Arabic sample) remains the safety net before anything publishes.
 
 ## `config/offers_catalog_meta`
 

@@ -323,8 +323,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
         </label>
       </div>
       <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:16px;line-height:1.6">
-        ℹ️ Publishing <strong>replaces the entire public catalog</strong> — re-upload Finance's sheet anytime it changes. The public page at <code>offers.html</code> always reflects whatever was last published here.
+        ℹ️ Publishing <strong>replaces the entire public catalog</strong> — re-upload Finance's sheet anytime it changes. The public page at <code>offers.html</code> always reflects whatever was last published here. Only rows whose <strong>Status</strong> column reads "Active" are imported; Inactive/Approved/Pending rows are excluded. Arabic is AI-drafted from the English description at import time — spot-check the sample in the preview before publishing.
       </div>
+      <div id="oc-import-status" style="display:none;font-size:12px;color:var(--text-3);margin-bottom:14px"></div>
       <div id="oc-preview-wrap" style="display:none">
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">Preview — review before publishing</div>
         <div id="oc-preview-summary" style="font-size:12px;color:var(--text-2);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;line-height:1.8"></div>
@@ -2962,6 +2963,11 @@ window.renderMarketingActionsTable = function() {
 // been tested against Finance's actual live sheet. The preview step below
 // is the safety net: nothing publishes without a human confirming the
 // detected columns and per-branch counts look right.
+// Finance's real sheet uses short codes for branch/entity, not full names —
+// confirmed directly with the user, not guessed. A code not in this map is
+// used as-is (flagged in the preview) rather than silently dropped.
+const OFFERS_BRANCH_CODE_MAP = { IMC: 'IMC Jeddah', FC: 'The First Clinic', MC: 'IMC Makkah Branch', RS: 'Red Sea Mall Clinic' };
+
 function offersColNorm(h) { return h.toLowerCase().replace(/[^a-z0-9]/g,''); }
 function findOffersCol(headers, used, ...candidates) {
   for (const c of candidates) {
@@ -2974,57 +2980,147 @@ function findOffersCol(headers, used, ...candidates) {
 window.handleOffersExcelUpload = function(input) {
   const file = input.files[0];
   if(!file) return;
+  const statusEl = document.getElementById('oc-import-status');
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Reading file…';
     try {
       const wb = XLSX.read(e.target.result, {type:'binary'});
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-      if(!rows.length) { showToast('No data found in the file', true); return; }
+      if(!rows.length) { showToast('No data found in the file', true); statusEl.style.display = 'none'; return; }
 
       const headers = Object.keys(rows[0]);
       const used = new Set();
-      // Order matters: more specific "discounted price" / "original price"
-      // candidates are matched before the bare "price" fallback, so a sheet
-      // with both columns doesn't have "price" greedily match either one.
-      const discountedCol = findOffersCol(headers, used, 'discountedprice','offerprice','finalprice','netprice','saleprice','specialprice');
-      const priceCol      = findOffersCol(headers, used, 'originalprice','listprice','regularprice','price');
-      const categoryCol   = findOffersCol(headers, used, 'billgroup','category','department','specialty');
-      const descCol       = findOffersCol(headers, used, 'description','servicename','service','itemname','name');
-      const arabicCol     = findOffersCol(headers, used, 'arabic','namear','descriptionar','servicear');
-      const branchCol     = findOffersCol(headers, used, 'branch','entity','location','facility','center');
-      const codeCol       = findOffersCol(headers, used, 'code','itemcode','sku');
+      // Order matters: more specific "discounted/net price" and "gross/
+      // original price" candidates are matched before the bare "price"
+      // fallback, so a sheet with several price-like columns doesn't have
+      // "price" greedily match the wrong one.
+      const discountedCol  = findOffersCol(headers, used, 'discountedprice','offerprice','finalprice','netprice','saleprice','specialprice');
+      const priceCol       = findOffersCol(headers, used, 'grossprice','originalprice','listprice','regularprice','price');
+      const discountPctCol = findOffersCol(headers, used, 'proposeddiscount','discountpercentage','discountpct','discount');
+      const categoryCol    = findOffersCol(headers, used, 'campaigntitle','billgroup','category','department','specialty');
+      const descCol        = findOffersCol(headers, used, 'description','servicename','service','itemname','name');
+      const arabicCol      = findOffersCol(headers, used, 'arabic','namear','descriptionar','servicear');
+      const branchCol      = findOffersCol(headers, used, 'provider','branch','entity','location','facility','center');
+      const codeCol        = findOffersCol(headers, used, 'code','itemcode','sku');
+      const statusCol      = findOffersCol(headers, used, 'status');
 
       if(!descCol || !priceCol) {
         showToast('Could not find Description or Price columns — check the file headers', true);
+        statusEl.style.display = 'none';
         return;
       }
 
       const branches = {};
-      let skipped = 0;
+      let skippedRequired = 0;      // no description at all
+      let skippedPrice = 0;         // active row, but no price could be resolved
+      const skippedPriceExamples = [];
+      const skippedByStatus = {};   // e.g. {Inactive: 520, Approved: 7, Pending: 2}
+      const unrecognizedBranchCodes = new Set();
+
       rows.forEach(r => {
+        // Only "Active" rows are live offers. Finance's own sheet defines
+        // Inactive as "code & discount previously approved in system" (i.e.
+        // retired, not current), Approved as scheduled but not yet live, and
+        // Pending as not yet approved — none of those belong on a public page.
+        if(statusCol) {
+          const status = String(r[statusCol]||'').trim();
+          if(status.toLowerCase() !== 'active') {
+            const key = status || '(blank)';
+            skippedByStatus[key] = (skippedByStatus[key]||0) + 1;
+            return;
+          }
+        }
+
         const description = String(r[descCol]||'').trim();
-        const price = parseFloat(r[priceCol]);
-        if(!description || isNaN(price)) { skipped++; return; }
-        const discountedRaw = discountedCol ? parseFloat(r[discountedCol]) : NaN;
-        const discountedPrice = isNaN(discountedRaw) ? price : discountedRaw;
+        if(!description) { skippedRequired++; return; }
+
+        // Price: prefer the sheet's own gross/net pair and always recompute
+        // the discount % ourselves (never trust a sheet's own % column when
+        // real prices are present). If Gross is blank but Net + a discount
+        // fraction are both given, back-calculate Gross from them — this
+        // sheet's real data confirms Net = Gross × (1 − discount) exactly.
+        // If nothing usable is present at all, skip rather than publish a
+        // broken "SAR undefined" tile.
+        let price = parseFloat(r[priceCol]);
+        let discountedPrice = discountedCol ? parseFloat(r[discountedCol]) : NaN;
+        if(isNaN(price) && !isNaN(discountedPrice) && discountPctCol) {
+          let d = parseFloat(r[discountPctCol]);
+          if(!isNaN(d)) {
+            if(d > 1) d = d / 100; // defend against whole-percent (25) vs fraction (0.25)
+            if(d > 0 && d < 1) price = discountedPrice / (1 - d);
+          }
+        }
+        if(isNaN(discountedPrice)) discountedPrice = price;
+        if(isNaN(price) || price <= 0 || isNaN(discountedPrice) || discountedPrice < 0) {
+          skippedPrice++;
+          if(skippedPriceExamples.length < 5) {
+            skippedPriceExamples.push(`${codeCol ? String(r[codeCol]||'') : ''} ${description}`.trim());
+          }
+          return;
+        }
         const discountPct = (price > 0 && discountedPrice < price) ? Math.round((price-discountedPrice)/price*100) : 0;
+
+        // Branch: a cell can list several at once (comma-separated, e.g.
+        // "FC, IMC") — the same offer then belongs on every branch named,
+        // not a new combined "branch" of its own.
         const branchRaw = branchCol ? String(r[branchCol]||'').trim() : '';
-        const branchId = slugify(branchRaw) || 'all-branches';
-        if(!branches[branchId]) branches[branchId] = { branchLabelEN: branchRaw || 'All Branches', branchLabelAR: '', offers: [] };
-        branches[branchId].offers.push({
+        const branchNames = branchRaw
+          ? branchRaw.split(',').map(s=>s.trim()).filter(Boolean).map(code => {
+              const mapped = OFFERS_BRANCH_CODE_MAP[code.toUpperCase()];
+              if(!mapped) unrecognizedBranchCodes.add(code);
+              return mapped || code;
+            })
+          : ['All Branches'];
+
+        const offer = {
           code: codeCol ? String(r[codeCol]||'') : '',
           description,
           category: categoryCol ? String(r[categoryCol]||'').trim() : '',
           arabic: arabicCol ? String(r[arabicCol]||'').trim() : '',
           price, discountedPrice, discountPct,
+        };
+        // Same offer object pushed into every branch it applies to — the
+        // Arabic-translation pass below mutates it once, which correctly
+        // reflects everywhere it's referenced.
+        branchNames.forEach(name => {
+          const branchId = slugify(name) || 'all-branches';
+          if(!branches[branchId]) branches[branchId] = { branchLabelEN: name, branchLabelAR: '', offers: [] };
+          branches[branchId].offers.push(offer);
         });
       });
 
+      // Arabic — AI-drafted from the English description, only where the
+      // sheet didn't already supply one. Best-effort: no key or a failed
+      // call degrades to English-only rather than blocking the import.
+      let arabicCoverage = null;
+      if(!arabicCol) {
+        const allOffers = Object.values(branches).flatMap(b => b.offers);
+        const needTranslation = [...new Set(allOffers.filter(o=>!o.arabic).map(o=>o.description))];
+        if(needTranslation.length && ANTHROPIC_API_KEY) {
+          try {
+            const translated = await translateOffersDescriptions(needTranslation, statusEl);
+            allOffers.forEach(o => { if(!o.arabic && translated.has(o.description)) o.arabic = translated.get(o.description); });
+            arabicCoverage = { done: translated.size, total: needTranslation.length, sample: [...translated.entries()].slice(0, 10) };
+          } catch(err) {
+            arabicCoverage = { error: err.message };
+          }
+        } else if(needTranslation.length) {
+          arabicCoverage = { error: 'No API key configured — set it in Campaign Generator → AI Setup, then re-upload to add Arabic' };
+        }
+      }
+
+      statusEl.style.display = 'none';
       pendingOffersBranches = branches;
-      renderOffersImportPreview({descCol,priceCol,discountedCol,categoryCol,arabicCol,branchCol,codeCol}, skipped);
+      renderOffersImportPreview(
+        { descCol, priceCol, discountedCol, discountPctCol, categoryCol, arabicCol, branchCol, codeCol, statusCol },
+        { skippedRequired, skippedPrice, skippedPriceExamples, skippedByStatus, unrecognizedBranchCodes: [...unrecognizedBranchCodes], arabicCoverage }
+      );
       document.getElementById('oc-preview-wrap').style.display = 'block';
     } catch(err) {
+      statusEl.style.display = 'none';
       showToast('Failed to read file: ' + err.message, true);
     }
   };
@@ -3032,7 +3128,32 @@ window.handleOffersExcelUpload = function(input) {
   input.value = '';
 }
 
-function renderOffersImportPreview(detected, skipped) {
+// Batched to keep each response a manageable size — these are short phrases,
+// but a few hundred distinct descriptions in one call risks a truncated
+// JSON response. Runs sequentially so the status line can show progress.
+async function translateOffersDescriptions(descriptions, statusEl) {
+  const map = new Map();
+  const chunkSize = 60;
+  for(let i=0; i<descriptions.length; i+=chunkSize) {
+    const chunk = descriptions.slice(i, i+chunkSize);
+    if(statusEl) statusEl.textContent = `Drafting Arabic — ${Math.min(i+chunkSize, descriptions.length)} of ${descriptions.length}…`;
+    const json = await advisorClaudeCall({
+      model: 'claude-sonnet-4-6',
+      system: 'You translate short healthcare service/offer descriptions from English to Modern Standard Arabic, for a Saudi private hospital group\'s public offers catalog. Keep medical terms accurate and natural for patients, not overly literal. Return ONLY a JSON array of strings — the Arabic translations, in exactly the same order as the input array, nothing else.',
+      messages: [{ role: 'user', content: JSON.stringify(chunk) }],
+      maxTokens: 4000,
+      expectJson: true,
+    });
+    if(!Array.isArray(json) || json.length !== chunk.length) {
+      throw new Error('Arabic translation response was not in the expected shape');
+    }
+    chunk.forEach((d, idx) => map.set(d, String(json[idx]||'').trim()));
+  }
+  return map;
+}
+
+function renderOffersImportPreview(detected, info) {
+  const { skippedRequired, skippedPrice, skippedPriceExamples, skippedByStatus, unrecognizedBranchCodes, arabicCoverage } = info;
   const branchEntries = Object.entries(pendingOffersBranches);
   const totalRows = branchEntries.reduce((s,[,b]) => s + b.offers.length, 0);
   const detectedList = Object.values(detected).filter(Boolean).join(', ') || '—';
@@ -3040,9 +3161,35 @@ function renderOffersImportPreview(detected, skipped) {
     const cats = new Set(b.offers.map(o=>o.category).filter(Boolean));
     return `<div>• <strong>${b.branchLabelEN}</strong> — ${b.offers.length} offer${b.offers.length===1?'':'s'}${cats.size?` across ${cats.size} categor${cats.size===1?'y':'ies'}`:''}</div>`;
   }).join('');
+
+  const statusLines = Object.entries(skippedByStatus||{});
+  const statusSummary = statusLines.length
+    ? `<div style="margin-bottom:8px;color:var(--text-3)">Excluded by status: ${statusLines.map(([s,n])=>`${n} ${s}`).join(', ')}</div>`
+    : '';
+  const priceSkipSummary = skippedPrice
+    ? `<div style="margin-bottom:8px;color:var(--red)">⚠ ${skippedPrice} active row(s) skipped — couldn't resolve a price${skippedPriceExamples?.length ? ` (e.g. ${skippedPriceExamples.map(s=>`"${s}"`).join(', ')}${skippedPrice > skippedPriceExamples.length ? ', …' : ''})` : ''}</div>`
+    : '';
+  const branchWarning = unrecognizedBranchCodes?.length
+    ? `<div style="margin-bottom:8px;color:var(--red)">⚠ Unrecognized branch code(s), used as-is: ${unrecognizedBranchCodes.join(', ')}</div>`
+    : '';
+  let arabicSummary = '';
+  if(arabicCoverage?.error) {
+    arabicSummary = `<div style="margin-bottom:8px;color:var(--red)">⚠ Arabic translation: ${arabicCoverage.error}</div>`;
+  } else if(arabicCoverage) {
+    const sampleHtml = (arabicCoverage.sample||[]).map(([en,ar]) =>
+      `<div style="padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-3)">${en}</span> → <span dir="rtl">${ar}</span></div>`
+    ).join('');
+    arabicSummary = `<div style="margin-bottom:4px">✓ Arabic drafted for ${arabicCoverage.done} of ${arabicCoverage.total} description(s) — spot-check a sample below (review before relying on it publicly):</div>
+      <div style="font-size:11px;max-height:180px;overflow-y:auto;background:var(--bg);border-radius:var(--radius);padding:8px 12px;margin-bottom:8px">${sampleHtml}</div>`;
+  }
+
   document.getElementById('oc-preview-summary').innerHTML = `
     <div style="margin-bottom:8px">Detected columns: ${detectedList}</div>
-    <div style="margin-bottom:8px"><strong>${totalRows}</strong> offer(s) across <strong>${branchEntries.length}</strong> branch(es)${skipped?`, ${skipped} row(s) skipped (missing description or price)`:''}</div>
+    <div style="margin-bottom:8px"><strong>${totalRows}</strong> offer(s) across <strong>${branchEntries.length}</strong> branch(es)${skippedRequired?`, ${skippedRequired} row(s) skipped (missing description)`:''}</div>
+    ${statusSummary}
+    ${priceSkipSummary}
+    ${branchWarning}
+    ${arabicSummary}
     ${perBranch}
   `;
 }
@@ -5151,7 +5298,10 @@ function advCollectNotes() {
 }
 
 // ── Claude call (mirrors the existing direct-from-browser pattern) ────────
-async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJson = false }) {
+// Despite the name (added for the Advisor tab first), this is a general
+// helper — the Offers Catalog Arabic-translation step reuses it too rather
+// than duplicating a 4th copy of this same fetch boilerplate.
+async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJson = false, model = ADVISOR_MODEL }) {
   if(!ANTHROPIC_API_KEY) throw new Error('No API key configured — set it in Campaign Generator → AI Setup');
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -5161,7 +5311,7 @@ async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJso
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true",
     },
-    body: JSON.stringify({ model: ADVISOR_MODEL, max_tokens: maxTokens, system, messages }),
+    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages }),
   });
   if(!res.ok) {
     const t = await res.text().catch(() => '');
