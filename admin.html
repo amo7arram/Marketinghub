@@ -728,6 +728,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
 
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:8px">Recent comments &amp; reviews — this month</div>
         <div id="sentiment-recent-list" style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto"></div>
+        <div id="sentiment-debug-samples"></div>
       </div>
     </div>
 
@@ -3750,6 +3751,26 @@ function renderSentimentStats() {
   }).join('') || `<div class="adv-muted">No comments synced for ${sentimentPeriodLabel(thisP)} yet.</div>`;
 }
 
+// TEMPORARY debug aid, not meant to stay long-term: shows one raw,
+// unmodified thread/review per channel exactly as Metricool's API returned
+// it, so a real field-name mismatch (like the root-vs-root.comments bug
+// this was built to catch) can be confirmed and fixed from real data
+// instead of guessed at again. Safe to show — this is the admin's own
+// already-visible comment data, not anything new being exposed.
+function renderSentimentDebugSamples(rawSamples) {
+  const el = document.getElementById('sentiment-debug-samples');
+  if(!el) return;
+  const entries = Object.entries(rawSamples||{});
+  if(!entries.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<details style="margin-top:14px">
+    <summary style="cursor:pointer;font-size:11px;color:var(--text-3)">🔍 Raw sample per platform (debug — for fixing field mapping, safe to ignore)</summary>
+    ${entries.map(([label, sample]) => `<div style="margin-top:8px">
+      <div style="font-size:10px;font-weight:700;color:var(--text-3);margin-bottom:2px">${advEsc(label)}</div>
+      <pre style="font-size:10px;background:var(--bg);border-radius:var(--radius);padding:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word">${advEsc(JSON.stringify(sample, null, 2))}</pre>
+    </div>`).join('')}
+  </details>`;
+}
+
 // Follows Metricool's page.next cursor if present — best-effort only, see
 // the SENTIMENT_MAX_PAGES comment above. onPage(items) is called once per
 // page fetched. Never throws — always resolves to a result object, so a
@@ -3805,18 +3826,33 @@ async function fetchInboxItems(authHeaders, userId, blogId) {
     { label: 'Facebook', provider: 'FACEBOOK' },
     { label: 'TikTok', provider: 'TIKTOKBUSINESS' },
   ];
+  const rawSamples = {}; // one raw thread/review per channel, for the debug view below
   for(const { label, provider } of commentChannels) {
     const result = await fetchSentimentPages(
       `${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`,
       authHeaders,
       (threads) => threads.forEach(thread => {
-        const postText = thread.root?.element?.text || thread.root?.text || null;
+        if(!rawSamples[label]) rawSamples[label] = thread;
+        const postText = thread.root?.element?.text || null;
+        // `root` IS the top-level comment on the post — it has its own
+        // text/owner/date. `root.comments[]` are only *replies* to that
+        // comment (rare — most comments never get one), not the comment
+        // itself. A real incident: only walking root.comments[] discarded
+        // almost every real comment, since a thread with no reply chain
+        // has an empty array there despite root itself holding real content.
+        if(thread.root?.text) {
+          fetched.push({
+            id: `${provider}_${thread.root.id || thread.id}`, provider, type: 'comment',
+            text: thread.root.text, authorName: thread.root.owner || null, stars: null,
+            postText, createdAt: thread.root.creationDate || thread.creationDate || null,
+          });
+        }
         (thread.root?.comments || []).forEach(c => {
           if(!c.text) return;
           fetched.push({
             id: `${provider}_${c.id}`, provider, type: 'comment',
             text: c.text, authorName: c.owner || null, stars: null,
-            postText, createdAt: c.creationDate || thread.creationDate || null,
+            postText, createdAt: c.creationDate || thread.root?.creationDate || thread.creationDate || null,
           });
         });
       })
@@ -3832,6 +3868,7 @@ async function fetchInboxItems(authHeaders, userId, blogId) {
     `${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`,
     authHeaders,
     (reviews) => reviews.forEach(r => {
+      if(!rawSamples['Google Business']) rawSamples['Google Business'] = r;
       if(!r.message) return;
       fetched.push({
         id: `GMB_${r.id}`, provider: 'GMB', type: 'review',
@@ -3843,7 +3880,7 @@ async function fetchInboxItems(authHeaders, userId, blogId) {
   report.push({ label: 'Google Business', ...gmbResult });
   if(!gmbResult.ok) console.error('Sentiment fetch failed for Google Business:', gmbResult.error);
 
-  return { fetched, report };
+  return { fetched, report, rawSamples };
 }
 
 // Batched Claude classification — same call helper the Advisor and Offers
@@ -3885,11 +3922,17 @@ window.syncCommentSentiment = async function() {
   try {
     const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
     const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
-    const { fetched, report } = await fetchInboxItems(authHeaders, userId, blogId);
+    const { fetched, report, rawSamples } = await fetchInboxItems(authHeaders, userId, blogId);
     // Per-channel breakdown, kept and shown persistently (not just this
     // instant) so "why is only one platform showing up" has a real answer
     // instead of a silent console.error only a developer would ever see.
     const reportSummary = report.map(r => r.ok ? `${r.label}: ${r.itemCount}` : `${r.label}: failed (${r.error})`).join(' · ');
+    renderSentimentDebugSamples(rawSamples);
+
+    // Defend against a missing/unparseable date rather than silently
+    // dropping the item into a hidden "unknown" bucket — default to right
+    // now, which for a freshly-synced comment is a reasonable approximation.
+    fetched.forEach(f => { if(!sentimentPeriodOf(f.createdAt)) f.createdAt = new Date().toISOString(); });
 
     if(!fetched.length) {
       statusEl.textContent = `No comments or reviews found. ${reportSummary}`;
