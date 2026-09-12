@@ -158,6 +158,8 @@ The request was to add sentiment analysis on social comments. Metricool itself h
 
 **Idempotent by design**: every fetched item is checked against what's already stored before spending an AI call on it, so re-running the sync never re-classifies (or double-counts in the rollup) an item it already has. Storage cost is a non-issue at any volume this org would realistically produce — see `DATA_MODEL.md`'s `social_comments` section for the actual numbers against Firestore's free-tier limits.
 
+**Coverage is a real limitation, not just idempotency.** Neither Inbox endpoint documents a date-range or page-size parameter, so a single sync gets whatever window Metricool's server decides to return — there's no way to explicitly ask for "everything this month." The rollup (`config/sentiment_stats.byMonth`, see `DATA_MODEL.md`) buckets by each comment's own real date regardless of when it was fetched, so this doesn't cause incorrect numbers — it just means a sync done only once, at month-end, may under-represent that month versus syncing a few times through it.
+
 `promotions` (the retired collection) is left in place untouched, same convention as the old `metrics` collection — nothing reads or writes it anymore, but historical documents aren't deleted.
 
 ---

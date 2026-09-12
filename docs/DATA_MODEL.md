@@ -343,14 +343,21 @@ The rollup `admin.html`'s Comment Sentiment section actually reads — kept smal
 
 ```
 config/sentiment_stats = {
-  totals: { positive: number, neutral: number, negative: number },  // accumulates across syncs, never double-counted
-  topThemes: [ "wait times", "pricing", ... ],                      // up to 6, by frequency
-  recentComments: [ /* up to 30 social_comments-shaped objects, negative-first, most-recent-first within that */ ],
+  byMonth: {
+    "2026-09": { positive: number, neutral: number, negative: number, themeCounts: { "wait times": number, ... } },
+    "2026-08": { ... },
+    ...
+  },
+  recentComments: [ /* up to 30 social_comments-shaped objects, current calendar month only, negative-first then most-recent-first */ ],
   lastSyncedAt: ISO string,
 }
 ```
 
-Also folded into the Advisor tab's pulse (`buildAdvisorSentimentSummary()` in `admin.html`) as `pulse.sentiment` — `{ positivePct, negativePct, total, topThemes, lastSyncedAt }` — so the AI briefing can reference it alongside everything else, e.g. "comment sentiment dipped this month, mostly complaints about wait times."
+**Bucketed by each comment's own real date, not "the month it happened to sync in"** — a sync run just adds whatever it fetched to the month bucket that date actually falls in, and only for items not already counted from an earlier sync (checked per-item against `social_comments`, so re-syncing never double-counts a bucket). This is what makes the admin dashboard's month-over-month percentage comparison possible, mirroring the `byMonth` convention already used by `lead_stats`/`metricool_stats`.
+
+**Coverage caveat, worth knowing**: Metricool's `/v2/inbox/post-comments` and `/v2/inbox/reviews` endpoints document no date-range or page-size parameter (confirmed against their real `swagger.json` — several *other* Metricool endpoints do document `page`/`limit`/`from`/`to` when supported, so this appears to be a genuine gap, not an oversight in reading their docs). `admin.html`'s `fetchInboxItems()` best-effort follows the `page.next` cursor their response includes (bounded by `SENTIMENT_MAX_PAGES`, since it's unconfirmed whether their server actually honors that cursor), but a single sync is **not guaranteed to capture every comment for the current month** — coverage improves by syncing a few times through the month rather than only once at the end. Numbers still roll up correctly either way, since each comment lands in its own real month bucket whenever it's eventually fetched.
+
+Also folded into the Advisor tab's pulse (`buildAdvisorSentimentSummary()` in `admin.html`) as `pulse.sentiment` — `{ positivePct, negativePct, positiveDeltaPts, total, topThemes, lastSyncedAt }`, `positiveDeltaPts` being the percentage-point change vs. the previous month — so the AI briefing can reference it alongside everything else, e.g. "comment sentiment dipped 12pts this month, mostly complaints about wait times."
 
 ---
 

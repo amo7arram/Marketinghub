@@ -717,13 +717,15 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)">💬 Comment Sentiment</div>
           <button class="btn btn-primary" id="sentiment-sync-btn" onclick="syncCommentSentiment()">🔄 Sync Comments &amp; Reviews</button>
         </div>
-        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Instagram, Facebook, TikTok comments + Google Business reviews, via Metricool's Inbox. Admin-only — this section is never shown on the public dashboard.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">Instagram, Facebook, TikTok comments + Google Business reviews, via Metricool's Inbox. Admin-only — this section is never shown on the public dashboard.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Metricool's API doesn't document a way to request a specific date range here, so one sync isn't guaranteed to capture every comment for the month — sync a few times through the month rather than only once at the end; numbers accumulate correctly either way.</div>
         <div id="sentiment-sync-status" style="font-size:12px;color:var(--text-3);margin-bottom:14px">Never synced yet</div>
 
+        <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px" id="sentiment-month-label"></div>
         <div id="sentiment-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px"></div>
         <div id="sentiment-themes" style="font-size:11px;color:var(--text-3);margin-bottom:16px"></div>
 
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:8px">Recent comments &amp; reviews</div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:8px">Recent comments &amp; reviews — this month</div>
         <div id="sentiment-recent-list" style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto"></div>
       </div>
     </div>
@@ -3648,7 +3650,26 @@ window.syncMetricool = async function() {
 // ══════════════════════════════════════════════════════════════════════════
 const SENTIMENT_PROVIDERS = ['INSTAGRAMBUSINESS', 'FACEBOOK', 'TIKTOKBUSINESS'];
 const SENTIMENT_RECENT_CAP = 30;
+// Metricool's own API docs show no date-range or page-size parameter for
+// these two endpoints (unlike several other Metricool endpoints, which do
+// document real page/limit/from/to params when they exist) — so how many
+// items come back per call is entirely up to their server, not us. Their
+// response DOES include a page.next cursor field, which we follow
+// best-effort, bounded by this cap so an ignored/misbehaving cursor can't
+// loop forever. Unconfirmed by their docs whether it's actually honored.
+const SENTIMENT_MAX_PAGES = 6;
 const SENTIMENT_ICON = { INSTAGRAMBUSINESS:'📸', INSTAGRAM:'📸', FACEBOOK:'👍', TIKTOKBUSINESS:'🎵', GMB:'⭐' };
+const SENTIMENT_LABEL = { INSTAGRAMBUSINESS:'Instagram', INSTAGRAM:'Instagram', FACEBOOK:'Facebook', TIKTOKBUSINESS:'TikTok', GMB:'Google Business' };
+
+function sentimentPeriodOf(dateStr) {
+  const d = dateStr ? new Date(dateStr) : null;
+  if(!d || isNaN(d)) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function sentimentPeriodLabel(p) {
+  const [y,m] = p.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleString('en', { month:'long', year:'numeric' });
+}
 
 function renderSentimentStats() {
   const summaryEl = document.getElementById('sentiment-summary');
@@ -3663,83 +3684,125 @@ function renderSentimentStats() {
       : 'Never synced yet';
   }
 
-  const card = (label, value, color) =>
+  const card = (label, value, color, note) =>
     `<div class="adv-card"><div class="adv-card-label">${label}</div>` +
-    `<div class="adv-card-value"${color?` style="color:${color}"`:''}>${value}</div></div>`;
+    `<div class="adv-card-value"${color?` style="color:${color}"`:''}>${value}</div>` +
+    `${note ? `<div class="adv-card-note">${note}</div>` : ''}</div>`;
 
-  if(!SENTIMENT_STATS || !SENTIMENT_STATS.totals) {
+  const now = new Date();
+  const thisP = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const prevD = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevP = `${prevD.getFullYear()}-${String(prevD.getMonth()+1).padStart(2,'0')}`;
+  const cur  = SENTIMENT_STATS?.byMonth?.[thisP] || null;
+  const prev = SENTIMENT_STATS?.byMonth?.[prevP] || null;
+
+  const monthLabelEl = document.getElementById('sentiment-month-label');
+  if(monthLabelEl) monthLabelEl.textContent = sentimentPeriodLabel(thisP);
+
+  if(!cur) {
     summaryEl.innerHTML = card('Positive','—',null) + card('Neutral','—',null) + card('Negative','—',null) + card('Analyzed','0',null);
     themesEl.innerHTML = '';
-    listEl.innerHTML = '<div class="adv-muted">No comments synced yet.</div>';
+    listEl.innerHTML = `<div class="adv-muted">No comments synced for ${sentimentPeriodLabel(thisP)} yet.</div>`;
     return;
   }
 
-  const t = SENTIMENT_STATS.totals;
-  const total = (t.positive||0) + (t.neutral||0) + (t.negative||0);
-  const pct = n => total ? Math.round((n||0)/total*100) : 0;
+  const total = (cur.positive||0) + (cur.neutral||0) + (cur.negative||0);
+  const pct = (n, of) => of ? Math.round((n||0)/of*100) : 0;
+  const prevTotal = prev ? (prev.positive||0)+(prev.neutral||0)+(prev.negative||0) : 0;
+  const delta = (key) => {
+    if(!prevTotal) return '';
+    const d = pct(cur[key], total) - pct(prev[key], prevTotal);
+    if(d === 0) return 'flat vs last month';
+    return d > 0 ? `<span class="up">▲${d}pts</span> vs last month` : `<span class="down">▼${Math.abs(d)}pts</span> vs last month`;
+  };
   summaryEl.innerHTML =
-    card('Positive', `${pct(t.positive)}%`, 'var(--green)') +
-    card('Neutral',  `${pct(t.neutral)}%`,  'var(--text-2)') +
-    card('Negative', `${pct(t.negative)}%`, 'var(--red)') +
-    card('Total analyzed', total, null);
+    card('Positive', `${pct(cur.positive,total)}%`, 'var(--green)', delta('positive')) +
+    card('Neutral',  `${pct(cur.neutral,total)}%`,  'var(--text-2)', delta('neutral')) +
+    card('Negative', `${pct(cur.negative,total)}%`, 'var(--red)', delta('negative')) +
+    card('Analyzed this month', total, null, prevTotal ? `${prevTotal} last month` : null);
 
-  themesEl.innerHTML = (SENTIMENT_STATS.topThemes||[]).length
-    ? `Common themes: ${SENTIMENT_STATS.topThemes.map(advEsc).join(', ')}` : '';
+  const topThemes = Object.entries(cur.themeCounts||{}).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
+  themesEl.innerHTML = topThemes.length ? `Common themes this month: ${topThemes.map(advEsc).join(', ')}` : '';
 
   listEl.innerHTML = (SENTIMENT_STATS.recentComments||[]).map(c => {
     const sentColor = c.sentiment==='positive' ? 'var(--green)' : c.sentiment==='negative' ? 'var(--red)' : 'var(--text-3)';
     const stars = c.stars ? ` ${'★'.repeat(c.stars)}${'☆'.repeat(Math.max(0,5-c.stars))}` : '';
+    const dateLabel = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en',{month:'short',day:'numeric'}) : '—';
     return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px">
-      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3);margin-bottom:4px">
-        <span>${SENTIMENT_ICON[c.provider]||'💬'}</span>
-        <span style="font-weight:600;color:var(--text-2)">${advEsc(c.authorName||'Anonymous')}</span>
-        <span>${stars}</span>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3);margin-bottom:3px">
+        <span>${SENTIMENT_ICON[c.provider]||'💬'} ${advEsc(SENTIMENT_LABEL[c.provider]||c.provider||'')}</span>
+        <span>·</span>
+        <span>${dateLabel}</span>
         <span style="margin-left:auto;text-transform:uppercase;font-weight:700;font-size:10px;color:${sentColor}">${advEsc(c.sentiment||'—')}</span>
       </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:4px">${advEsc(c.authorName||'Anonymous')}${stars}</div>
       <div style="font-size:12px;color:var(--text-2)">${advEsc(c.text||'')}</div>
     </div>`;
-  }).join('') || '<div class="adv-muted">No comments synced yet.</div>';
+  }).join('') || `<div class="adv-muted">No comments synced for ${sentimentPeriodLabel(thisP)} yet.</div>`;
+}
+
+// Follows Metricool's page.next cursor if present — best-effort only, see
+// the SENTIMENT_MAX_PAGES comment above. onPage(items) is called once per
+// page fetched.
+async function fetchSentimentPages(baseUrl, authHeaders, onPage) {
+  let url = baseUrl;
+  let pagesFetched = 0;
+  let lastCursor = null;
+  while(url && pagesFetched < SENTIMENT_MAX_PAGES) {
+    const res = await fetch(url, { headers: authHeaders });
+    if(!res.ok) { console.error(`Sentiment fetch failed: HTTP ${res.status} for ${url}`); return; }
+    const body = await res.json();
+    onPage(body.data || body || []);
+    pagesFetched++;
+    const next = body.page?.next || null;
+    url = (next && next !== lastCursor) ? `${baseUrl}&next=${encodeURIComponent(next)}` : null;
+    lastCursor = next;
+  }
 }
 
 // Raw fetch from Metricool's Inbox — same auth pattern as syncMetricool()
 // above, same CORS proxy Worker (a generic passthrough, so these newer
-// endpoint paths need no Worker changes).
+// endpoint paths need no Worker changes). Whatever comes back is bucketed
+// by its own real date afterward — see syncCommentSentiment() — so partial
+// coverage from one sync still rolls up correctly; it's just not
+// guaranteed to be the *complete* current month in a single run.
 async function fetchInboxItems(authHeaders, userId, blogId) {
   const fetched = [];
   for(const provider of SENTIMENT_PROVIDERS) {
     try {
-      const res = await fetch(`${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`, { headers: authHeaders });
-      if(!res.ok) { console.error(`Sentiment fetch failed for ${provider}: HTTP ${res.status}`); continue; }
-      const body = await res.json();
-      (body.data || body || []).forEach(thread => {
-        const postText = thread.root?.element?.text || thread.root?.text || null;
-        (thread.root?.comments || []).forEach(c => {
-          if(!c.text) return;
-          fetched.push({
-            id: `${provider}_${c.id}`, provider, type: 'comment',
-            text: c.text, authorName: c.owner || null, stars: null,
-            postText, createdAt: c.creationDate || thread.creationDate || null,
+      await fetchSentimentPages(
+        `${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`,
+        authHeaders,
+        (threads) => threads.forEach(thread => {
+          const postText = thread.root?.element?.text || thread.root?.text || null;
+          (thread.root?.comments || []).forEach(c => {
+            if(!c.text) return;
+            fetched.push({
+              id: `${provider}_${c.id}`, provider, type: 'comment',
+              text: c.text, authorName: c.owner || null, stars: null,
+              postText, createdAt: c.creationDate || thread.creationDate || null,
+            });
           });
-        });
-      });
+        })
+      );
     } catch(e) { console.error(`Sentiment fetch error for ${provider}:`, e); }
   }
   // Google Business reviews — a star rating comes free with these, but still
   // AI-classified for consistency and to catch text/star mismatches (a
   // 5-star review can still mention a real complaint).
   try {
-    const res = await fetch(`${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`, { headers: authHeaders });
-    if(res.ok) {
-      const body = await res.json();
-      (body.data || body || []).forEach(r => {
+    await fetchSentimentPages(
+      `${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`,
+      authHeaders,
+      (reviews) => reviews.forEach(r => {
         if(!r.message) return;
         fetched.push({
           id: `GMB_${r.id}`, provider: 'GMB', type: 'review',
           text: r.message, authorName: (r.participants && r.participants[0]?.name) || null,
           stars: r.stars ?? null, postText: null, createdAt: r.creationDate || null,
         });
-      });
-    } else { console.error('Sentiment fetch failed for GMB reviews: HTTP', res.status); }
+      })
+    );
   } catch(e) { console.error('Sentiment fetch error for GMB reviews:', e); }
   return fetched;
 }
@@ -3815,27 +3878,37 @@ window.syncCommentSentiment = async function() {
       syncedAt: new Date().toISOString(),
     })));
 
-    // Roll up. Totals accumulate across syncs — only items that were newly
-    // classified this run add to the running count, so re-syncing the same
-    // comment never double-counts it. Recent list is capped and sorted
-    // negative-first so the admin sees what needs attention first.
-    const prevTotals = SENTIMENT_STATS?.totals || { positive:0, neutral:0, negative:0 };
-    const newTotals = { ...prevTotals };
+    // Roll up, bucketed by each item's own real month — not "this sync's
+    // month" — so a late sync that happens to pick up a stray older item
+    // still lands it in the right place, and month-over-month comparisons
+    // (rendered in renderSentimentStats()) are meaningful. Only items newly
+    // classified this run add to a bucket's count, so re-syncing the same
+    // comment never double-counts it.
+    const byMonth = {};
+    Object.entries(SENTIMENT_STATS?.byMonth || {}).forEach(([p, v]) => {
+      byMonth[p] = { positive: v.positive||0, neutral: v.neutral||0, negative: v.negative||0, themeCounts: { ...(v.themeCounts||{}) } };
+    });
     let newlyClassifiedCount = 0;
     finalItems.forEach((m, i) => {
-      if(!priorDocs[i]?.sentiment) { newTotals[m.sentiment] = (newTotals[m.sentiment]||0) + 1; newlyClassifiedCount++; }
+      if(priorDocs[i]?.sentiment) return; // already counted in an earlier sync
+      const p = sentimentPeriodOf(m.createdAt) || 'unknown';
+      if(!byMonth[p]) byMonth[p] = { positive:0, neutral:0, negative:0, themeCounts:{} };
+      byMonth[p][m.sentiment] = (byMonth[p][m.sentiment]||0) + 1;
+      (m.sentimentThemes||[]).forEach(t => { byMonth[p].themeCounts[t] = (byMonth[p].themeCounts[t]||0) + 1; });
+      newlyClassifiedCount++;
     });
 
-    const themeCounts = {};
-    finalItems.forEach(m => (m.sentimentThemes||[]).forEach(t => { themeCounts[t] = (themeCounts[t]||0) + 1; }));
-    const topThemes = Object.entries(themeCounts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
-
-    const priorRecent = (SENTIMENT_STATS?.recentComments || []).filter(r => !finalItems.some(m => m.id === r.id));
-    const recentComments = [...finalItems, ...priorRecent]
+    // Recent list is scoped to the current calendar month (this is meant to
+    // be presented monthly), negative-first so the admin sees what needs
+    // attention first, deduped against itself when re-syncing the same items.
+    const thisPeriod = sentimentPeriodOf(new Date().toISOString());
+    const thisMonthFetched = finalItems.filter(m => sentimentPeriodOf(m.createdAt) === thisPeriod);
+    const priorRecent = (SENTIMENT_STATS?.recentComments || []).filter(r => !thisMonthFetched.some(m => m.id === r.id));
+    const recentComments = [...thisMonthFetched, ...priorRecent]
       .sort((a,b) => (a.sentiment==='negative'?0:1) - (b.sentiment==='negative'?0:1) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
       .slice(0, SENTIMENT_RECENT_CAP);
 
-    SENTIMENT_STATS = { totals: newTotals, topThemes, recentComments, lastSyncedAt: new Date().toISOString() };
+    SENTIMENT_STATS = { byMonth, recentComments, lastSyncedAt: new Date().toISOString() };
     await setSentimentStats(SENTIMENT_STATS);
     renderSentimentStats();
     showToast(`✓ Sentiment sync complete — ${newlyClassifiedCount} new item(s) classified`);
@@ -5449,15 +5522,22 @@ function buildAdvisorPulse() {
 // reads the already-fetched SENTIMENT_STATS, no extra Firestore call here.
 function buildAdvisorSentimentSummary() {
   const s = SENTIMENT_STATS;
-  if(!s || !s.totals) return null;
-  const t = s.totals;
-  const total = (t.positive||0) + (t.neutral||0) + (t.negative||0);
+  if(!s || !s.byMonth) return null;
+  const { thisP, lastP } = advPeriods();
+  const cur = s.byMonth[thisP];
+  if(!cur) return null;
+  const total = (cur.positive||0) + (cur.neutral||0) + (cur.negative||0);
   if(!total) return null;
+  const prev = s.byMonth[lastP];
+  const prevTotal = prev ? (prev.positive||0)+(prev.neutral||0)+(prev.negative||0) : 0;
+  const positivePct = advPct((cur.positive||0) / total);
+  const prevPositivePct = prevTotal ? advPct((prev.positive||0) / prevTotal) : null;
   return {
-    positivePct: advPct((t.positive||0) / total),
-    negativePct: advPct((t.negative||0) / total),
+    positivePct,
+    negativePct: advPct((cur.negative||0) / total),
+    positiveDeltaPts: prevPositivePct != null ? positivePct - prevPositivePct : null,
     total,
-    topThemes: s.topThemes || [],
+    topThemes: Object.entries(cur.themeCounts||{}).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t])=>t),
     lastSyncedAt: s.lastSyncedAt || null,
   };
 }
@@ -5501,8 +5581,11 @@ function renderAdvisorPulse(p) {
     cards.push(card('Biggest line item', p.spend.biggestItem.label, 'SAR ' + fmtSAR(p.spend.biggestItem.cost)));
   }
   if(p.sentiment) {
+    const d = p.sentiment.positiveDeltaPts;
+    const dTxt = d == null ? '' : d === 0 ? ' · flat vs last month' :
+      d > 0 ? ` · <span class="up">▲${d}pts</span> vs last month` : ` · <span class="down">▼${Math.abs(d)}pts</span> vs last month`;
     cards.push(card('Comment sentiment', `${p.sentiment.positivePct}% positive`,
-      `${p.sentiment.negativePct}% negative · ${p.sentiment.total} analyzed${p.sentiment.topThemes.length ? ' · ' + p.sentiment.topThemes.slice(0,2).map(advEsc).join(', ') : ''}`));
+      `${p.sentiment.negativePct}% negative · ${p.sentiment.total} analyzed${dTxt}${p.sentiment.topThemes.length ? ' · ' + p.sentiment.topThemes.slice(0,2).map(advEsc).join(', ') : ''}`));
   }
   if(p.social.biggestDecliner) {
     cards.push(card('Sliding', p.social.biggestDecliner.metric,
