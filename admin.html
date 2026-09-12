@@ -718,7 +718,8 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <button class="btn btn-primary" id="sentiment-sync-btn" onclick="syncCommentSentiment()">🔄 Sync Comments &amp; Reviews</button>
         </div>
         <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">Instagram, Facebook, TikTok comments + Google Business reviews, via Metricool's Inbox. Admin-only — this section is never shown on the public dashboard.</div>
-        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Metricool's API doesn't document a way to request a specific date range here, so one sync isn't guaranteed to capture every comment for the month — sync a few times through the month rather than only once at the end; numbers accumulate correctly either way.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:2px">Metricool's API doesn't document a way to request a specific date range here, so one sync isn't guaranteed to capture every comment for the month — sync a few times through the month rather than only once at the end; numbers accumulate correctly either way.</div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">The line below the button shows how many items came back per platform (or why one failed) — check it if a platform looks like it's missing.</div>
         <div id="sentiment-sync-status" style="font-size:12px;color:var(--text-3);margin-bottom:14px">Never synced yet</div>
 
         <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px" id="sentiment-month-label"></div>
@@ -3648,7 +3649,6 @@ window.syncMetricool = async function() {
 // 2 theme tags). Admin-only by product decision — see the section's own
 // intro text in the markup and DATA_MODEL.md for why.
 // ══════════════════════════════════════════════════════════════════════════
-const SENTIMENT_PROVIDERS = ['INSTAGRAMBUSINESS', 'FACEBOOK', 'TIKTOKBUSINESS'];
 const SENTIMENT_RECENT_CAP = 30;
 // Metricool's own API docs show no date-range or page-size parameter for
 // these two endpoints (unlike several other Metricool endpoints, which do
@@ -3680,7 +3680,7 @@ function renderSentimentStats() {
 
   if(statusEl) {
     statusEl.textContent = SENTIMENT_STATS?.lastSyncedAt
-      ? `Last synced: ${new Date(SENTIMENT_STATS.lastSyncedAt).toLocaleString()}`
+      ? `Last synced: ${new Date(SENTIMENT_STATS.lastSyncedAt).toLocaleString()}${SENTIMENT_STATS.lastSyncReport ? ' — ' + SENTIMENT_STATS.lastSyncReport : ''}`
       : 'Never synced yet';
   }
 
@@ -3724,7 +3724,13 @@ function renderSentimentStats() {
       card('Analyzed this month', total, null, prevTotal ? `${prevTotal} last month` : null);
 
     const topThemes = Object.entries(cur.themeCounts||{}).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
-    themesEl.innerHTML = topThemes.length ? `Common themes this month: ${topThemes.map(advEsc).join(', ')}` : '';
+    let themesLine = topThemes.length ? `Common themes this month: ${topThemes.map(advEsc).join(', ')}` : '';
+    // A percentage from a handful of items is noise, not signal — say so
+    // rather than let a 0%/100% swing look more meaningful than it is.
+    if(total > 0 && total < 20) {
+      themesLine += `${themesLine ? '<br>' : ''}<span style="color:var(--text-3)">Only ${total} item${total===1?'':'s'} analyzed this month — percentages will move a lot until this grows.</span>`;
+    }
+    themesEl.innerHTML = themesLine;
   }
 
   listEl.innerHTML = (SENTIMENT_STATS?.recentComments||[]).map(c => {
@@ -3746,21 +3752,36 @@ function renderSentimentStats() {
 
 // Follows Metricool's page.next cursor if present — best-effort only, see
 // the SENTIMENT_MAX_PAGES comment above. onPage(items) is called once per
-// page fetched.
+// page fetched. Never throws — always resolves to a result object, so a
+// per-provider failure is something the admin can actually see (a real gap
+// before: everything short of a JS crash was silently console.error'd only,
+// which is exactly why "why is only Google Business showing up" had no
+// visible answer).
 async function fetchSentimentPages(baseUrl, authHeaders, onPage) {
   let url = baseUrl;
   let pagesFetched = 0;
   let lastCursor = null;
+  let itemCount = 0;
   while(url && pagesFetched < SENTIMENT_MAX_PAGES) {
-    const res = await fetch(url, { headers: authHeaders });
-    if(!res.ok) { console.error(`Sentiment fetch failed: HTTP ${res.status} for ${url}`); return; }
-    const body = await res.json();
-    onPage(body.data || body || []);
-    pagesFetched++;
-    const next = body.page?.next || null;
-    url = (next && next !== lastCursor) ? `${baseUrl}&next=${encodeURIComponent(next)}` : null;
-    lastCursor = next;
+    try {
+      const res = await fetch(url, { headers: authHeaders });
+      if(!res.ok) {
+        const bodyText = await res.text().catch(() => '');
+        return { ok: false, error: `HTTP ${res.status}${bodyText ? ' — ' + bodyText.slice(0,150) : ''}`, itemCount };
+      }
+      const body = await res.json();
+      const page = body.data || body || [];
+      itemCount += page.length;
+      onPage(page);
+      pagesFetched++;
+      const next = body.page?.next || null;
+      url = (next && next !== lastCursor) ? `${baseUrl}&next=${encodeURIComponent(next)}` : null;
+      lastCursor = next;
+    } catch(e) {
+      return { ok: false, error: e.message, itemCount };
+    }
   }
+  return { ok: true, itemCount };
 }
 
 // Raw fetch from Metricool's Inbox — same auth pattern as syncMetricool()
@@ -3769,45 +3790,60 @@ async function fetchSentimentPages(baseUrl, authHeaders, onPage) {
 // by its own real date afterward — see syncCommentSentiment() — so partial
 // coverage from one sync still rolls up correctly; it's just not
 // guaranteed to be the *complete* current month in a single run.
+//
+// Trying both INSTAGRAM and INSTAGRAMBUSINESS for Instagram, temporarily:
+// Metricool's schema lists both as valid `provider` values and there's no
+// way to know from outside which one this specific account's connection
+// actually needs — a real sync where one comes back empty/failed and the
+// other doesn't will settle it, at which point drop whichever one is wrong.
 async function fetchInboxItems(authHeaders, userId, blogId) {
   const fetched = [];
-  for(const provider of SENTIMENT_PROVIDERS) {
-    try {
-      await fetchSentimentPages(
-        `${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`,
-        authHeaders,
-        (threads) => threads.forEach(thread => {
-          const postText = thread.root?.element?.text || thread.root?.text || null;
-          (thread.root?.comments || []).forEach(c => {
-            if(!c.text) return;
-            fetched.push({
-              id: `${provider}_${c.id}`, provider, type: 'comment',
-              text: c.text, authorName: c.owner || null, stars: null,
-              postText, createdAt: c.creationDate || thread.creationDate || null,
-            });
-          });
-        })
-      );
-    } catch(e) { console.error(`Sentiment fetch error for ${provider}:`, e); }
-  }
-  // Google Business reviews — a star rating comes free with these, but still
-  // AI-classified for consistency and to catch text/star mismatches (a
-  // 5-star review can still mention a real complaint).
-  try {
-    await fetchSentimentPages(
-      `${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`,
+  const report = [];
+  const commentChannels = [
+    { label: 'Instagram (Business)', provider: 'INSTAGRAMBUSINESS' },
+    { label: 'Instagram', provider: 'INSTAGRAM' },
+    { label: 'Facebook', provider: 'FACEBOOK' },
+    { label: 'TikTok', provider: 'TIKTOKBUSINESS' },
+  ];
+  for(const { label, provider } of commentChannels) {
+    const result = await fetchSentimentPages(
+      `${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`,
       authHeaders,
-      (reviews) => reviews.forEach(r => {
-        if(!r.message) return;
-        fetched.push({
-          id: `GMB_${r.id}`, provider: 'GMB', type: 'review',
-          text: r.message, authorName: (r.participants && r.participants[0]?.name) || null,
-          stars: r.stars ?? null, postText: null, createdAt: r.creationDate || null,
+      (threads) => threads.forEach(thread => {
+        const postText = thread.root?.element?.text || thread.root?.text || null;
+        (thread.root?.comments || []).forEach(c => {
+          if(!c.text) return;
+          fetched.push({
+            id: `${provider}_${c.id}`, provider, type: 'comment',
+            text: c.text, authorName: c.owner || null, stars: null,
+            postText, createdAt: c.creationDate || thread.creationDate || null,
+          });
         });
       })
     );
-  } catch(e) { console.error('Sentiment fetch error for GMB reviews:', e); }
-  return fetched;
+    report.push({ label, ...result });
+    if(!result.ok) console.error(`Sentiment fetch failed for ${label}:`, result.error);
+  }
+
+  // Google Business reviews — a star rating comes free with these, but still
+  // AI-classified for consistency and to catch text/star mismatches (a
+  // 5-star review can still mention a real complaint).
+  const gmbResult = await fetchSentimentPages(
+    `${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`,
+    authHeaders,
+    (reviews) => reviews.forEach(r => {
+      if(!r.message) return;
+      fetched.push({
+        id: `GMB_${r.id}`, provider: 'GMB', type: 'review',
+        text: r.message, authorName: (r.participants && r.participants[0]?.name) || null,
+        stars: r.stars ?? null, postText: null, createdAt: r.creationDate || null,
+      });
+    })
+  );
+  report.push({ label: 'Google Business', ...gmbResult });
+  if(!gmbResult.ok) console.error('Sentiment fetch failed for Google Business:', gmbResult.error);
+
+  return { fetched, report };
 }
 
 // Batched Claude classification — same call helper the Advisor and Offers
@@ -3849,10 +3885,14 @@ window.syncCommentSentiment = async function() {
   try {
     const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
     const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
-    const fetched = await fetchInboxItems(authHeaders, userId, blogId);
+    const { fetched, report } = await fetchInboxItems(authHeaders, userId, blogId);
+    // Per-channel breakdown, kept and shown persistently (not just this
+    // instant) so "why is only one platform showing up" has a real answer
+    // instead of a silent console.error only a developer would ever see.
+    const reportSummary = report.map(r => r.ok ? `${r.label}: ${r.itemCount}` : `${r.label}: failed (${r.error})`).join(' · ');
 
     if(!fetched.length) {
-      statusEl.textContent = 'No comments or reviews found.';
+      statusEl.textContent = `No comments or reviews found. ${reportSummary}`;
       return;
     }
 
@@ -3923,7 +3963,7 @@ window.syncCommentSentiment = async function() {
       .sort((a,b) => (a.sentiment==='negative'?0:1) - (b.sentiment==='negative'?0:1) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
       .slice(0, SENTIMENT_RECENT_CAP);
 
-    SENTIMENT_STATS = { byMonth, recentComments, lastSyncedAt: new Date().toISOString() };
+    SENTIMENT_STATS = { byMonth, recentComments, lastSyncReport: reportSummary, lastSyncedAt: new Date().toISOString() };
     await setSentimentStats(SENTIMENT_STATS);
     renderSentimentStats();
     showToast(`✓ Sentiment sync complete — ${newlyClassifiedCount} new item(s) classified, ${newlyCountedCount} added to the monthly totals`);

@@ -350,9 +350,12 @@ config/sentiment_stats = {
     ...
   },
   recentComments: [ /* up to 30 social_comments-shaped objects, current calendar month only, negative-first then most-recent-first */ ],
+  lastSyncReport: "Instagram (Business): 0 · Instagram: 15 · Facebook: failed (HTTP 403 — ...) · TikTok: 0 · Google Business: 13",
   lastSyncedAt: ISO string,
 }
 ```
+
+**`lastSyncReport`** is the per-platform breakdown from the most recent sync (item count, or the failure reason) — shown persistently under the sync button, not just as a transient toast. Added after a real incident where every platform except Google Business silently returned nothing, with no visible indication of *why* (a per-provider fetch failure was only ever `console.error`'d, invisible to the admin). Currently tries **both** `INSTAGRAM` and `INSTAGRAMBUSINESS` for the Instagram row — Metricool's schema allows either and there was no way to know which this account's connection actually needs without a live sync; once a real sync shows which one returns data, drop the other from `commentChannels` in `fetchInboxItems()`.
 
 **Bucketed by each comment's own real date, not "the month it happened to sync in"** — a sync run just adds whatever it fetched to the month bucket that date actually falls in, and only for items not already counted from an earlier sync (checked per-item against `social_comments`, so re-syncing never double-counts a bucket). This is what makes the admin dashboard's month-over-month percentage comparison possible, mirroring the `byMonth` convention already used by `lead_stats`/`metricool_stats`.
 
