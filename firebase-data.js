@@ -517,6 +517,36 @@ export function setAccessGate(data) {
   return setDoc(doc(db, CONFIG, "access_gate"), data, { merge: true });
 }
 
+// ── SOCIAL COMMENT SENTIMENT ───────────────────────────────────────────
+// Durable per-item store of comments/reviews pulled from Metricool's Inbox
+// API (GET /v2/inbox/post-comments, GET /v2/inbox/reviews — Metricool's own
+// documented endpoints, confirmed against their real swagger.json; not
+// scraping), sentiment-classified by Claude in admin.html. Authenticated-
+// only by product decision, not a technical PII rule: the comments were
+// posted publicly, but some are patient-adjacent complaints, so this stays
+// admin-only and is never read by any public page.
+const SOCIAL_COMMENTS = "social_comments";
+
+export function saveSocialComment(id, data) {
+  return setDoc(doc(db, SOCIAL_COMMENTS, id), data, { merge: true });
+}
+export async function getSocialComment(id) {
+  const snap = await getDoc(doc(db, SOCIAL_COMMENTS, id));
+  return snap.exists() ? snap.data() : null;
+}
+
+// Small rollup doc — the only thing admin.html's dashboard actually reads,
+// so display stays cheap no matter how large social_comments grows over
+// time. Stored as config/sentiment_stats: { totals, topThemes,
+// recentComments (capped), lastSyncedAt }.
+export async function getSentimentStats() {
+  const snap = await getDoc(doc(db, CONFIG, "sentiment_stats"));
+  return snap.exists() ? snap.data() : null;
+}
+export function setSentimentStats(data) {
+  return setDoc(doc(db, CONFIG, "sentiment_stats"), data);
+}
+
 // ── ADVISOR BRIEF ───────────────────────────────────────────────────────
 // Stored as config/advisor_brief → { json, generatedAt, generatedByName,
 // coverageNote }. The AI-written briefing shown on admin.html's Advisor tab.

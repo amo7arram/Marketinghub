@@ -707,6 +707,25 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <span id="metrics-saving-indicator" style="font-size:12px;color:var(--text-3);display:none">Saving...</span>
         </div>
       </div>
+
+      <!-- COMMENT SENTIMENT — admin-only, never surfaced on the public
+           dashboard. Pulls comments/reviews via Metricool's own documented
+           Inbox API (GET /v2/inbox/post-comments, /v2/inbox/reviews) — not
+           scraping — and classifies each with Claude. -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-top:16px;box-shadow:var(--shadow)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+          <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text)">💬 Comment Sentiment</div>
+          <button class="btn btn-primary" id="sentiment-sync-btn" onclick="syncCommentSentiment()">🔄 Sync Comments &amp; Reviews</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:10px">Instagram, Facebook, TikTok comments + Google Business reviews, via Metricool's Inbox. Admin-only — this section is never shown on the public dashboard.</div>
+        <div id="sentiment-sync-status" style="font-size:12px;color:var(--text-3);margin-bottom:14px">Never synced yet</div>
+
+        <div id="sentiment-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px"></div>
+        <div id="sentiment-themes" style="font-size:11px;color:var(--text-3);margin-bottom:16px"></div>
+
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:8px">Recent comments &amp; reviews</div>
+        <div id="sentiment-recent-list" style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- CONTENT GENERATOR PAGE -->
@@ -1776,6 +1795,7 @@ import {
   saveMonthMetrics as saveLegacyMonthMetrics, getMetricsForPeriod as getLegacyMetricsForPeriod, getAllMetrics,
   getAccessGate, setAccessGate, hashPassword,
   watchAdvisorBrief, saveAdvisorBrief,
+  getSentimentStats, setSentimentStats, saveSocialComment, getSocialComment,
   watchTeamMembers, addTeamMember, updateTeamMember, deleteTeamMember, createTeamMemberWithLogin,
   watchEntities, addEntity, deleteEntity, checkEntityUsage,
   watchHealthDays, addHealthDay, updateHealthDay, deleteHealthDay, migrateHealthDaysFromInitiatives,
@@ -1810,6 +1830,7 @@ let editingLandingPageSlug = null; // null = creating; non-null = editing (slug 
 let unsubLandingPages = null;
 let ALL_EXPENSES = [];
 let ADVISOR_BRIEF = null;          // cached { json, generatedAt, generatedByName, coverageNote }
+let SENTIMENT_STATS = null;        // cached { totals, topThemes, recentComments, lastSyncedAt }
 let unsubAdvisorBrief = null;
 let advisorChat = [];             // in-memory chat turns [{role:'user'|'assistant', content}]
 let advisorPulseCache = null;     // last computed pulse object (reused by the chat calls)
@@ -3490,6 +3511,17 @@ async function initMetricsTab() {
   renderMetricsYearGrid();
   renderMetricoolSyncStatus();
   await loadMetricsForPeriod();
+  // Isolated from the rest of this function on purpose: if the
+  // config/sentiment_stats rule hasn't been pasted into Firebase Console
+  // yet (or any other transient failure), this should degrade to the
+  // "never synced" placeholder, not silently abort tab setup.
+  try {
+    SENTIMENT_STATS = await getSentimentStats();
+  } catch(e) {
+    console.error('Sentiment stats fetch failed:', e);
+    SENTIMENT_STATS = null;
+  }
+  renderSentimentStats();
 }
 
 function renderMetricoolSyncStatus() {
@@ -3603,6 +3635,217 @@ window.syncMetricool = async function() {
     btn.disabled = false;
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// COMMENT SENTIMENT — pulls comments/reviews via Metricool's own documented
+// Inbox API (confirmed against their real swagger.json, not scraping):
+//   GET /v2/inbox/post-comments?provider=X  — Instagram/Facebook/TikTok
+//   GET /v2/inbox/reviews?provider=GMB      — Google Business reviews (with
+//                                              a star rating already attached)
+// Each new item is classified by Claude (positive/neutral/negative + up to
+// 2 theme tags). Admin-only by product decision — see the section's own
+// intro text in the markup and DATA_MODEL.md for why.
+// ══════════════════════════════════════════════════════════════════════════
+const SENTIMENT_PROVIDERS = ['INSTAGRAMBUSINESS', 'FACEBOOK', 'TIKTOKBUSINESS'];
+const SENTIMENT_RECENT_CAP = 30;
+const SENTIMENT_ICON = { INSTAGRAMBUSINESS:'📸', INSTAGRAM:'📸', FACEBOOK:'👍', TIKTOKBUSINESS:'🎵', GMB:'⭐' };
+
+function renderSentimentStats() {
+  const summaryEl = document.getElementById('sentiment-summary');
+  const themesEl  = document.getElementById('sentiment-themes');
+  const listEl    = document.getElementById('sentiment-recent-list');
+  const statusEl  = document.getElementById('sentiment-sync-status');
+  if(!summaryEl || !listEl) return;
+
+  if(statusEl) {
+    statusEl.textContent = SENTIMENT_STATS?.lastSyncedAt
+      ? `Last synced: ${new Date(SENTIMENT_STATS.lastSyncedAt).toLocaleString()}`
+      : 'Never synced yet';
+  }
+
+  const card = (label, value, color) =>
+    `<div class="adv-card"><div class="adv-card-label">${label}</div>` +
+    `<div class="adv-card-value"${color?` style="color:${color}"`:''}>${value}</div></div>`;
+
+  if(!SENTIMENT_STATS || !SENTIMENT_STATS.totals) {
+    summaryEl.innerHTML = card('Positive','—',null) + card('Neutral','—',null) + card('Negative','—',null) + card('Analyzed','0',null);
+    themesEl.innerHTML = '';
+    listEl.innerHTML = '<div class="adv-muted">No comments synced yet.</div>';
+    return;
+  }
+
+  const t = SENTIMENT_STATS.totals;
+  const total = (t.positive||0) + (t.neutral||0) + (t.negative||0);
+  const pct = n => total ? Math.round((n||0)/total*100) : 0;
+  summaryEl.innerHTML =
+    card('Positive', `${pct(t.positive)}%`, 'var(--green)') +
+    card('Neutral',  `${pct(t.neutral)}%`,  'var(--text-2)') +
+    card('Negative', `${pct(t.negative)}%`, 'var(--red)') +
+    card('Total analyzed', total, null);
+
+  themesEl.innerHTML = (SENTIMENT_STATS.topThemes||[]).length
+    ? `Common themes: ${SENTIMENT_STATS.topThemes.map(advEsc).join(', ')}` : '';
+
+  listEl.innerHTML = (SENTIMENT_STATS.recentComments||[]).map(c => {
+    const sentColor = c.sentiment==='positive' ? 'var(--green)' : c.sentiment==='negative' ? 'var(--red)' : 'var(--text-3)';
+    const stars = c.stars ? ` ${'★'.repeat(c.stars)}${'☆'.repeat(Math.max(0,5-c.stars))}` : '';
+    return `<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-3);margin-bottom:4px">
+        <span>${SENTIMENT_ICON[c.provider]||'💬'}</span>
+        <span style="font-weight:600;color:var(--text-2)">${advEsc(c.authorName||'Anonymous')}</span>
+        <span>${stars}</span>
+        <span style="margin-left:auto;text-transform:uppercase;font-weight:700;font-size:10px;color:${sentColor}">${advEsc(c.sentiment||'—')}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-2)">${advEsc(c.text||'')}</div>
+    </div>`;
+  }).join('') || '<div class="adv-muted">No comments synced yet.</div>';
+}
+
+// Raw fetch from Metricool's Inbox — same auth pattern as syncMetricool()
+// above, same CORS proxy Worker (a generic passthrough, so these newer
+// endpoint paths need no Worker changes).
+async function fetchInboxItems(authHeaders, userId, blogId) {
+  const fetched = [];
+  for(const provider of SENTIMENT_PROVIDERS) {
+    try {
+      const res = await fetch(`${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`, { headers: authHeaders });
+      if(!res.ok) { console.error(`Sentiment fetch failed for ${provider}: HTTP ${res.status}`); continue; }
+      const body = await res.json();
+      (body.data || body || []).forEach(thread => {
+        const postText = thread.root?.element?.text || thread.root?.text || null;
+        (thread.root?.comments || []).forEach(c => {
+          if(!c.text) return;
+          fetched.push({
+            id: `${provider}_${c.id}`, provider, type: 'comment',
+            text: c.text, authorName: c.owner || null, stars: null,
+            postText, createdAt: c.creationDate || thread.creationDate || null,
+          });
+        });
+      });
+    } catch(e) { console.error(`Sentiment fetch error for ${provider}:`, e); }
+  }
+  // Google Business reviews — a star rating comes free with these, but still
+  // AI-classified for consistency and to catch text/star mismatches (a
+  // 5-star review can still mention a real complaint).
+  try {
+    const res = await fetch(`${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`, { headers: authHeaders });
+    if(res.ok) {
+      const body = await res.json();
+      (body.data || body || []).forEach(r => {
+        if(!r.message) return;
+        fetched.push({
+          id: `GMB_${r.id}`, provider: 'GMB', type: 'review',
+          text: r.message, authorName: (r.participants && r.participants[0]?.name) || null,
+          stars: r.stars ?? null, postText: null, createdAt: r.creationDate || null,
+        });
+      });
+    } else { console.error('Sentiment fetch failed for GMB reviews: HTTP', res.status); }
+  } catch(e) { console.error('Sentiment fetch error for GMB reviews:', e); }
+  return fetched;
+}
+
+// Batched Claude classification — same call helper the Advisor and Offers
+// Catalog's Arabic translation reuse, so this isn't a 5th copy of the fetch
+// boilerplate. A failed chunk is logged and left unclassified (falls back
+// to "neutral" below) rather than aborting the whole sync.
+async function classifySentiment(items, statusEl) {
+  const results = new Map();
+  const chunkSize = 40;
+  for(let i=0; i<items.length; i+=chunkSize) {
+    const chunk = items.slice(i, i+chunkSize);
+    if(statusEl) statusEl.textContent = `Classifying — ${Math.min(i+chunkSize, items.length)} of ${items.length}…`;
+    try {
+      const payload = chunk.map(c => ({ id: c.id, text: c.text, stars: c.stars }));
+      const json = await advisorClaudeCall({
+        model: 'claude-sonnet-4-6',
+        system: 'You classify social media comments and reviews for a Saudi private healthcare group. For each item, return its id, a sentiment of exactly "positive", "neutral", or "negative", and up to 2 short lowercase theme tags (e.g. "wait times", "pricing", "staff friendliness", "cleanliness") when a clear theme is present, else an empty array. If a star rating is given, weigh it but don\'t just copy it — read the text too. Return ONLY a JSON array of {"id":"...","sentiment":"...","themes":["..."]} objects, one per input item, same ids, nothing else.',
+        messages: [{ role: 'user', content: JSON.stringify(payload) }],
+        maxTokens: 4000,
+        expectJson: true,
+      });
+      if(Array.isArray(json)) json.forEach(r => { if(r && r.id) results.set(r.id, { sentiment: r.sentiment, themes: r.themes||[] }); });
+    } catch(e) { console.error('Sentiment classification chunk failed:', e); }
+  }
+  return results;
+}
+
+window.syncCommentSentiment = async function() {
+  if(!METRICOOL_SETTINGS.apiToken || !METRICOOL_SETTINGS.blogId) {
+    showToast('Connect Metricool in Settings first', true); return;
+  }
+  if(!ANTHROPIC_API_KEY) {
+    showToast('No API key configured — set it in Campaign Generator → AI Setup', true); return;
+  }
+  const btn = document.getElementById('sentiment-sync-btn');
+  const statusEl = document.getElementById('sentiment-sync-status');
+  btn.disabled = true;
+  statusEl.textContent = 'Fetching comments & reviews…';
+  try {
+    const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
+    const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
+    const fetched = await fetchInboxItems(authHeaders, userId, blogId);
+
+    if(!fetched.length) {
+      statusEl.textContent = 'No comments or reviews found.';
+      return;
+    }
+
+    // Only classify items not already analyzed from a prior sync — bounded
+    // by however many items this run fetched (Metricool's own inbox window),
+    // not the whole historical social_comments collection.
+    statusEl.textContent = `Checking ${fetched.length} item(s) against what's already analyzed…`;
+    const priorDocs = await Promise.all(fetched.map(f => getSocialComment(f.id)));
+    const needsClassification = fetched.filter((f,i) => !priorDocs[i]?.sentiment);
+
+    let freshResults = new Map();
+    if(needsClassification.length) freshResults = await classifySentiment(needsClassification, statusEl);
+
+    const finalItems = fetched.map((f, i) => {
+      const prior = priorDocs[i];
+      if(prior?.sentiment) return { ...f, sentiment: prior.sentiment, sentimentThemes: prior.sentimentThemes||[] };
+      const fresh = freshResults.get(f.id);
+      return { ...f, sentiment: fresh?.sentiment || 'neutral', sentimentThemes: fresh?.themes || [] };
+    });
+
+    statusEl.textContent = 'Saving…';
+    await Promise.all(finalItems.map(m => saveSocialComment(m.id, {
+      provider: m.provider, type: m.type, text: m.text, authorName: m.authorName,
+      stars: m.stars, postText: m.postText, createdAtRaw: m.createdAt,
+      sentiment: m.sentiment, sentimentThemes: m.sentimentThemes,
+      syncedAt: new Date().toISOString(),
+    })));
+
+    // Roll up. Totals accumulate across syncs — only items that were newly
+    // classified this run add to the running count, so re-syncing the same
+    // comment never double-counts it. Recent list is capped and sorted
+    // negative-first so the admin sees what needs attention first.
+    const prevTotals = SENTIMENT_STATS?.totals || { positive:0, neutral:0, negative:0 };
+    const newTotals = { ...prevTotals };
+    let newlyClassifiedCount = 0;
+    finalItems.forEach((m, i) => {
+      if(!priorDocs[i]?.sentiment) { newTotals[m.sentiment] = (newTotals[m.sentiment]||0) + 1; newlyClassifiedCount++; }
+    });
+
+    const themeCounts = {};
+    finalItems.forEach(m => (m.sentimentThemes||[]).forEach(t => { themeCounts[t] = (themeCounts[t]||0) + 1; }));
+    const topThemes = Object.entries(themeCounts).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
+
+    const priorRecent = (SENTIMENT_STATS?.recentComments || []).filter(r => !finalItems.some(m => m.id === r.id));
+    const recentComments = [...finalItems, ...priorRecent]
+      .sort((a,b) => (a.sentiment==='negative'?0:1) - (b.sentiment==='negative'?0:1) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')))
+      .slice(0, SENTIMENT_RECENT_CAP);
+
+    SENTIMENT_STATS = { totals: newTotals, topThemes, recentComments, lastSyncedAt: new Date().toISOString() };
+    await setSentimentStats(SENTIMENT_STATS);
+    renderSentimentStats();
+    showToast(`✓ Sentiment sync complete — ${newlyClassifiedCount} new item(s) classified`);
+  } catch(e) {
+    statusEl.textContent = 'Sync failed';
+    showToast('Sentiment sync failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+};
 
 function renderMetricsYearGrid() {
   document.getElementById('metrics-year-label').textContent = metricsYear;
@@ -5198,6 +5441,24 @@ function buildAdvisorPulse() {
     hygiene: { overdue, stuckInProduction: stuck, unassignedThisMonth: unassigned },
     calendar,
     campaignGaps,
+    sentiment: buildAdvisorSentimentSummary(),
+  };
+}
+
+// Rolls the Comment Sentiment section's own stored rollup into the pulse —
+// reads the already-fetched SENTIMENT_STATS, no extra Firestore call here.
+function buildAdvisorSentimentSummary() {
+  const s = SENTIMENT_STATS;
+  if(!s || !s.totals) return null;
+  const t = s.totals;
+  const total = (t.positive||0) + (t.neutral||0) + (t.negative||0);
+  if(!total) return null;
+  return {
+    positivePct: advPct((t.positive||0) / total),
+    negativePct: advPct((t.negative||0) / total),
+    total,
+    topThemes: s.topThemes || [],
+    lastSyncedAt: s.lastSyncedAt || null,
   };
 }
 
@@ -5238,6 +5499,10 @@ function renderAdvisorPulse(p) {
       : `SAR ${fmtSAR(p.spend.lastMonthTotal)} all of last month`));
   if(p.spend.biggestItem) {
     cards.push(card('Biggest line item', p.spend.biggestItem.label, 'SAR ' + fmtSAR(p.spend.biggestItem.cost)));
+  }
+  if(p.sentiment) {
+    cards.push(card('Comment sentiment', `${p.sentiment.positivePct}% positive`,
+      `${p.sentiment.negativePct}% negative · ${p.sentiment.total} analyzed${p.sentiment.topThemes.length ? ' · ' + p.sentiment.topThemes.slice(0,2).map(advEsc).join(', ') : ''}`));
   }
   if(p.social.biggestDecliner) {
     cards.push(card('Sliding', p.social.biggestDecliner.metric,
@@ -5464,12 +5729,16 @@ function renderAdvisorChat(scroll) {
   if(scroll) log.scrollTop = log.scrollHeight;
 }
 
-function initAdvisorTab() {
+async function initAdvisorTab() {
   const hr = new Date().getHours();
   const greet = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
   const first = (myMemberName() || '').split(' ')[0];
   const gEl = document.getElementById('adv-greeting');
   if(gEl) gEl.textContent = first ? `${greet}, ${first}` : greet;
+  // The Dashboard Metrics tab usually loads this first, but the Advisor can
+  // be opened before that happens — fetch it here too if still unset, so
+  // the pulse's sentiment line isn't silently missing on a first visit.
+  if(SENTIMENT_STATS === null) { try { SENTIMENT_STATS = await getSentimentStats(); } catch(e) { console.error('Sentiment stats fetch failed:', e); } }
   try {
     advisorPulseCache = buildAdvisorPulse();
     renderAdvisorPulse(advisorPulseCache);

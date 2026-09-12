@@ -314,6 +314,46 @@ Points are daily. `source:"metricool"` points come from admin.html's "Sync Now" 
 
 ---
 
+## `social_comments`
+
+Comments and reviews pulled from Metricool's **Inbox API** — `GET /v2/inbox/post-comments?provider={INSTAGRAMBUSINESS|FACEBOOK|TIKTOKBUSINESS}` for comments and `GET /v2/inbox/reviews?provider=GMB` for Google Business reviews. These are Metricool's own real, documented endpoints (verified directly against their `swagger.json`, not assumed or reverse-engineered) — the same Inbox feature visible in Metricool's own web app, reached through the same CORS proxy Worker and token already used for everything else Metricool in this app. Not scraping: no separate Meta Developer App or App Review was needed.
+
+Doc ID = `${provider}_${sourceCommentOrReviewId}` (deterministic, so re-syncing the same item is a no-op `setDoc` rather than a duplicate).
+
+| Field | Type | Notes |
+|---|---|---|
+| `provider` | string | One of Metricool's own enum values: `INSTAGRAMBUSINESS`, `FACEBOOK`, `TIKTOKBUSINESS`, `GMB` |
+| `type` | string | `comment` or `review` |
+| `text` | string | The comment text, or the review's `message` |
+| `authorName` | string \| null | From Metricool's `owner` (comments) or first `participants[].name` (reviews) |
+| `stars` | number \| null | Google Business reviews only — the star rating, returned by Metricool's `Review.stars` field |
+| `postText` | string \| null | The original post's caption, for context — comments only, null for reviews |
+| `createdAtRaw` | string \| null | The comment/review's own creation date/time, as returned by Metricool |
+| `sentiment` | `positive` \| `neutral` \| `negative` \| null | Set by `admin.html`'s `classifySentiment()` (Claude, `claude-sonnet-4-6`) — never re-computed once set, so re-syncing the same item doesn't re-spend AI tokens on it |
+| `sentimentThemes` | array of strings \| null | Up to 2 short lowercase theme tags per item (e.g. `"wait times"`, `"pricing"`), when a clear theme is present |
+| `syncedAt` | ISO string | When this app last wrote this document |
+
+**Authenticated-only by product decision, not a technical PII rule**: this content was posted publicly, but some of it is patient-adjacent complaints, so it's admin-only and never read by any public page — see `ARCHITECTURE.md`'s security-model notes for the full reasoning.
+
+**Storage/read cost is a non-issue at any realistic volume**: comment text is small (a few hundred bytes each) — even tens of thousands of items stay far under Firestore's free-tier 1 GiB storage cap. The dashboard never queries this collection directly (see `config/sentiment_stats` below); it's read only during sync, to check whether an already-fetched item was already classified (bounded by however many items one sync run fetches, not the collection's full historical size).
+
+## `config/sentiment_stats`
+
+The rollup `admin.html`'s Comment Sentiment section actually reads — kept small and cheap regardless of how large `social_comments` grows, same reasoning as `config/lead_stats`/`config/metricool_stats`, except this one is **authenticated-only**, not public.
+
+```
+config/sentiment_stats = {
+  totals: { positive: number, neutral: number, negative: number },  // accumulates across syncs, never double-counted
+  topThemes: [ "wait times", "pricing", ... ],                      // up to 6, by frequency
+  recentComments: [ /* up to 30 social_comments-shaped objects, negative-first, most-recent-first within that */ ],
+  lastSyncedAt: ISO string,
+}
+```
+
+Also folded into the Advisor tab's pulse (`buildAdvisorSentimentSummary()` in `admin.html`) as `pulse.sentiment` — `{ positivePct, negativePct, total, topThemes, lastSyncedAt }` — so the AI briefing can reference it alongside everything else, e.g. "comment sentiment dipped this month, mostly complaints about wait times."
+
+---
+
 ## `resources`
 
 Brand resource library links (logos, templates, guidelines).
@@ -353,6 +393,7 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 | `access_gate` | Public portal password gate settings |
 | ~~`admin_passcode`~~ | **Removed** — held the "Magic Word" shared admin-login passcode hash; that login path was retired once every admin had an individual account (`ARCHITECTURE.md` §4.4). The document may still exist in Firestore but has no rule and is read/written by nothing. |
 | `advisor_brief` | **Authenticated-only** (never public — lead-derived). The AI-written briefing for `admin.html`'s Advisor tab: `{ json: {headline, whatStandsOut, phoneRoomSignal, recommendations[], watchList[], campaignIdeas[], provocation}, generatedAt, generatedByName, coverageNote }`. One org-wide doc; any admin can regenerate it (overwrites). The pulse it's built from is computed client-side and not stored. Becomes `/orgs/{id}/config/advisor_brief` under multi-tenancy. |
+| `sentiment_stats` | **Authenticated-only.** Rollup for the Comment Sentiment section — see its own section above for the full shape. |
 | `lead_stats` | **Public-readable** aggregated leads funnel snapshot — written by admin, read by `index.html`. Contains zero PII by design. |
 | `department_revenue_estimates` | Per-department average revenue, used as the ROI fallback when actual `leads.revenueValue` isn't entered |
 | `metricool_settings` | Metricool API token + userId/blogId (⚠️ stored here, visible client-side — same tradeoff as `ai_settings`, see `ARCHITECTURE.md` §4). Needs an authenticated-only Firestore rule, same sensitivity class as `ai_settings`. |
@@ -418,6 +459,9 @@ marketing_actions
 
 offers_catalog (branch slug = doc ID)
   └── config/offers_catalog_meta                      [lists which branch docs exist]
+
+social_comments (provider_sourceId = doc ID)
+  └── config/sentiment_stats                          [rollup the dashboard/Advisor actually read]
 ```
 
 None of these relationships are enforced by Firestore itself — every "reference" is just a string ID or name stored on the child document, validated only by application code at write time. A real relational (or rigorously-validated document) database would be a meaningful reliability improvement in any SaaS rebuild.
