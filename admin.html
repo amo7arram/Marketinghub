@@ -3699,32 +3699,35 @@ function renderSentimentStats() {
   const monthLabelEl = document.getElementById('sentiment-month-label');
   if(monthLabelEl) monthLabelEl.textContent = sentimentPeriodLabel(thisP);
 
+  // Summary cards and the recent-comments list are rendered independently —
+  // a missing/empty `cur` (this month's byMonth bucket) must never blank
+  // out `recentComments`, which is tracked separately and can have real
+  // data even when the bucket itself hasn't caught up yet (this exact gap
+  // caused a real "comments vanished after sync" incident).
   if(!cur) {
     summaryEl.innerHTML = card('Positive','—',null) + card('Neutral','—',null) + card('Negative','—',null) + card('Analyzed','0',null);
     themesEl.innerHTML = '';
-    listEl.innerHTML = `<div class="adv-muted">No comments synced for ${sentimentPeriodLabel(thisP)} yet.</div>`;
-    return;
+  } else {
+    const total = (cur.positive||0) + (cur.neutral||0) + (cur.negative||0);
+    const pct = (n, of) => of ? Math.round((n||0)/of*100) : 0;
+    const prevTotal = prev ? (prev.positive||0)+(prev.neutral||0)+(prev.negative||0) : 0;
+    const delta = (key) => {
+      if(!prevTotal) return '';
+      const d = pct(cur[key], total) - pct(prev[key], prevTotal);
+      if(d === 0) return 'flat vs last month';
+      return d > 0 ? `<span class="up">▲${d}pts</span> vs last month` : `<span class="down">▼${Math.abs(d)}pts</span> vs last month`;
+    };
+    summaryEl.innerHTML =
+      card('Positive', `${pct(cur.positive,total)}%`, 'var(--green)', delta('positive')) +
+      card('Neutral',  `${pct(cur.neutral,total)}%`,  'var(--text-2)', delta('neutral')) +
+      card('Negative', `${pct(cur.negative,total)}%`, 'var(--red)', delta('negative')) +
+      card('Analyzed this month', total, null, prevTotal ? `${prevTotal} last month` : null);
+
+    const topThemes = Object.entries(cur.themeCounts||{}).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
+    themesEl.innerHTML = topThemes.length ? `Common themes this month: ${topThemes.map(advEsc).join(', ')}` : '';
   }
 
-  const total = (cur.positive||0) + (cur.neutral||0) + (cur.negative||0);
-  const pct = (n, of) => of ? Math.round((n||0)/of*100) : 0;
-  const prevTotal = prev ? (prev.positive||0)+(prev.neutral||0)+(prev.negative||0) : 0;
-  const delta = (key) => {
-    if(!prevTotal) return '';
-    const d = pct(cur[key], total) - pct(prev[key], prevTotal);
-    if(d === 0) return 'flat vs last month';
-    return d > 0 ? `<span class="up">▲${d}pts</span> vs last month` : `<span class="down">▼${Math.abs(d)}pts</span> vs last month`;
-  };
-  summaryEl.innerHTML =
-    card('Positive', `${pct(cur.positive,total)}%`, 'var(--green)', delta('positive')) +
-    card('Neutral',  `${pct(cur.neutral,total)}%`,  'var(--text-2)', delta('neutral')) +
-    card('Negative', `${pct(cur.negative,total)}%`, 'var(--red)', delta('negative')) +
-    card('Analyzed this month', total, null, prevTotal ? `${prevTotal} last month` : null);
-
-  const topThemes = Object.entries(cur.themeCounts||{}).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t])=>t);
-  themesEl.innerHTML = topThemes.length ? `Common themes this month: ${topThemes.map(advEsc).join(', ')}` : '';
-
-  listEl.innerHTML = (SENTIMENT_STATS.recentComments||[]).map(c => {
+  listEl.innerHTML = (SENTIMENT_STATS?.recentComments||[]).map(c => {
     const sentColor = c.sentiment==='positive' ? 'var(--green)' : c.sentiment==='negative' ? 'var(--red)' : 'var(--text-3)';
     const stars = c.stars ? ` ${'★'.repeat(c.stars)}${'☆'.repeat(Math.max(0,5-c.stars))}` : '';
     const dateLabel = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en',{month:'short',day:'numeric'}) : '—';
@@ -3875,27 +3878,39 @@ window.syncCommentSentiment = async function() {
       provider: m.provider, type: m.type, text: m.text, authorName: m.authorName,
       stars: m.stars, postText: m.postText, createdAtRaw: m.createdAt,
       sentiment: m.sentiment, sentimentThemes: m.sentimentThemes,
+      countedInRollup: true,
       syncedAt: new Date().toISOString(),
     })));
 
     // Roll up, bucketed by each item's own real month — not "this sync's
     // month" — so a late sync that happens to pick up a stray older item
     // still lands it in the right place, and month-over-month comparisons
-    // (rendered in renderSentimentStats()) are meaningful. Only items newly
-    // classified this run add to a bucket's count, so re-syncing the same
-    // comment never double-counts it.
+    // (rendered in renderSentimentStats()) are meaningful.
+    //
+    // Counting is gated on `countedInRollup`, NOT on whether the item needed
+    // a fresh Claude call — those are different questions. An item can
+    // already have a `sentiment` (no AI spend needed) while never having
+    // been counted into a byMonth bucket yet, e.g. anything classified
+    // before this bucketed-rollup existed. Gating on `sentiment` here caused
+    // a real incident: every already-classified comment silently vanished
+    // from the rollup on the next sync, because none of them registered as
+    // "new" even though none had ever been counted. `countedInRollup`
+    // defaults to missing/false on such pre-existing docs, so this also
+    // self-heals them the next time they're fetched — no manual reset needed.
     const byMonth = {};
     Object.entries(SENTIMENT_STATS?.byMonth || {}).forEach(([p, v]) => {
       byMonth[p] = { positive: v.positive||0, neutral: v.neutral||0, negative: v.negative||0, themeCounts: { ...(v.themeCounts||{}) } };
     });
     let newlyClassifiedCount = 0;
+    let newlyCountedCount = 0;
     finalItems.forEach((m, i) => {
-      if(priorDocs[i]?.sentiment) return; // already counted in an earlier sync
+      if(!priorDocs[i]?.sentiment) newlyClassifiedCount++;
+      if(priorDocs[i]?.countedInRollup) return; // already counted in an earlier sync
       const p = sentimentPeriodOf(m.createdAt) || 'unknown';
       if(!byMonth[p]) byMonth[p] = { positive:0, neutral:0, negative:0, themeCounts:{} };
       byMonth[p][m.sentiment] = (byMonth[p][m.sentiment]||0) + 1;
       (m.sentimentThemes||[]).forEach(t => { byMonth[p].themeCounts[t] = (byMonth[p].themeCounts[t]||0) + 1; });
-      newlyClassifiedCount++;
+      newlyCountedCount++;
     });
 
     // Recent list is scoped to the current calendar month (this is meant to
@@ -3911,7 +3926,7 @@ window.syncCommentSentiment = async function() {
     SENTIMENT_STATS = { byMonth, recentComments, lastSyncedAt: new Date().toISOString() };
     await setSentimentStats(SENTIMENT_STATS);
     renderSentimentStats();
-    showToast(`✓ Sentiment sync complete — ${newlyClassifiedCount} new item(s) classified`);
+    showToast(`✓ Sentiment sync complete — ${newlyClassifiedCount} new item(s) classified, ${newlyCountedCount} added to the monthly totals`);
   } catch(e) {
     statusEl.textContent = 'Sync failed';
     showToast('Sentiment sync failed: ' + e.message, true);
