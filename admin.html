@@ -726,9 +726,17 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div id="sentiment-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px"></div>
         <div id="sentiment-themes" style="font-size:11px;color:var(--text-3);margin-bottom:16px"></div>
 
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:8px">Recent comments &amp; reviews — this month</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3)">Recent comments &amp; reviews — this month</div>
+          <div id="sentiment-platform-filter" style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm sentiment-filter-btn" data-provider="ALL" onclick="setSentimentPlatformFilter('ALL')">All</button>
+            <button class="btn btn-sm sentiment-filter-btn" data-provider="INSTAGRAM" onclick="setSentimentPlatformFilter('INSTAGRAM')">📸 Instagram</button>
+            <button class="btn btn-sm sentiment-filter-btn" data-provider="FACEBOOK" onclick="setSentimentPlatformFilter('FACEBOOK')">👍 Facebook</button>
+            <button class="btn btn-sm sentiment-filter-btn" data-provider="TIKTOKBUSINESS" onclick="setSentimentPlatformFilter('TIKTOKBUSINESS')">🎵 TikTok</button>
+            <button class="btn btn-sm sentiment-filter-btn" data-provider="GMB" onclick="setSentimentPlatformFilter('GMB')">⭐ Google Business</button>
+          </div>
+        </div>
         <div id="sentiment-recent-list" style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto"></div>
-        <div id="sentiment-debug-samples"></div>
       </div>
     </div>
 
@@ -3651,6 +3659,12 @@ window.syncMetricool = async function() {
 // intro text in the markup and DATA_MODEL.md for why.
 // ══════════════════════════════════════════════════════════════════════════
 const SENTIMENT_RECENT_CAP = 30;
+let sentimentPlatformFilter = 'ALL'; // client-side only — filters the already-loaded recentComments list
+
+window.setSentimentPlatformFilter = function(provider) {
+  sentimentPlatformFilter = provider;
+  renderSentimentStats();
+};
 // Metricool's own API docs show no date-range or page-size parameter for
 // these two endpoints (unlike several other Metricool endpoints, which do
 // document real page/limit/from/to params when they exist) — so how many
@@ -3734,7 +3748,15 @@ function renderSentimentStats() {
     themesEl.innerHTML = themesLine;
   }
 
-  listEl.innerHTML = (SENTIMENT_STATS?.recentComments||[]).map(c => {
+  document.querySelectorAll('.sentiment-filter-btn').forEach(btn => {
+    const active = btn.dataset.provider === sentimentPlatformFilter;
+    btn.style.background = active ? 'var(--navy)' : '';
+    btn.style.color = active ? '#fff' : '';
+  });
+
+  const filteredComments = (SENTIMENT_STATS?.recentComments||[])
+    .filter(c => sentimentPlatformFilter === 'ALL' || c.provider === sentimentPlatformFilter);
+  listEl.innerHTML = filteredComments.map(c => {
     const sentColor = c.sentiment==='positive' ? 'var(--green)' : c.sentiment==='negative' ? 'var(--red)' : 'var(--text-3)';
     const stars = c.stars ? ` ${'★'.repeat(c.stars)}${'☆'.repeat(Math.max(0,5-c.stars))}` : '';
     const dateLabel = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en',{month:'short',day:'numeric'}) : '—';
@@ -3748,27 +3770,7 @@ function renderSentimentStats() {
       <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:4px">${advEsc(c.authorName||'Anonymous')}${stars}</div>
       <div style="font-size:12px;color:var(--text-2)">${advEsc(c.text||'')}</div>
     </div>`;
-  }).join('') || `<div class="adv-muted">No comments synced for ${sentimentPeriodLabel(thisP)} yet.</div>`;
-}
-
-// TEMPORARY debug aid, not meant to stay long-term: shows one raw,
-// unmodified thread/review per channel exactly as Metricool's API returned
-// it, so a real field-name mismatch (like the root-vs-root.comments bug
-// this was built to catch) can be confirmed and fixed from real data
-// instead of guessed at again. Safe to show — this is the admin's own
-// already-visible comment data, not anything new being exposed.
-function renderSentimentDebugSamples(rawSamples) {
-  const el = document.getElementById('sentiment-debug-samples');
-  if(!el) return;
-  const entries = Object.entries(rawSamples||{});
-  if(!entries.length) { el.innerHTML = ''; return; }
-  el.innerHTML = `<details style="margin-top:14px">
-    <summary style="cursor:pointer;font-size:11px;color:var(--text-3)">🔍 Raw sample per platform (debug — for fixing field mapping, safe to ignore)</summary>
-    ${entries.map(([label, sample]) => `<div style="margin-top:8px">
-      <div style="font-size:10px;font-weight:700;color:var(--text-3);margin-bottom:2px">${advEsc(label)}</div>
-      <pre style="font-size:10px;background:var(--bg);border-radius:var(--radius);padding:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-word">${advEsc(JSON.stringify(sample, null, 2))}</pre>
-    </div>`).join('')}
-  </details>`;
+  }).join('') || `<div class="adv-muted">No comments${sentimentPlatformFilter!=='ALL' ? ' from this platform' : ''} synced for ${sentimentPeriodLabel(thisP)} yet.</div>`;
 }
 
 // Follows Metricool's page.next cursor if present — best-effort only, see
@@ -3812,27 +3814,23 @@ async function fetchSentimentPages(baseUrl, authHeaders, onPage) {
 // coverage from one sync still rolls up correctly; it's just not
 // guaranteed to be the *complete* current month in a single run.
 //
-// Trying both INSTAGRAM and INSTAGRAMBUSINESS for Instagram, temporarily:
-// Metricool's schema lists both as valid `provider` values and there's no
-// way to know from outside which one this specific account's connection
-// actually needs — a real sync where one comes back empty/failed and the
-// other doesn't will settle it, at which point drop whichever one is wrong.
+// Confirmed live (2026-09-13): this account's Instagram connection needs
+// plain `INSTAGRAM`, not `INSTAGRAMBUSINESS` (which consistently returned 0
+// with no error) — Metricool's schema allows either, there was no way to
+// know which without a real sync.
 async function fetchInboxItems(authHeaders, userId, blogId) {
   const fetched = [];
   const report = [];
   const commentChannels = [
-    { label: 'Instagram (Business)', provider: 'INSTAGRAMBUSINESS' },
     { label: 'Instagram', provider: 'INSTAGRAM' },
     { label: 'Facebook', provider: 'FACEBOOK' },
     { label: 'TikTok', provider: 'TIKTOKBUSINESS' },
   ];
-  const rawSamples = {}; // one raw thread/review per channel, for the debug view below
   for(const { label, provider } of commentChannels) {
     const result = await fetchSentimentPages(
       `${METRICOOL_API_BASE}/v2/inbox/post-comments?userId=${userId}&blogId=${blogId}&provider=${provider}`,
       authHeaders,
       (threads) => threads.forEach(thread => {
-        if(!rawSamples[label]) rawSamples[label] = thread;
         const postText = thread.root?.element?.text || null;
         // `root` IS the top-level comment on the post — it has its own
         // text/owner/date. `root.comments[]` are only *replies* to that
@@ -3868,7 +3866,6 @@ async function fetchInboxItems(authHeaders, userId, blogId) {
     `${METRICOOL_API_BASE}/v2/inbox/reviews?userId=${userId}&blogId=${blogId}&provider=GMB`,
     authHeaders,
     (reviews) => reviews.forEach(r => {
-      if(!rawSamples['Google Business']) rawSamples['Google Business'] = r;
       if(!r.message) return;
       fetched.push({
         id: `GMB_${r.id}`, provider: 'GMB', type: 'review',
@@ -3880,7 +3877,7 @@ async function fetchInboxItems(authHeaders, userId, blogId) {
   report.push({ label: 'Google Business', ...gmbResult });
   if(!gmbResult.ok) console.error('Sentiment fetch failed for Google Business:', gmbResult.error);
 
-  return { fetched, report, rawSamples };
+  return { fetched, report };
 }
 
 // Batched Claude classification — same call helper the Advisor and Offers
@@ -3922,12 +3919,11 @@ window.syncCommentSentiment = async function() {
   try {
     const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
     const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
-    const { fetched, report, rawSamples } = await fetchInboxItems(authHeaders, userId, blogId);
+    const { fetched, report } = await fetchInboxItems(authHeaders, userId, blogId);
     // Per-channel breakdown, kept and shown persistently (not just this
     // instant) so "why is only one platform showing up" has a real answer
     // instead of a silent console.error only a developer would ever see.
     const reportSummary = report.map(r => r.ok ? `${r.label}: ${r.itemCount}` : `${r.label}: failed (${r.error})`).join(' · ');
-    renderSentimentDebugSamples(rawSamples);
 
     // Defend against a missing/unparseable date rather than silently
     // dropping the item into a hidden "unknown" bucket — default to right
