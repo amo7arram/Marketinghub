@@ -5764,8 +5764,35 @@ async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJso
   const data = await res.json();
   const text = data.content?.find(b => b.type === 'text')?.text || '';
   if(!expectJson) return text;
-  try { return JSON.parse(text.replace(/```json|```/g, '').trim()); }
-  catch(e) { throw new Error('Could not parse the advisor response — try again'); }
+  try { return JSON.parse(extractJsonBlock(text)); }
+  catch(e) {
+    // The generic error shown to the user is deliberately non-technical, but
+    // a parse failure with no trace of the actual bad text is a dead end
+    // the next time this happens — log it so it's at least debuggable via
+    // devtools instead of a pure guess (this is exactly how the previous
+    // occurrence had to be diagnosed).
+    console.error('Could not parse AI JSON response. Raw text was:', text);
+    throw new Error('Could not parse the advisor response — try again (raw response logged to console for debugging)');
+  }
+}
+
+// Claude is asked to return ONLY JSON, but a response can still arrive
+// truncated (hit max_tokens before the closing brace/bracket) or wrapped in
+// a little stray prose despite the instruction. Slicing from the first
+// {/[ to the last matching }/] is a cheap, common defense against both —
+// still fails loudly via JSON.parse if the JSON itself is genuinely broken
+// (e.g. really was truncated mid-structure), which is the correct behavior.
+function extractJsonBlock(text) {
+  const trimmed = text.replace(/```json|```/g, '').trim();
+  const firstBrace = trimmed.indexOf('{');
+  const firstBracket = trimmed.indexOf('[');
+  let start, closeChar;
+  if(firstBrace === -1 && firstBracket === -1) return trimmed;
+  if(firstBracket === -1 || (firstBrace !== -1 && firstBrace < firstBracket)) { start = firstBrace; closeChar = '}'; }
+  else { start = firstBracket; closeChar = ']'; }
+  const end = trimmed.lastIndexOf(closeChar);
+  if(end === -1 || end < start) return trimmed;
+  return trimmed.slice(start, end + 1);
 }
 
 window.generateAdvisorBrief = async function() {
@@ -5798,7 +5825,12 @@ window.generateAdvisorBrief = async function() {
     const json = await advisorClaudeCall({
       system: ADVISOR_PERSONA + '\n\n' + shape,
       messages: [{ role: 'user', content: 'Here is the snapshot:\n\n' + JSON.stringify(payload, null, 2) }],
-      maxTokens: 3500,
+      // Raised from 3500 — the pulse now also carries comment-sentiment data
+      // (added after this was first built), giving the model more to write
+      // about across recommendations/campaignIdeas/watchList, and a response
+      // that hits the old ceiling mid-JSON fails to parse entirely rather
+      // than just being shorter than ideal.
+      maxTokens: 6000,
       expectJson: true,
     });
     const record = {
