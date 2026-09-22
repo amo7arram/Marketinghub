@@ -512,10 +512,10 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <table style="min-width:1080px">
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
-            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Entity</th><th>Source</th>
+            <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
             <th>Campaign</th><th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="15" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="14" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
@@ -1559,6 +1559,11 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <select class="field-select" id="bulk-entity"><option value="">— No change —</option></select>
       </div>
       <div class="field-group">
+        <label class="field-label">Source</label>
+        <input class="field-input" id="bulk-source" placeholder="e.g. Meta Ads, Google, Walk-in">
+        <div class="form-hint" style="font-size:10px;color:var(--text-3);margin-top:3px">Leave blank to skip</div>
+      </div>
+      <div class="field-group">
         <label class="field-label">Contact Status</label>
         <select class="field-select" id="bulk-contact-status"><option value="">— No change —</option></select>
       </div>
@@ -2365,11 +2370,12 @@ window.saveInitiative = async function() {
   if(deptSelectVal === 'Other' && !deptFinal) { showToast('Please enter the department name', true); return; }
 
   // Published activities must have a post/content link — no dangling
-  // "Published" status with nothing to actually show for it.
+  // "Published" status with nothing to actually show for it. Only enforced
+  // for social media content: other types (Event, Print, Physician Video,
+  // Campaign) don't always have a link to point to.
   const statusVal = document.getElementById('fld-status').value;
   const postLinkVal = document.getElementById('fld-postLink')?.value.trim() || '';
-  const postLinkFieldVisible = document.getElementById('fld-postlink-wrap')?.style.display !== 'none';
-  if(statusVal === 'Published' && postLinkFieldVisible && !postLinkVal) {
+  if(statusVal === 'Published' && currentType === 'SM Content' && !postLinkVal) {
     showToast('This activity is marked Published — add the Post / Content Link before saving', true);
     return;
   }
@@ -6906,7 +6912,6 @@ window.renderLeadsTable = function() {
           <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
           <td style="font-weight:600">${l.name||'—'}</td>
           <td style="font-size:12px">${l.phone||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.email||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.entity||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${l.source||'—'}</td>
@@ -6945,7 +6950,7 @@ window.renderLeadsTable = function() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="15" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
+    : `<tr><td colspan="14" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
 
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
@@ -7060,6 +7065,7 @@ window.openBulkEditModal = function() {
   document.getElementById('bulk-date').value = '';
   document.getElementById('bulk-department').value = '';
   document.getElementById('bulk-entity').value = '';
+  document.getElementById('bulk-source').value = '';
   document.getElementById('bulk-contact-status').value = '';
   document.getElementById('bulk-outcome').value = '';
   document.getElementById('bulk-campaign').value = '';
@@ -7073,6 +7079,7 @@ window.confirmBulkEdit = async function() {
   const dateVal    = document.getElementById('bulk-date').value;
   const deptVal    = document.getElementById('bulk-department').value;
   const entityVal  = document.getElementById('bulk-entity').value;
+  const sourceVal  = document.getElementById('bulk-source').value.trim();
   const contactVal = document.getElementById('bulk-contact-status').value;
   const outcomeVal = document.getElementById('bulk-outcome').value;
   const campaignSel = document.getElementById('bulk-campaign');
@@ -7084,6 +7091,7 @@ window.confirmBulkEdit = async function() {
   if(dateVal)    updateObj.dateCreated   = dateVal;
   if(deptVal)    updateObj.department    = deptVal;
   if(entityVal)  updateObj.entity        = entityVal;
+  if(sourceVal)  updateObj.source        = sourceVal;
   if(contactVal) updateObj.contactStatus = contactVal;
   if(outcomeVal) updateObj.outcome       = outcomeVal;
   if(campaignVal) {
