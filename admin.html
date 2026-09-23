@@ -461,6 +461,18 @@ tr.row-overdue:hover td{background:#FFD6D6}
           </table>
         </div>
       </div>
+      <!-- Campaign Performance — collapsible; same CPL/CPA/ROI numbers shown on the public Leads & Attribution dashboard -->
+      <div style="margin-bottom:16px">
+        <div onclick="toggleCampaignPerformancePanel()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;user-select:none">
+          <span id="campaign-perf-toggle-icon">▸</span> 📈 Campaign Performance
+        </div>
+        <div id="campaign-performance-panel" style="display:none">
+          <table>
+            <thead><tr><th>Campaign</th><th>Leads</th><th>Cost (SAR)</th><th>CPL</th><th>Booked</th><th>CPA</th><th>ROI</th></tr></thead>
+            <tbody id="campaign-performance-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
       <!-- Toolbar -->
       <div class="toolbar">
         <div class="filters">
@@ -1632,7 +1644,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <button class="modal-close" onclick="closeExcelPreview()">✕</button>
     </div>
     <div class="modal-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
         <div>
           <label class="field-label">Default department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used only for rows with no department match)</span></label>
           <select class="field-select" id="import-dept"></select>
@@ -1640,6 +1652,10 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div>
           <label class="field-label">Attribute to Campaign <span style="color:var(--text-3);font-weight:400;font-size:11px">(optional — enables cost-per-lead tracking)</span></label>
           <select class="field-select" id="import-campaign" onchange="renderExcelImportPreview()"><option value="">— No campaign —</option></select>
+        </div>
+        <div>
+          <label class="field-label">Assign to Agent <span style="color:var(--text-3);font-weight:400;font-size:11px">(optional — applies to every imported row)</span></label>
+          <select class="field-select" id="import-agent"><option value="">— Unassigned —</option></select>
         </div>
       </div>
       <div style="padding:10px 12px;background:var(--bg);border-radius:var(--radius);font-size:12px;color:var(--text-3);margin-bottom:14px">
@@ -1983,10 +1999,10 @@ watchAuth(async user => {
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderMarketingActionsTable(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderCampaignPerformance(); renderMarketingActionsTable(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); });
-  unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); });
+  unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); renderCampaignPerformance(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
@@ -2117,6 +2133,8 @@ function populateAssignLeadSelect() {
   if(single) single.innerHTML = '<option value="">— Unassigned —</option>' + optionsHtml;
   const bulk = document.getElementById('bulk-assign');
   if(bulk) bulk.innerHTML = '<option value="">— No change —</option>' + optionsHtml;
+  const importAgent = document.getElementById('import-agent');
+  if(importAgent) importAgent.innerHTML = '<option value="">— Unassigned —</option>' + optionsHtml;
   const filter = document.getElementById('lead-filter-agent');
   if(filter) filter.innerHTML = '<option value="">All Agents</option>' + optionsHtml + '<option value="__unassigned__">— Unassigned —</option>';
 }
@@ -6743,6 +6761,7 @@ window.renderLeadsStats = function() {
   // Keep the public-facing aggregate snapshot in sync any time stats render
   computeAndPublishLeadStats();
   renderAgentPerformance();
+  renderCampaignPerformance();
 }
 
 window.toggleAgentPerformancePanel = function() {
@@ -6791,6 +6810,46 @@ function renderAgentPerformance() {
       <td>${contactedPct}%</td>
     </tr>`;
   }).join('') : '<tr><td colspan="8" class="empty">No agents with login access yet — see Settings → Team Members</td></tr>';
+}
+
+window.toggleCampaignPerformancePanel = function() {
+  const panel = document.getElementById('campaign-performance-panel');
+  const icon = document.getElementById('campaign-perf-toggle-icon');
+  const opening = panel.style.display === 'none';
+  panel.style.display = opening ? 'block' : 'none';
+  icon.textContent = opening ? '▾' : '▸';
+}
+
+// Admin-side mirror of the public Leads & Attribution dashboard's Campaign
+// Performance card — same computeCampaignStats() source, so the numbers
+// always match; this just gives the marketing team a live in-app view of
+// CPL/CPA/ROI without leaving admin.html.
+function renderCampaignPerformance() {
+  const tbody = document.getElementById('campaign-performance-body');
+  if(!tbody) return;
+  const rows = computeCampaignStats();
+
+  tbody.innerHTML = rows.length ? rows.map(c => {
+    const roiColor = c.roi==null ? 'var(--text-3)' : c.roi >= 0 ? 'var(--green)' : 'var(--red)';
+    const roiDisplay = c.roi==null ? '—' : `${c.roi>=0?'+':''}${c.roi}%${c.roiIsEstimated?' ‡':''}`;
+    return `<tr style="cursor:pointer" onclick="filterLeadsByCampaign('${c.campaignId}')" title="Click to filter the leads table to this campaign">
+      <td style="font-weight:600">${c.title}</td>
+      <td>${c.leads}</td>
+      <td style="color:var(--text-3)">${c.cost?c.cost.toLocaleString():'—'}</td>
+      <td style="font-weight:600;color:var(--navy)">${c.cpl!=null?c.cpl.toLocaleString():'—'}</td>
+      <td style="color:var(--green);font-weight:600">${c.booked}</td>
+      <td style="font-weight:600;color:var(--green)">${c.cpa!=null?c.cpa.toLocaleString():'—'}</td>
+      <td style="font-weight:700;color:${roiColor}">${roiDisplay}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">No leads linked to a campaign yet</td></tr>';
+}
+
+window.filterLeadsByCampaign = function(campaignId) {
+  const filter = document.getElementById('lead-filter-campaign');
+  if(!filter) return;
+  filter.value = campaignId;
+  resetLeadsPageAndRender();
+  document.getElementById('page-leads').scrollIntoView({behavior:'smooth'});
 }
 
 window.filterLeadsByAgent = function(uid) {
@@ -7391,6 +7450,13 @@ window.handleExcelUpload = function(input) {
 
       if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
 
+      // No date column in the sheet at all → every row gets today's date
+      // rather than being left blank (local components, same reasoning as
+      // parseExcelDate's Date-instance branch above — avoids a UTC-shift
+      // day-off for anyone in a timezone ahead of UTC).
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
       pendingImportRows = rows.map((r,idx)=>{
         const rawDept = deptCol ? r[deptCol] : '';
         const matchedDept = matchDepartment(rawDept);
@@ -7401,7 +7467,7 @@ window.handleExcelUpload = function(input) {
           source:        sourceCol ? r[sourceCol]||'' : '',
           campaign:      campaignCol ? r[campaignCol]||'' : '',
           entity:        entityCol ? r[entityCol]||'' : '',
-          dateCreated:   dateCol ? parseExcelDate(rawRows[idx][dateCol]) : '',
+          dateCreated:   dateCol ? parseExcelDate(rawRows[idx][dateCol]) : todayStr,
           contactStatus: mappedStatus.contactStatus,
           outcome:       mappedStatus.outcome,
           notes:         notesCol ? r[notesCol]||'' : '',
@@ -7415,10 +7481,12 @@ window.handleExcelUpload = function(input) {
       const deptStatus = deptCol
         ? `${matchedCount} matched to a department${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`
         : `No department column found — all rows will use the default below`;
-      importColInfoText = `Detected: ${[nameCol,phoneCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}`;
+      const dateStatus = dateCol ? '' : `<br>No date column found — all rows will use today's date (${todayStr})`;
+      importColInfoText = `Detected: ${[nameCol,phoneCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}${dateStatus}`;
 
       document.getElementById('import-dept').value = DEPARTMENTS[0];
       document.getElementById('import-campaign').value = '';
+      document.getElementById('import-agent').value = '';
       document.getElementById('import-progress').style.display='none';
       renderExcelImportPreview();
       document.getElementById('excel-overlay').classList.add('open');
@@ -7497,13 +7565,21 @@ window.renderExcelImportPreview = function() {
 window.confirmImport = async function() {
   if(!pendingImportRows.length) return;
   const fallbackDept = document.getElementById('import-dept').value;
+  const agentSel = document.getElementById('import-agent');
+  const agentUid = agentSel.value;
+  const agentName = agentUid ? agentSel.options[agentSel.selectedIndex].textContent : '';
   // Use each row's matched department from the sheet; only fall back to the
   // selected default for rows where the sheet had no department or no match.
+  // Agent assignment (if picked) applies to every imported row the same way.
   const leadsToImport = computeExcelImportRows()
     .filter(r => !r._isDuplicate)
     .map(r => {
       const { _rawDept, _isDuplicate, ...clean } = r;
-      return { ...clean, department: r.department || fallbackDept };
+      return {
+        ...clean,
+        department: r.department || fallbackDept,
+        ...(agentUid ? { assignedAgentUid: agentUid, assignedAgentName: agentName } : {}),
+      };
     });
   if(!leadsToImport.length) { showToast('Nothing to import — every row is already in this campaign', true); return; }
   const btn = document.getElementById('confirm-import-btn');
@@ -7682,6 +7758,60 @@ window.confirmSheetImport = async function() {
 // writes it to a public config doc. Called whenever leads or campaigns
 // change, so the public dashboard stays current without ever needing read
 // access to individual names/phone numbers.
+//
+// Per-campaign lead/revenue breakdown (leads, reached, booked, CPL, CPA,
+// ROI) — shared by the public Leads & Attribution dashboard's "Campaign
+// Performance" card (via computeAndPublishLeadStats below) and the admin-
+// side Campaign Performance panel in Leads CRM (renderCampaignPerformance),
+// so the two views can never drift out of sync with each other.
+function computeCampaignStats() {
+  const byCampaign = {};
+  ALL_LEADS.forEach(l => {
+    if(!l.campaignId) return;
+    const cs = l.contactStatus || 'Untouched';
+    const oc = l.outcome || 'Pending';
+    if(!byCampaign[l.campaignId]) byCampaign[l.campaignId] = { total:0, reached:0, booked:0, openFile:0, actualRevenue:0, estimatedRevenue:0 };
+    byCampaign[l.campaignId].total++;
+    if(cs==='Reached') byCampaign[l.campaignId].reached++;
+    if(oc==='Booked') byCampaign[l.campaignId].booked++;
+    if(oc==='Open File') byCampaign[l.campaignId].openFile++;
+    // Revenue tracking — actual entered value if known, otherwise fall
+    // back to the department's average estimate (only for booked leads).
+    if(oc==='Booked') {
+      if(l.revenueValue) {
+        byCampaign[l.campaignId].actualRevenue += l.revenueValue;
+      } else {
+        const estimate = DEPT_REVENUE_ESTIMATES[l.department];
+        if(estimate) byCampaign[l.campaignId].estimatedRevenue += estimate;
+      }
+    }
+  });
+
+  // Attach campaign name + cost + CPL/CPA/ROI for each campaign with leads
+  return Object.entries(byCampaign).map(([id, stats]) => {
+    const campaign = ALL_INITIATIVES.find(i=>i.id===id);
+    const cost = campaign?.cost || 0;
+    const acquisitions = stats.booked + stats.openFile;
+    const totalRevenue = stats.actualRevenue + stats.estimatedRevenue;
+    const hasRevenueData = totalRevenue > 0;
+    return {
+      campaignId: id,
+      title: campaign?.title || 'Unknown Campaign',
+      cost,
+      leads: stats.total,
+      reached: stats.reached,
+      booked: stats.booked,
+      openFile: stats.openFile,
+      cpl: stats.total > 0 ? Math.round((cost / stats.total) * 100) / 100 : null,
+      cpa: acquisitions > 0 ? Math.round((cost / acquisitions) * 100) / 100 : null,
+      actualRevenue: stats.actualRevenue,
+      estimatedRevenue: stats.estimatedRevenue,
+      roi: (hasRevenueData && cost > 0) ? Math.round(((totalRevenue - cost) / cost) * 1000) / 10 : null,
+      roiIsEstimated: stats.estimatedRevenue > 0, // true if any portion of ROI relies on department averages, not actuals
+    };
+  }).sort((a,b) => b.leads - a.leads);
+}
+
 let _statsDebounce = null;
 function computeAndPublishLeadStats() {
   // Debounce — leads/initiatives can both fire in quick succession on load
@@ -7693,7 +7823,7 @@ function computeAndPublishLeadStats() {
 
       const counts = { Untouched:0, Reached:0, Unreached:0, Missed:0 };
       const outcomeCounts = { 'Pending':0, 'Open File':0, 'Booked':0, 'Closed - Unsuccessful':0 };
-      const byDept = {}, byEntity = {}, bySource = {}, byMonth = {}, byCampaign = {}, byMonthDept = {};
+      const byDept = {}, byEntity = {}, bySource = {}, byMonth = {}, byMonthDept = {};
 
       ALL_LEADS.forEach(l => {
         const cs = l.contactStatus || 'Untouched';
@@ -7724,49 +7854,7 @@ function computeAndPublishLeadStats() {
             byMonthDept[month][l.department] = (byMonthDept[month][l.department]||0) + 1;
           }
         }
-
-        if(l.campaignId) {
-          if(!byCampaign[l.campaignId]) byCampaign[l.campaignId] = { total:0, reached:0, booked:0, openFile:0, actualRevenue:0, estimatedRevenue:0 };
-          byCampaign[l.campaignId].total++;
-          if(cs==='Reached') byCampaign[l.campaignId].reached++;
-          if(oc==='Booked') byCampaign[l.campaignId].booked++;
-          if(oc==='Open File') byCampaign[l.campaignId].openFile++;
-          // Revenue tracking — actual entered value if known, otherwise fall
-          // back to the department's average estimate (only for booked leads).
-          if(oc==='Booked') {
-            if(l.revenueValue) {
-              byCampaign[l.campaignId].actualRevenue += l.revenueValue;
-            } else {
-              const estimate = DEPT_REVENUE_ESTIMATES[l.department];
-              if(estimate) byCampaign[l.campaignId].estimatedRevenue += estimate;
-            }
-          }
-        }
       });
-
-      // Attach campaign name + cost + CPL/CPA/ROI for each campaign with leads
-      const campaignStats = Object.entries(byCampaign).map(([id, stats]) => {
-        const campaign = ALL_INITIATIVES.find(i=>i.id===id);
-        const cost = campaign?.cost || 0;
-        const acquisitions = stats.booked + stats.openFile;
-        const totalRevenue = stats.actualRevenue + stats.estimatedRevenue;
-        const hasRevenueData = totalRevenue > 0;
-        return {
-          campaignId: id,
-          title: campaign?.title || 'Unknown Campaign',
-          cost,
-          leads: stats.total,
-          reached: stats.reached,
-          booked: stats.booked,
-          openFile: stats.openFile,
-          cpl: stats.total > 0 ? Math.round((cost / stats.total) * 100) / 100 : null,
-          cpa: acquisitions > 0 ? Math.round((cost / acquisitions) * 100) / 100 : null,
-          actualRevenue: stats.actualRevenue,
-          estimatedRevenue: stats.estimatedRevenue,
-          roi: (hasRevenueData && cost > 0) ? Math.round(((totalRevenue - cost) / cost) * 1000) / 10 : null,
-          roiIsEstimated: stats.estimatedRevenue > 0, // true if any portion of ROI relies on department averages, not actuals
-        };
-      }).sort((a,b) => b.leads - a.leads);
 
       await setLeadStats({
         total,
@@ -7775,7 +7863,7 @@ function computeAndPublishLeadStats() {
         openFile: outcomeCounts['Open File'], booked: outcomeCounts['Booked'],
         closedUnsuccessful: outcomeCounts['Closed - Unsuccessful'],
         byDepartment: byDept, byEntity, bySource, byMonth, byMonthDept,
-        campaigns: campaignStats,
+        campaigns: computeCampaignStats(),
       });
     } catch(e) { console.error('computeAndPublishLeadStats failed:', e); }
   }, 800);
