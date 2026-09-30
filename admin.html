@@ -7411,6 +7411,110 @@ function matchDepartment(raw) {
   return partial || null;
 }
 
+// ── LEAD IMPORT COLUMN DETECTION — shared by Excel upload + Google Sheet ──
+// Both import paths accept raw exports from Meta Lead Ads (synced via
+// Zapier/Make into a Google Sheet, or downloaded as Excel), which name each
+// column after the literal question text configured inside the lead form —
+// often Arabic, and varying form-to-form — not a fixed English field name.
+// Keyword matching alone can't reliably find name/phone/email against that,
+// so content-sniffing (does the column's actual data look like an email or
+// a phone number?) is the real fallback. Internal Meta bookkeeping columns
+// are recognized by name so they're never mistaken for a real answer.
+const META_SYSTEM_COLUMNS = new Set([
+  'id','created_time','ad_id','ad_name','adset_id','adset_name',
+  'campaign_id','campaign_name','form_id','form_name','is_organic','lead_status'
+]);
+
+// Finds the first header containing any of `keywords` (case-insensitive
+// substring). Columns ending in "_id" are never matched — an ID column is
+// never the human-facing field we want for name/phone/email/source/etc.
+// `exclude` additionally rules out specific columns by exact name — needed
+// because Meta's own bookkeeping columns (ad_name, adset_name, form_name)
+// all contain the substring "name" and would otherwise win over the real
+// name column before an Arabic keyword ever gets a chance to match.
+function findColByKeywords(headers, keywords, exclude = new Set()) {
+  const candidates = headers.filter(h => !/_id$/i.test(h.trim()) && !exclude.has(h));
+  const lower = candidates.map(h => h.toLowerCase());
+  for (const kw of keywords) {
+    const idx = lower.findIndex(h => h.includes(kw));
+    if (idx !== -1) return candidates[idx];
+  }
+  return null;
+}
+
+// Guesses which column holds email/phone by sampling actual cell values,
+// for when keyword matching finds nothing (e.g. an Arabic-only header).
+// Requires >50% of a column's non-empty values to match to be confident.
+function sniffColumnByContent(headers, rows, exclude, test) {
+  let best = null, bestScore = 0;
+  for (const h of headers) {
+    if (exclude.has(h)) continue;
+    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
+    if (!vals.length) continue;
+    const score = vals.filter(test).length / vals.length;
+    if (score > 0.5 && score > bestScore) { best = h; bestScore = score; }
+  }
+  return best;
+}
+
+function detectLeadColumns(headers, rows) {
+  const used = new Set();
+  const claim = col => { if (col) used.add(col); return col; };
+  const sniffExclude = () => new Set([...used, ...headers.filter(h => META_SYSTEM_COLUMNS.has(h))]);
+
+  const nameCol      = claim(findColByKeywords(headers, ['name','اسم'], META_SYSTEM_COLUMNS));
+  const phoneCol      = claim(findColByKeywords(headers, ['phone','mobile','number','هاتف','جوال','موبايل'], META_SYSTEM_COLUMNS)
+                          || sniffColumnByContent(headers, rows, sniffExclude(), v => { const d = v.replace(/\D/g,''); return d.length >= 7 && d.length <= 15; }));
+  const emailCol      = claim(findColByKeywords(headers, ['email','ايميل','إيميل','بريد'], META_SYSTEM_COLUMNS)
+                          || sniffColumnByContent(headers, rows, sniffExclude(), v => v.includes('@')));
+  const platformCol   = claim(findColByKeywords(headers, ['platform'], META_SYSTEM_COLUMNS));
+  const sourceCol      = platformCol || claim(findColByKeywords(headers, ['source'], META_SYSTEM_COLUMNS));
+  const dateCol        = claim(findColByKeywords(headers, ['date'], META_SYSTEM_COLUMNS) || (headers.includes('created_time') ? 'created_time' : null));
+  const statusCol      = claim(findColByKeywords(headers, ['status'], META_SYSTEM_COLUMNS));
+  const deptCol        = claim(findColByKeywords(headers, ['department','dept'], META_SYSTEM_COLUMNS));
+  const entityCol      = claim(findColByKeywords(headers, ['entity','branch'], META_SYSTEM_COLUMNS));
+  const notesCol       = claim(findColByKeywords(headers, ['note','comment','notes'], META_SYSTEM_COLUMNS));
+  // Deliberately no META_SYSTEM_COLUMNS exclusion here — campaign_name is
+  // the one Meta bookkeeping field worth surfacing as a real value (the
+  // ad campaign's human-readable name), unlike ad_name/adset_name/form_name.
+  const campaignCol    = claim(findColByKeywords(headers, ['campaign']));
+
+  // Anything left — e.g. a lead form's custom questions — isn't a column we
+  // recognize but isn't Meta bookkeeping either. Carried into notes below
+  // rather than silently dropped.
+  const leftoverCols = headers.filter(h => !used.has(h) && !META_SYSTEM_COLUMNS.has(h));
+
+  return { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource: !!platformCol, dateCol, statusCol, deptCol, entityCol, notesCol, campaignCol, leftoverCols };
+}
+
+// ig/fb are Meta's own shorthand for where the lead form was shown — only
+// applied when the detected source column really was "platform" (Meta's
+// field), never to a genuinely free-typed Source column, where blank should
+// stay blank rather than being overwritten with a guess.
+function normalizeLeadSource(raw, isPlatformSource) {
+  const val = String(raw || '').trim();
+  if (!isPlatformSource) return val;
+  const lower = val.toLowerCase();
+  if (lower === 'ig') return 'Instagram';
+  if (lower === 'fb') return 'Facebook';
+  return val || 'Meta';
+}
+
+// Appends any unrecognized columns (a lead form's custom questions) onto
+// notes as "Question: Answer" pairs, so they're preserved instead of
+// silently dropped — necessary because custom questions vary form-to-form
+// and can't be mapped to a fixed field. Underscores are replaced with
+// spaces in both the question and the answer — Meta's export encodes
+// spaces as underscores in predefined multiple-choice answer text the same
+// way it does in column headers, not just the header.
+function buildLeadNotesWithLeftover(row, leftoverCols, existingNotes) {
+  const clean = s => String(s ?? '').trim().replace(/_/g, ' ');
+  const qa = leftoverCols
+    .map(col => { const val = clean(row[col]); return val ? `${clean(col)}: ${val}` : null; })
+    .filter(Boolean);
+  return [existingNotes, ...qa].map(s => (s||'').trim()).filter(Boolean).join('\n');
+}
+
 window.handleExcelUpload = function(input) {
   const file = input.files[0];
   if(!file) return;
@@ -7437,16 +7541,8 @@ window.handleExcelUpload = function(input) {
       if(!rows.length){showToast('No data found in the file',true);return;}
 
       const headers = Object.keys(rows[0]);
-      const map = col => headers.find(h=>h.toLowerCase().includes(col.toLowerCase()))||null;
-      const nameCol     = map('name');
-      const phoneCol    = map('phone')||map('mobile')||map('number');
-      const sourceCol   = map('source');
-      const campaignCol = map('campaign');
-      const dateCol     = map('date');
-      const statusCol   = map('status');
-      const deptCol     = map('department')||map('dept');
-      const entityCol   = map('entity')||map('branch');
-      const notesCol    = map('note')||map('comment')||map('notes');
+      const { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource, dateCol, statusCol,
+              deptCol, entityCol, notesCol, campaignCol, leftoverCols } = detectLeadColumns(headers, rows);
 
       if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
 
@@ -7464,13 +7560,14 @@ window.handleExcelUpload = function(input) {
         return {
           name:          r[nameCol]||'',
           phone:         normalizePhone(r[phoneCol]),
-          source:        sourceCol ? r[sourceCol]||'' : '',
+          email:         emailCol ? r[emailCol]||'' : '',
+          source:        sourceCol ? normalizeLeadSource(r[sourceCol], isPlatformSource) : '',
           campaign:      campaignCol ? r[campaignCol]||'' : '',
           entity:        entityCol ? r[entityCol]||'' : '',
           dateCreated:   dateCol ? parseExcelDate(rawRows[idx][dateCol]) : todayStr,
           contactStatus: mappedStatus.contactStatus,
           outcome:       mappedStatus.outcome,
-          notes:         notesCol ? r[notesCol]||'' : '',
+          notes:         buildLeadNotesWithLeftover(r, leftoverCols, notesCol ? r[notesCol]||'' : ''),
           department:    matchedDept,
           _rawDept:      rawDept ? String(rawDept) : '',
         };
@@ -7482,7 +7579,9 @@ window.handleExcelUpload = function(input) {
         ? `${matchedCount} matched to a department${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`
         : `No department column found — all rows will use the default below`;
       const dateStatus = dateCol ? '' : `<br>No date column found — all rows will use today's date (${todayStr})`;
-      importColInfoText = `Detected: ${[nameCol,phoneCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}${dateStatus}`;
+      const emailStatus = emailCol ? '' : `<br>No email column found`;
+      const leftoverStatus = leftoverCols.length ? `<br>${leftoverCols.length} extra column(s) (e.g. custom form questions) appended to Notes` : '';
+      importColInfoText = `Detected: ${[nameCol,phoneCol,emailCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}${dateStatus}${emailStatus}${leftoverStatus}`;
 
       document.getElementById('import-dept').value = DEPARTMENTS[0];
       document.getElementById('import-campaign').value = '';
@@ -7542,19 +7641,20 @@ window.renderExcelImportPreview = function() {
   const dupCount = computed.length - newRows.length;
 
   const previewRows = computed.slice(0,10);
-  const thCols = ['Name','Phone','Department','Source','Campaign','Date','Contact Status'];
+  const thCols = ['Name','Phone','Email','Department','Source','Campaign','Date','Contact Status'];
   document.getElementById('excel-preview-table').innerHTML =
     `<thead style="background:var(--navy);color:#fff"><tr>${thCols.map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
     <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border);${r._isDuplicate?'opacity:0.5':''}">
       <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}${r._isDuplicate?' <span style="color:var(--orange);font-weight:700">(duplicate)</span>':''}</td>
       <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
+      <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.email||'—'}</td>
       <td style="padding:5px 10px;font-size:11px">${r.department?`<span style="color:var(--navy);font-weight:600">${r.department}</span>`:`<span style="color:var(--orange)">${r._rawDept?'No match: "'+r._rawDept+'"':'Not in sheet'} → uses default</span>`}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'<span style="color:var(--red)">not parsed</span>'}</td>
       <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
     </tr>`).join('')}
-    ${computed.length>10?`<tr><td colspan="7" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${computed.length-10} more rows</td></tr>`:''}</tbody>`;
+    ${computed.length>10?`<tr><td colspan="8" style="padding:5px 10px;font-size:11px;color:var(--text-3)">...and ${computed.length-10} more rows</td></tr>`:''}</tbody>`;
 
   document.getElementById('import-count').textContent = newRows.length;
   document.getElementById('import-col-info').innerHTML =
@@ -7661,15 +7761,8 @@ window.fetchAndPreviewSheet = async function() {
     if(!rows.length) { statusEl.textContent = 'No rows found in that sheet'; statusEl.style.color = 'var(--red)'; return; }
 
     const headers = Object.keys(rows[0]);
-    const map = col => headers.find(h=>h.toLowerCase().includes(col.toLowerCase()))||null;
-    const nameCol     = map('name');
-    const phoneCol    = map('phone')||map('mobile')||map('number');
-    const sourceCol   = map('source');
-    const dateCol     = map('date');
-    const statusCol   = map('status');
-    const deptCol     = map('department')||map('dept');
-    const entityCol   = map('entity')||map('branch');
-    const notesCol    = map('note')||map('comment')||map('notes');
+    const { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource, dateCol, statusCol,
+            deptCol, entityCol, notesCol, leftoverCols } = detectLeadColumns(headers, rows);
 
     if(!nameCol||!phoneCol) { statusEl.textContent = 'Could not find Name or Phone columns in that sheet'; statusEl.style.color = 'var(--red)'; return; }
 
@@ -7691,12 +7784,13 @@ window.fetchAndPreviewSheet = async function() {
       const pairKey = `${phone}__${campaignId||''}`;
       return {
         name: r[nameCol]||'', phone,
-        source: sourceCol ? r[sourceCol]||'' : '',
+        email: emailCol ? r[emailCol]||'' : '',
+        source: sourceCol ? normalizeLeadSource(r[sourceCol], isPlatformSource) : '',
         entity: entityCol ? r[entityCol]||'' : '',
         dateCreated: dateCol ? parseExcelDate(r[dateCol]) : '',
         contactStatus: mappedStatus.contactStatus,
         outcome: mappedStatus.outcome,
-        notes: notesCol ? r[notesCol]||'' : '',
+        notes: buildLeadNotesWithLeftover(r, leftoverCols, notesCol ? r[notesCol]||'' : ''),
         department: matchDepartment(rawDept),
         campaignId: campaignId || null,
         campaign: campaignId ? campaignName : '',
@@ -7709,17 +7803,20 @@ window.fetchAndPreviewSheet = async function() {
 
     const previewRows = pendingSheetImportRows.slice(0,10);
     document.getElementById('sheet-preview-table').innerHTML =
-      `<thead style="background:var(--navy);color:#fff"><tr>${['Name','Phone','Department','Source','Date','Contact Status'].map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
+      `<thead style="background:var(--navy);color:#fff"><tr>${['Name','Phone','Email','Department','Source','Date','Contact Status'].map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
       <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
         <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}</td>
         <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
+        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.email||'—'}</td>
         <td style="padding:5px 10px;font-size:11px">${r.department||`<span style="color:var(--orange)">uses default</span>`}</td>
         <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
         <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'—'}</td>
         <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
       </tr>`).join('')}</tbody>`;
 
-    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}`;
+    const emailStatus = emailCol ? '' : ' — no email column found';
+    const leftoverStatus = leftoverCols.length ? ` — ${leftoverCols.length} extra column(s) appended to Notes` : '';
+    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}${emailStatus}${leftoverStatus}`;
     statusEl.style.color = 'var(--green)';
     document.getElementById('sheet-import-preview-wrap').style.display = 'block';
     document.getElementById('confirm-sheet-import-btn').disabled = pendingSheetImportRows.length === 0;
