@@ -440,6 +440,21 @@ tr.row-overdue:hover td{background:#FFD6D6}
 
     <!-- LEADS CRM PAGE -->
     <div class="page" id="page-leads">
+      <!-- Month navigator — scopes the stat cards AND the table below to leads
+           whose Date Created falls in the chosen month, so the headline numbers
+           describe one month, not every lead since day one. The Agent and
+           Campaign Performance panels below deliberately stay all-time. -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px" id="leads-month-nav">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn btn-sm" onclick="shiftLeadsMonth(-1)">◀</button>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--navy);min-width:150px;text-align:center" id="leads-month-label">—</div>
+          <button class="btn btn-sm" onclick="shiftLeadsMonth(1)">▶</button>
+          <button class="btn btn-sm" onclick="jumpToCurrentLeadsMonth()" id="leads-today-btn" style="display:none">Today</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer">
+          <input type="checkbox" id="leads-show-all" onchange="toggleLeadsShowAll()"> Show All Time
+        </label>
+      </div>
       <!-- Stats row -->
       <div class="budget-stats" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
         <div class="budget-stat"><div class="budget-stat-label">Total Leads</div><div class="budget-stat-val" id="ls-total">—</div></div>
@@ -452,7 +467,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <!-- Agent Performance — collapsible -->
       <div style="margin-bottom:16px">
         <div onclick="toggleAgentPerformancePanel()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;user-select:none">
-          <span id="agent-perf-toggle-icon">▸</span> 📊 Agent Performance
+          <span id="agent-perf-toggle-icon">▸</span> 📊 Agent Performance <span style="font-weight:400;color:var(--text-3)">· all time</span>
         </div>
         <div id="agent-performance-panel" style="display:none">
           <table>
@@ -464,12 +479,12 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <!-- Campaign Performance — collapsible; same CPL/CPA/ROI numbers shown on the public Leads & Attribution dashboard -->
       <div style="margin-bottom:16px">
         <div onclick="toggleCampaignPerformancePanel()" style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;user-select:none">
-          <span id="campaign-perf-toggle-icon">▸</span> 📈 Campaign Performance
+          <span id="campaign-perf-toggle-icon">▸</span> 📈 Campaign Performance <span style="font-weight:400;color:var(--text-3)">· all time</span>
         </div>
         <div id="campaign-performance-panel" style="display:none">
           <table>
-            <thead><tr><th>Campaign</th><th>Leads</th><th>Cost (SAR)</th><th>CPL</th><th>Booked</th><th>CPA</th><th>ROI</th></tr></thead>
-            <tbody id="campaign-performance-body"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+            <thead><tr><th>Campaign</th><th>Status</th><th>Leads</th><th>Cost (SAR)</th><th>CPL</th><th>Booked</th><th>CPA</th><th>ROI</th></tr></thead>
+            <tbody id="campaign-performance-body"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -6742,12 +6757,75 @@ let editingLeadId = null;
 let pendingImportRows = [];
 let importColInfoText = '';
 
+// ── Month navigator (stat cards + table) ──────────────────────────────────
+// A lead belongs to the month of its Date Created, so a lead created in
+// September and booked in October is a September lead — each month's numbers
+// are a cohort ("how did the leads that arrived this month turn out so far").
+// Leads with no Date Created appear only under Show All Time.
+let leadsMonthOffset = 0; // 0 = current month, -1 = prev, +1 = next
+let leadsShowAll = false;
+
+// Local date components, not toISOString() — that converts to UTC first and
+// can land in the wrong month for anyone ahead of UTC (e.g. Asia/Riyadh).
+function currentLeadsPeriod() {
+  const d = new Date();
+  d.setDate(1); // avoid month-length overflow (e.g. Jan 31 + 1 month skipping to Mar)
+  d.setMonth(d.getMonth() + leadsMonthOffset);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function leadsInScope(leads) {
+  if(leadsShowAll) return leads;
+  const period = currentLeadsPeriod();
+  return leads.filter(l => (l.dateCreated||'').startsWith(period));
+}
+function refreshLeadsMonthNav() {
+  const period = currentLeadsPeriod();
+  const [y,m] = period.split('-').map(Number);
+  document.getElementById('leads-month-label').textContent = leadsShowAll
+    ? 'All Time'
+    : new Date(y, m-1, 1).toLocaleDateString('en-US', {month:'long', year:'numeric'});
+  document.getElementById('leads-today-btn').style.display = (!leadsShowAll && leadsMonthOffset !== 0) ? 'inline-block' : 'none';
+  document.getElementById('leads-month-nav').style.opacity = leadsShowAll ? '0.4' : '1';
+  document.getElementById('leads-show-all').checked = leadsShowAll;
+}
+function rerenderLeadsForScope() {
+  currentLeadsPage = 1;
+  selectedLeadIds.clear();
+  renderLeadsStatCards();
+  renderLeadsTable();
+}
+window.shiftLeadsMonth = function(delta) {
+  leadsShowAll = false;
+  leadsMonthOffset += delta;
+  rerenderLeadsForScope();
+}
+window.jumpToCurrentLeadsMonth = function() {
+  leadsShowAll = false;
+  leadsMonthOffset = 0;
+  rerenderLeadsForScope();
+}
+window.toggleLeadsShowAll = function() {
+  leadsShowAll = document.getElementById('leads-show-all').checked;
+  rerenderLeadsForScope();
+}
+// Click-throughs from the all-time panels (campaign/agent/landing page) and
+// the Contact History jump need every month's leads, not just this month's.
+function showAllLeadsTime() {
+  if(leadsShowAll) return;
+  leadsShowAll = true;
+  refreshLeadsMonthNav();
+}
+
 // ── Stats ──────────────────────────────────────────────────────────────────
-window.renderLeadsStats = function() {
-  const total = ALL_LEADS.length;
+// Cards only — safe to call on every month click. renderLeadsStats below
+// additionally re-publishes the public snapshot, which is for data changes only.
+function renderLeadsStatCards() {
+  refreshLeadsMonthNav();
+  const scoped = leadsInScope(ALL_LEADS);
+  const total = scoped.length;
   const counts = {Untouched:0, Reached:0, Unreached:0, Missed:0};
   let booked = 0;
-  ALL_LEADS.forEach(l => {
+  scoped.forEach(l => {
     const cs = l.contactStatus || 'Untouched';
     if(counts[cs]!==undefined) counts[cs]++;
     if(l.outcome === 'Booked') booked++;
@@ -6758,6 +6836,10 @@ window.renderLeadsStats = function() {
   document.getElementById('ls-missed').textContent    = counts.Missed;
   document.getElementById('ls-booked').textContent    = booked;
   document.getElementById('ls-untouched').textContent = counts.Untouched;
+}
+
+window.renderLeadsStats = function() {
+  renderLeadsStatCards();
   // Keep the public-facing aggregate snapshot in sync any time stats render
   computeAndPublishLeadStats();
   renderAgentPerformance();
@@ -6832,8 +6914,11 @@ function renderCampaignPerformance() {
   tbody.innerHTML = rows.length ? rows.map(c => {
     const roiColor = c.roi==null ? 'var(--text-3)' : c.roi >= 0 ? 'var(--green)' : 'var(--red)';
     const roiDisplay = c.roi==null ? '—' : `${c.roi>=0?'+':''}${c.roi}%${c.roiIsEstimated?' ‡':''}`;
+    const rs = CAMPAIGN_RUN_STATE_STYLE[c.runState] || CAMPAIGN_RUN_STATE_STYLE.Running;
+    const dates = campaignDateRangeLabel(c.startDate, c.endDate);
     return `<tr style="cursor:pointer" onclick="filterLeadsByCampaign('${c.campaignId}')" title="Click to filter the leads table to this campaign">
-      <td style="font-weight:600">${c.title}</td>
+      <td style="font-weight:600">${c.title}${dates?`<div style="font-weight:400;font-size:10px;color:var(--text-3);margin-top:2px">${dates}</div>`:''}</td>
+      <td><span style="display:inline-block;background:${rs.bg};color:${rs.t};font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap">${rs.icon} ${c.runState}</span>${c.runDetail?`<div style="font-size:10px;color:var(--text-3);margin-top:3px;white-space:nowrap">${c.runDetail}</div>`:''}</td>
       <td>${c.leads}</td>
       <td style="color:var(--text-3)">${c.cost?c.cost.toLocaleString():'—'}</td>
       <td style="font-weight:600;color:var(--navy)">${c.cpl!=null?c.cpl.toLocaleString():'—'}</td>
@@ -6841,14 +6926,15 @@ function renderCampaignPerformance() {
       <td style="font-weight:600;color:var(--green)">${c.cpa!=null?c.cpa.toLocaleString():'—'}</td>
       <td style="font-weight:700;color:${roiColor}">${roiDisplay}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="7" class="empty">No leads linked to a campaign yet</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">No leads linked to a campaign yet</td></tr>';
 }
 
 window.filterLeadsByCampaign = function(campaignId) {
   const filter = document.getElementById('lead-filter-campaign');
   if(!filter) return;
   filter.value = campaignId;
-  resetLeadsPageAndRender();
+  showAllLeadsTime(); // a campaign's leads span months; the panel above is all-time
+  rerenderLeadsForScope();
   document.getElementById('page-leads').scrollIntoView({behavior:'smooth'});
 }
 
@@ -6856,7 +6942,8 @@ window.filterLeadsByAgent = function(uid) {
   const filter = document.getElementById('lead-filter-agent');
   if(!filter) return;
   filter.value = uid;
-  resetLeadsPageAndRender();
+  showAllLeadsTime(); // the Agent Performance panel above is all-time
+  rerenderLeadsForScope();
   document.getElementById('page-leads').scrollIntoView({behavior:'smooth'});
 }
 
@@ -6869,7 +6956,8 @@ window.filterLeadsByLandingPage = function(slug) {
   const search = document.getElementById('lead-search');
   if(!search) return;
   search.value = slug;
-  resetLeadsPageAndRender();
+  showAllLeadsTime(); // submissions can predate the month currently in view
+  rerenderLeadsForScope();
 }
 
 // ── Table ──────────────────────────────────────────────────────────────────
@@ -6935,7 +7023,7 @@ function getFilteredLeads() {
   const campaignF= document.getElementById('lead-filter-campaign')?.value||'';
   const agentF   = document.getElementById('lead-filter-agent')?.value||'';
 
-  return ALL_LEADS.filter(l=>{
+  return leadsInScope(ALL_LEADS).filter(l=>{
     if(contactF && (l.contactStatus||'Untouched')!==contactF) return false;
     if(outcomeF && (l.outcome||'Pending')!==outcomeF) return false;
     if(deptF && l.department!==deptF) return false;
@@ -6948,6 +7036,7 @@ function getFilteredLeads() {
 }
 
 window.renderLeadsTable = function() {
+  refreshLeadsMonthNav();
   let data = getFilteredLeads();
 
   const validIds = new Set(ALL_LEADS.map(l=>l.id));
@@ -7009,7 +7098,7 @@ window.renderLeadsTable = function() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="14" class="empty">${ALL_LEADS.length?'No leads match filters':'No leads yet — upload an Excel, import from a Google Sheet, or add manually'}</td></tr>`;
+    : `<tr><td colspan="14" class="empty">${!ALL_LEADS.length ? 'No leads yet — upload an Excel, import from a Google Sheet, or add manually' : leadsShowAll ? 'No leads match filters' : `No leads match filters in ${document.getElementById('leads-month-label').textContent} — try another month or Show All Time`}</td></tr>`;
 
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
@@ -7861,6 +7950,45 @@ window.confirmSheetImport = async function() {
 // Performance" card (via computeAndPublishLeadStats below) and the admin-
 // side Campaign Performance panel in Leads CRM (renderCampaignPerformance),
 // so the two views can never drift out of sync with each other.
+const CAMPAIGN_RUN_STATE_STYLE = {
+  Running:   { bg:'#E3F6EC', t:'#0D6E44', icon:'●' },
+  Upcoming:  { bg:'#E8F0FE', t:'#1A4FA0', icon:'◷' },
+  Completed: { bg:'#EEF0F5', t:'#5A6178', icon:'✓' },
+  Cancelled: { bg:'#FBE9ED', t:'#B0234A', icon:'✕' },
+};
+
+function ymdToLocalDate(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+
+// Whether a campaign is still live, derived from its own Start/End dates and
+// the Cancelled status — computed live and never stored, same convention as
+// isActivityOverdue(). A campaign with no End Date is treated as ongoing,
+// since there's nothing to say it finished.
+function campaignRunState(c) {
+  if(!c) return { state:'Running', detail:'' };
+  if(c.status === 'Cancelled') return { state:'Cancelled', detail:'' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = ymdToLocalDate(c.startDate), end = ymdToLocalDate(c.endDate);
+  const days = ms => Math.round(ms / 86400000);
+  const plural = n => `${n} day${n===1?'':'s'}`;
+  if(end && end < today) return { state:'Completed', detail:`ended ${plural(days(today-end))} ago` };
+  if(start && start > today) return { state:'Upcoming', detail:`starts in ${plural(days(start-today))}` };
+  if(end) {
+    const left = days(end - today);
+    return { state:'Running', detail: left === 0 ? 'ends today' : `${plural(left)} left` };
+  }
+  return { state:'Running', detail:'no end date set' };
+}
+
+function campaignDateRangeLabel(startDate, endDate) {
+  const fmtD = s => { const d = ymdToLocalDate(s); return d ? d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : ''; };
+  const a = fmtD(startDate), b = fmtD(endDate);
+  if(a && b) return `${a} – ${b}`;
+  return a ? `from ${a}` : b ? `until ${b}` : '';
+}
+
 function computeCampaignStats() {
   const byCampaign = {};
   ALL_LEADS.forEach(l => {
@@ -7891,9 +8019,14 @@ function computeCampaignStats() {
     const acquisitions = stats.booked + stats.openFile;
     const totalRevenue = stats.actualRevenue + stats.estimatedRevenue;
     const hasRevenueData = totalRevenue > 0;
+    const run = campaignRunState(campaign);
     return {
       campaignId: id,
       title: campaign?.title || 'Unknown Campaign',
+      startDate: campaign?.startDate || '',
+      endDate: campaign?.endDate || '',
+      runState: run.state,
+      runDetail: run.detail,
       cost,
       leads: stats.total,
       reached: stats.reached,

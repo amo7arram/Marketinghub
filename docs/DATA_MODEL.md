@@ -429,10 +429,12 @@ config/lead_stats = {
   bySource:     { [source]: {total, reached, booked} }, // all-time cumulative
   byMonth:      { [YYYY-MM]: {total, reached, booked} },
   byMonthDept:  { [YYYY-MM]: { [dept]: count } },        // powers index.html's "Leads by Department" chart
-  campaigns:    [ {campaignId, title, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
+  campaigns:    [ {campaignId, title, startDate, endDate, runState, runDetail, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
   updatedAt,
 }
 ```
+
+`campaigns[].runState` (`Running`/`Upcoming`/`Completed`/`Cancelled`) and `runDetail` ("3 days left", "ended 12 days ago", …) are derived from the campaign's own `startDate`/`endDate`/`status` by `campaignRunState()` in `admin.html`. **They are a snapshot as of the last publish** — a campaign whose end date passes overnight still reads "Running" in this document until an admin next loads the Leads CRM. The admin panel recomputes live on every render, so it is never stale; any public consumer should recompute from `startDate`/`endDate` rather than trust `runState`.
 
 `byDepartment`/`byEntity`/`bySource` are all-time totals with no month dimension — `byMonthDept` was added specifically because the Dashboard's monthly department breakdown needed one and none of the existing structures had it.
 
