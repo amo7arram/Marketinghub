@@ -8025,6 +8025,7 @@ function computeCampaignStats() {
       title: campaign?.title || 'Unknown Campaign',
       startDate: campaign?.startDate || '',
       endDate: campaign?.endDate || '',
+      cancelled: campaign?.status === 'Cancelled',
       runState: run.state,
       runDetail: run.detail,
       cost,
@@ -8054,6 +8055,7 @@ function computeAndPublishLeadStats() {
       const counts = { Untouched:0, Reached:0, Unreached:0, Missed:0 };
       const outcomeCounts = { 'Pending':0, 'Open File':0, 'Booked':0, 'Closed - Unsuccessful':0 };
       const byDept = {}, byEntity = {}, bySource = {}, byMonth = {}, byMonthDept = {};
+      const byMonthEntity = {}, byMonthCampaign = {};
 
       ALL_LEADS.forEach(l => {
         const cs = l.contactStatus || 'Untouched';
@@ -8074,14 +8076,30 @@ function computeAndPublishLeadStats() {
 
         if(l.dateCreated) {
           const month = l.dateCreated.substring(0,7);
-          if(!byMonth[month]) byMonth[month] = { total:0, reached:0, booked:0 };
-          byMonth[month].total++;
-          if(cs==='Reached') byMonth[month].reached++;
-          if(oc==='Booked') byMonth[month].booked++;
+          // Full per-month funnel (not just total/reached/booked) so the public
+          // Leads & Attribution page can show every card for one month.
+          if(!byMonth[month]) byMonth[month] = { total:0, reached:0, booked:0, untouched:0, unreached:0, missed:0, openFile:0, closedUnsuccessful:0 };
+          const bm = byMonth[month];
+          bm.total++;
+          if(cs==='Reached') bm.reached++;
+          if(cs==='Untouched') bm.untouched++;
+          if(cs==='Unreached') bm.unreached++;
+          if(cs==='Missed') bm.missed++;
+          if(oc==='Booked') bm.booked++;
+          if(oc==='Open File') bm.openFile++;
+          if(oc==='Closed - Unsuccessful') bm.closedUnsuccessful++;
 
           if(l.department) {
             if(!byMonthDept[month]) byMonthDept[month] = {};
             byMonthDept[month][l.department] = (byMonthDept[month][l.department]||0) + 1;
+          }
+          if(l.entity) {
+            if(!byMonthEntity[month]) byMonthEntity[month] = {};
+            byMonthEntity[month][l.entity] = (byMonthEntity[month][l.entity]||0) + 1;
+          }
+          if(l.campaignId) {
+            if(!byMonthCampaign[month]) byMonthCampaign[month] = {};
+            byMonthCampaign[month][l.campaignId] = (byMonthCampaign[month][l.campaignId]||0) + 1;
           }
         }
       });
@@ -8092,7 +8110,7 @@ function computeAndPublishLeadStats() {
         unreached: counts.Unreached, missed: counts.Missed,
         openFile: outcomeCounts['Open File'], booked: outcomeCounts['Booked'],
         closedUnsuccessful: outcomeCounts['Closed - Unsuccessful'],
-        byDepartment: byDept, byEntity, bySource, byMonth, byMonthDept,
+        byDepartment: byDept, byEntity, bySource, byMonth, byMonthDept, byMonthEntity, byMonthCampaign,
         campaigns: computeCampaignStats(),
       });
     } catch(e) { console.error('computeAndPublishLeadStats failed:', e); }

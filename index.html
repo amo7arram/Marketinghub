@@ -2063,6 +2063,69 @@ const VIEW_LEADS_LINK = `<div style="display:flex;justify-content:flex-end;margi
   <a href="call-center.html" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--navy);background:var(--surface);border:1px solid var(--border);padding:8px 14px;border-radius:20px;text-decoration:none;box-shadow:var(--shadow)">🔒 View Individual Leads (Agent Access) ↗</a>
 </div>`;
 
+// ── Month scoping ────────────────────────────────────────────────────────
+// Each month is a cohort by the lead's Date Created (a September lead booked
+// in October counts under September) — the same basis as the admin Leads CRM.
+// Defaults to the current month; Show All Time restores the lifetime view.
+let ldMonthOffset = 0; // 0 = current month, negative = earlier (never future)
+let ldShowAll = false;
+
+// Local components, not toISOString() — that converts to UTC first and can
+// land in the wrong month for anyone ahead of UTC (e.g. Asia/Riyadh).
+function ldPeriod() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + ldMonthOffset);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function ldPeriodLabel(period) {
+  const [y,m] = period.split('-').map(Number);
+  return new Date(y, m-1, 1).toLocaleDateString('en-US', {month:'long', year:'numeric'});
+}
+window.shiftLdMonth = function(dir) {
+  ldShowAll = false;
+  ldMonthOffset = Math.min(0, ldMonthOffset + dir);
+  renderLeadsDashboard();
+}
+window.toggleLdShowAll = function(checked) {
+  ldShowAll = checked;
+  renderLeadsDashboard();
+}
+
+// Recomputed here from the campaign's own dates rather than read from the
+// published `runState` — that value is a snapshot from the last time an admin
+// opened the Leads CRM, so a campaign that ended overnight would still read
+// "Running". Mirrors campaignRunState() in admin.html.
+function ldCampaignRunState(c) {
+  if(c.cancelled) return { state:'Cancelled', detail:'' };
+  const parse = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); return m ? new Date(+m[1], +m[2]-1, +m[3]) : null; };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const start = parse(c.startDate), end = parse(c.endDate);
+  const days = ms => Math.round(ms / 86400000);
+  const plural = n => `${n} day${n===1?'':'s'}`;
+  if(end && end < today) return { state:'Completed', detail:`ended ${plural(days(today-end))} ago` };
+  if(start && start > today) return { state:'Upcoming', detail:`starts in ${plural(days(start-today))}` };
+  if(end) { const left = days(end - today); return { state:'Running', detail: left===0 ? 'ends today' : `${plural(left)} left` }; }
+  return { state:'Running', detail:'' };
+}
+const LD_RUN_STYLE = {
+  Running:   { bg:'#E3F6EC', t:'#0D6E44', icon:'●' },
+  Upcoming:  { bg:'#E8F0FE', t:'#1A4FA0', icon:'◷' },
+  Completed: { bg:'#EEF0F5', t:'#5A6178', icon:'✓' },
+  Cancelled: { bg:'#FBE9ED', t:'#B0234A', icon:'✕' },
+};
+function ldDateRange(a, b) {
+  const f = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); return m ? new Date(+m[1], +m[2]-1, +m[3]).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : ''; };
+  const x = f(a), y = f(b);
+  return x && y ? `${x} – ${y}` : x ? `from ${x}` : y ? `until ${y}` : '';
+}
+// byMonthDept/byMonthEntity publish plain counts; the breakdown bars expect {total}.
+function ldCountsToBuckets(counts) {
+  const out = {};
+  Object.entries(counts||{}).forEach(([k,v]) => { out[k] = { total: v }; });
+  return out;
+}
+
 window.renderLeadsDashboard = function() {
   const el = document.getElementById('leadsdash-content');
   if(!el) return;
@@ -2072,13 +2135,51 @@ window.renderLeadsDashboard = function() {
     return;
   }
 
-  const s = LEAD_STATS;
+  const allStats = LEAD_STATS;
+  const byMonthAll = allStats.byMonth || {};
+  const earliest = Object.keys(byMonthAll).sort()[0];
+  const period = ldPeriod();
+  const scopeLabel = ldShowAll ? 'All Time' : ldPeriodLabel(period);
+
+  const navHtml = `<div class="period-nav-bar" style="margin-bottom:16px;width:100%;box-sizing:border-box;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="period-nav-btn" onclick="shiftLdMonth(-1)" ${(!earliest || period <= earliest) ? 'disabled' : ''}>←</button>
+      <div class="period-nav-label" style="${ldShowAll?'opacity:0.45':''}">${scopeLabel}</div>
+      <button class="period-nav-btn" onclick="shiftLdMonth(1)" ${ldMonthOffset >= 0 ? 'disabled' : ''}>→</button>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer">
+      <input type="checkbox" ${ldShowAll?'checked':''} onchange="toggleLdShowAll(this.checked)"> Show All Time
+    </label>
+  </div>`;
+
+  let s, deptData, entityData;
+  if(ldShowAll) {
+    s = allStats;
+    deptData = allStats.byDepartment || {};
+    entityData = allStats.byEntity || {};
+  } else {
+    const m = byMonthAll[period];
+    if(!m) {
+      el.innerHTML = navHtml + VIEW_LEADS_LINK + `<div class="empty-state"><div class="empty-state-icon">📈</div>No leads were created in ${scopeLabel}</div>`;
+      return;
+    }
+    s = { ...m, campaigns: allStats.campaigns };
+    deptData = ldCountsToBuckets(allStats.byMonthDept && allStats.byMonthDept[period]);
+    entityData = ldCountsToBuckets(allStats.byMonthEntity && allStats.byMonthEntity[period]);
+  }
+  const monthCamp = (!ldShowAll && allStats.byMonthCampaign && allStats.byMonthCampaign[period]) || {};
+
+  // Some fields (untouched/unreached/missed/…) only exist per-month once an
+  // admin has opened the Leads CRM after the per-month publish was added —
+  // until then they're undefined and render as "—" rather than a wrong 0.
+  const pctOf = (n, d) => (d && n != null) ? Math.round((n/d)*100) : null;
+  const pctTxt = p => p == null ? '—' : `${p}%`;
   const reachPct = s.total ? Math.round((s.reached/s.total)*100) : 0;
   const bookRate = s.reached ? Math.round((s.booked/s.reached)*100) : 0;
-  const unreachedPct = s.total ? Math.round((s.unreached/s.total)*100) : 0;
-  const missedPct = s.total ? Math.round((s.missed/s.total)*100) : 0;
+  const unreachedPct = pctOf(s.unreached, s.total);
+  const missedPct = pctOf(s.missed, s.total);
 
-  el.innerHTML = VIEW_LEADS_LINK + `
+  el.innerHTML = navHtml + VIEW_LEADS_LINK + `
     <div class="ld-kpi-grid">
       <div class="ld-kpi-card"><div class="ld-kpi-val">${fmt(s.total)}</div><div class="ld-kpi-label">Total Leads</div></div>
       <div class="ld-kpi-card"><div class="ld-kpi-val" style="color:#0D6E44">${reachPct}%</div><div class="ld-kpi-label">Reach Rate</div><div class="ld-kpi-sub">${fmt(s.reached)} reached</div></div>
@@ -2106,8 +2207,8 @@ window.renderLeadsDashboard = function() {
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px">
-        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#9B5800"></span><div><div class="ld-side-stat-val">${fmt(s.unreached)}</div><div class="ld-side-stat-label">Unreached (${unreachedPct}%)</div></div></div>
-        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#B0234A"></span><div><div class="ld-side-stat-val">${fmt(s.missed)}</div><div class="ld-side-stat-label">Missed (${missedPct}%)</div></div></div>
+        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#9B5800"></span><div><div class="ld-side-stat-val">${fmt(s.unreached)}</div><div class="ld-side-stat-label">Unreached (${pctTxt(unreachedPct)})</div></div></div>
+        <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#B0234A"></span><div><div class="ld-side-stat-val">${fmt(s.missed)}</div><div class="ld-side-stat-label">Missed (${pctTxt(missedPct)})</div></div></div>
         <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#9B5800"></span><div><div class="ld-side-stat-val">${fmt(s.openFile)}</div><div class="ld-side-stat-label">Open File</div></div></div>
         <div class="ld-side-stat"><span class="ld-side-stat-dot" style="background:#8890A8"></span><div><div class="ld-side-stat-val">${fmt(s.closedUnsuccessful)}</div><div class="ld-side-stat-label">Closed / Unsuccessful</div></div></div>
       </div>
@@ -2115,7 +2216,7 @@ window.renderLeadsDashboard = function() {
 
     <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:24px">
       <div class="card">
-        <div class="card-header"><div class="card-title">Leads Trend</div><span style="font-size:11px;color:var(--text-3)">Monthly — Total / Reached / Booked</span></div>
+        <div class="card-header"><div class="card-title">Leads Trend</div><span style="font-size:11px;color:var(--text-3)">Monthly — Total / Reached / Booked${ldShowAll ? '' : ` · ${scopeLabel} highlighted`}</span></div>
         <div class="chart-container"><canvas id="ldTrendChart"></canvas></div>
       </div>
       <div class="card">
@@ -2130,12 +2231,14 @@ window.renderLeadsDashboard = function() {
     </div>
 
     <div class="card">
-      <div class="card-header"><div class="card-title">Campaign Performance</div><span style="font-size:11px;color:var(--text-3)">Cost per Lead, Cost per Acquisition & ROI</span></div>
+      <div class="card-header"><div class="card-title">Campaign Performance</div><span style="font-size:11px;color:var(--text-3)">All-time — Cost per Lead, Cost per Acquisition & ROI</span></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
           <thead><tr style="border-bottom:2px solid var(--border)">
             <th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-3)">Campaign</th>
-            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Leads</th>
+            <th style="text-align:left;padding:8px 10px;font-size:11px;color:var(--text-3)">Status</th>
+            ${ldShowAll ? '' : `<th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--navy)">Leads in ${scopeLabel}</th>`}
+            <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">${ldShowAll ? 'Leads' : 'Leads (all-time)'}</th>
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Cost (SAR)</th>
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">CPL</th>
             <th style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text-3)">Booked</th>
@@ -2147,8 +2250,15 @@ window.renderLeadsDashboard = function() {
               ? s.campaigns.map(c=>{
                   const roiColor = c.roi==null ? 'var(--text-3)' : c.roi >= 0 ? 'var(--green)' : 'var(--red)';
                   const roiDisplay = c.roi==null ? '—' : `${c.roi>=0?'+':''}${c.roi}%${c.roiIsEstimated?' <span title="Includes department-average revenue estimates for bookings with no actual revenue entered yet" style="color:var(--text-3);cursor:help">‡</span>':''}`;
-                  return `<tr style="border-bottom:1px solid var(--border)">
-                    <td style="padding:8px 10px;font-weight:600">${c.title}</td>
+                  const rs = ldCampaignRunState(c);
+                  const rst = LD_RUN_STYLE[rs.state];
+                  const dates = ldDateRange(c.startDate, c.endDate);
+                  const monthLeads = allStats.byMonthCampaign ? (monthCamp[c.campaignId] || 0) : null;
+                  const dim = (!ldShowAll && monthLeads === 0) ? 'opacity:0.5;' : '';
+                  return `<tr style="border-bottom:1px solid var(--border);${dim}">
+                    <td style="padding:8px 10px;font-weight:600">${c.title}${dates?`<div style="font-weight:400;font-size:10px;color:var(--text-3);margin-top:2px">${dates}</div>`:''}</td>
+                    <td style="padding:8px 10px"><span style="display:inline-block;background:${rst.bg};color:${rst.t};font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap">${rst.icon} ${rs.state}</span>${rs.detail?`<div style="font-size:10px;color:var(--text-3);margin-top:3px;white-space:nowrap">${rs.detail}</div>`:''}</td>
+                    ${ldShowAll ? '' : `<td style="padding:8px 10px;text-align:right;font-weight:700;color:var(--navy)">${monthLeads==null?'—':fmt(monthLeads)}</td>`}
                     <td style="padding:8px 10px;text-align:right">${fmt(c.leads)}</td>
                     <td style="padding:8px 10px;text-align:right;color:var(--text-3)">${c.cost?c.cost.toLocaleString():'—'}</td>
                     <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--navy)">${c.cpl!=null?c.cpl.toLocaleString():'—'}</td>
@@ -2157,7 +2267,7 @@ window.renderLeadsDashboard = function() {
                     <td style="padding:8px 10px;text-align:right;font-weight:700;color:${roiColor}">${roiDisplay}</td>
                   </tr>`;
                 }).join('')
-              : `<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3)">No leads linked to a campaign yet</td></tr>`
+              : `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text-3)">No leads linked to a campaign yet</td></tr>`
           }</tbody>
         </table>
       </div>
@@ -2165,12 +2275,12 @@ window.renderLeadsDashboard = function() {
     </div>
   `;
 
-  renderLeadsTrendChart(s.byMonth||{});
-  renderLeadsBreakdown('ld-dept-breakdown', s.byDepartment||{});
-  renderLeadsBreakdown('ld-entity-breakdown', s.byEntity||{});
+  renderLeadsTrendChart(byMonthAll, ldShowAll ? null : period);
+  renderLeadsBreakdown('ld-dept-breakdown', deptData);
+  renderLeadsBreakdown('ld-entity-breakdown', entityData);
 }
 
-function renderLeadsTrendChart(byMonth) {
+function renderLeadsTrendChart(byMonth, highlightPeriod) {
   const canvas = document.getElementById('ldTrendChart');
   if(!canvas) return;
   const months = Object.keys(byMonth).sort();
@@ -2178,14 +2288,16 @@ function renderLeadsTrendChart(byMonth) {
   const totalData   = months.map(m=>byMonth[m].total);
   const reachedData = months.map(m=>byMonth[m].reached);
   const bookedData  = months.map(m=>byMonth[m].booked);
+  // Selected month's points drawn larger so the trend shows where "now" is.
+  const radii = months.map(m => m === highlightPeriod ? 7 : 3);
 
   if(ldTrendChart) ldTrendChart.destroy();
   ldTrendChart = new Chart(canvas, {
     type:'line',
     data:{ labels, datasets:[
-      { label:'Total',   data:totalData,   borderColor:'#8890A8', backgroundColor:'transparent', tension:0.35, borderWidth:2, pointRadius:3 },
-      { label:'Reached', data:reachedData, borderColor:'#0D6E44', backgroundColor:'transparent', tension:0.35, borderWidth:2, pointRadius:3 },
-      { label:'Booked',  data:bookedData,  borderColor:'#1DB87A', backgroundColor:'rgba(29,184,122,0.08)', tension:0.35, borderWidth:2, pointRadius:3, fill:true },
+      { label:'Total',   data:totalData,   borderColor:'#8890A8', backgroundColor:'transparent', tension:0.35, borderWidth:2, pointRadius:radii },
+      { label:'Reached', data:reachedData, borderColor:'#0D6E44', backgroundColor:'transparent', tension:0.35, borderWidth:2, pointRadius:radii },
+      { label:'Booked',  data:bookedData,  borderColor:'#1DB87A', backgroundColor:'rgba(29,184,122,0.08)', tension:0.35, borderWidth:2, pointRadius:radii, fill:true },
     ]},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ position:'bottom', labels:{font:{size:10},boxWidth:10,padding:10} } },

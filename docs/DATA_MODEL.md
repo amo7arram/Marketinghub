@@ -427,14 +427,18 @@ config/lead_stats = {
   byDepartment: { [dept]: {total, reached, booked} },   // all-time cumulative, not month-scoped
   byEntity:     { [entity]: {total, reached, booked} }, // all-time cumulative
   bySource:     { [source]: {total, reached, booked} }, // all-time cumulative
-  byMonth:      { [YYYY-MM]: {total, reached, booked} },
-  byMonthDept:  { [YYYY-MM]: { [dept]: count } },        // powers index.html's "Leads by Department" chart
-  campaigns:    [ {campaignId, title, startDate, endDate, runState, runDetail, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
+  byMonth:      { [YYYY-MM]: {total, reached, booked, untouched, unreached, missed, openFile, closedUnsuccessful} },
+  byMonthDept:  { [YYYY-MM]: { [dept]: count } },        // powers index.html's "Leads by Department" chart and the month-scoped By Department bars
+  byMonthEntity:   { [YYYY-MM]: { [entity]: count } },   // month-scoped By Entity bars on the public Leads & Attribution page
+  byMonthCampaign: { [YYYY-MM]: { [campaignId]: count } }, // the "Leads in <month>" column of the public campaign table
+  campaigns:    [ {campaignId, title, startDate, endDate, cancelled, runState, runDetail, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
   updatedAt,
 }
 ```
 
-`campaigns[].runState` (`Running`/`Upcoming`/`Completed`/`Cancelled`) and `runDetail` ("3 days left", "ended 12 days ago", …) are derived from the campaign's own `startDate`/`endDate`/`status` by `campaignRunState()` in `admin.html`. **They are a snapshot as of the last publish** — a campaign whose end date passes overnight still reads "Running" in this document until an admin next loads the Leads CRM. The admin panel recomputes live on every render, so it is never stale; any public consumer should recompute from `startDate`/`endDate` rather than trust `runState`.
+All `byMonth*` structures key on the lead's `dateCreated` month — each month is a cohort ("how did the leads that *arrived* this month turn out so far"), not activity within the month. `byMonth`'s first three fields (`total`/`reached`/`booked`) predate the others; a document published before the full funnel was added has month entries missing `untouched`/`unreached`/`missed`/`openFile`/`closedUnsuccessful`, and no `byMonthEntity`/`byMonthCampaign` at all, until an admin next opens the Leads CRM and republishes — consumers must treat those as "not available yet", not zero. `index.html` renders them as "—".
+
+`campaigns[].runState` (`Running`/`Upcoming`/`Completed`/`Cancelled`) and `runDetail` ("3 days left", "ended 12 days ago", …) are derived from the campaign's own `startDate`/`endDate`/`status` by `campaignRunState()` in `admin.html`. **They are a snapshot as of the last publish** — a campaign whose end date passes overnight still reads "Running" in this document until an admin next loads the Leads CRM. The admin panel recomputes live on every render, so it is never stale. `cancelled` (campaign `status === "Cancelled"`) and `startDate`/`endDate` are published precisely so the public page can recompute the state itself rather than trust `runState` — `index.html`'s `ldCampaignRunState()` does, and mirrors `campaignRunState()`'s rules.
 
 `byDepartment`/`byEntity`/`bySource` are all-time totals with no month dimension — `byMonthDept` was added specifically because the Dashboard's monthly department breakdown needed one and none of the existing structures had it.
 
