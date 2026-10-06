@@ -85,7 +85,7 @@ Stored in the `roles` Firestore collection, keyed by Firebase Auth UID:
 |---|---|
 | `admin` | Full access — `admin.html`, `call-center.html`, `request.html`, and `actions.html` (same login gate, same session — see §4.4) |
 | `agent` | `call-center.html` only — view/update leads, no delete, no reassignment |
-| `coordinator` | `request.html` only — submit marketing requests, nothing else |
+| `coordinator` | `request.html` only — submit marketing requests, nothing else. In practice these are the ~20 shared **request accounts** (§4.9) plus any individually-created coordinator. A coordinator can read only the requests they submitted themselves, and — enforced by the Firestore rules, not just the UI — nothing else in the database |
 
 A user with **no** role document is treated as unauthorized everywhere, even if they have a valid Firebase Auth login. Creating a Firebase Auth account does not grant any access by itself — the `roles` document is the actual gate.
 
@@ -95,12 +95,16 @@ A user with **no** role document is treated as unauthorized everywhere, even if 
 
 ### 4.2 Firestore Rules Pattern
 
-Every collection follows one of two patterns:
+**The rules are role-based — they check `roles/{uid}`, not just "is signed in".** Every collection follows one of two patterns:
 
-- **Public read, authenticated write:** `allow read: if true; allow write: if request.auth != null;` — used for anything the public portal needs to display (initiatives, promotions, entities, health days, BD cards, wellspan packages, loyalty cards).
-- **Authenticated read and write:** `allow read: if request.auth != null; allow write: if request.auth != null;` — used for anything containing PII or internal-only data (leads, requests, expenses, team members).
+- **Public read, admin write:** `allow read: if true; allow write: if isAdmin();` — used for anything the public portal needs to display (initiatives, promotions, entities, health days, BD cards, wellspan packages, loyalty cards, offers).
+- **Admin only:** `allow read, write: if isAdmin();` — used for PII, secrets, and internal-only data (expenses, team members, marketing actions, request accounts, and every non-public `config` document including the Anthropic API key and Metricool token).
 
-`roles` itself has a special rule: only an existing admin can write a new role document (checked via a Firestore rule that reads the requester's own role before allowing the write), preventing privilege escalation.
+Two collections have role-specific access beyond that: `leads` (admins and agents read/update; only admins create or delete, apart from the narrow landing-page create in §4.6) and `requests` (see §4.9).
+
+**Why this changed:** these rules used to read `request.auth != null` for the internal collections and for *writing* the public ones. That was harmless while every signed-in user was a trusted admin or agent, but once `request.html` went to ~20 shared department logins it meant any of them — with nothing but the browser console — could read every lead (PII), read the Anthropic API key and Metricool token, delete initiatives, or edit/delete other departments' requests. The role check (`hasRole()` in `firestore.rules`, an `exists()`+`get()` on the caller's own `roles` doc) closes that. An account with no roles document gets nothing beyond the public reads. Each such check costs a document read on rule evaluation; negligible at this scale.
+
+`roles` itself has a special rule: you can read your own doc, and only an existing admin can read others or write any (checked via a Firestore rule that reads the requester's own role before allowing the write), preventing privilege escalation.
 
 The `config` collection is the one exception to "one rule per collection" — it holds several unrelated single documents (see `DATA_MODEL.md`), each needing its own explicit per-document rule rather than one blanket collection rule. A blanket `config` rule caused a real incident: it silently exposed `ai_settings` (the Anthropic API key) and `admin_passcode` publicly, because Firestore rules are OR'd across every matching block — a broad `allow read: if true` on the collection wins over a narrower authenticated-only rule on the same document path. `admin_passcode` also has to stay genuinely public-read (it only ever stores a SHA-256 hash) since the Magic Word login flow reads it before the visitor is authenticated — that's the entire point of a passcode-based pre-auth path.
 
@@ -161,6 +165,19 @@ The request was to add sentiment analysis on social comments. Metricool itself h
 **Coverage is a real limitation, not just idempotency.** Neither Inbox endpoint documents a date-range or page-size parameter, so a single sync gets whatever window Metricool's server decides to return — there's no way to explicitly ask for "everything this month." The rollup (`config/sentiment_stats.byMonth`, see `DATA_MODEL.md`) buckets by each comment's own real date regardless of when it was fetched, so this doesn't cause incorrect numbers — it just means a sync done only once, at month-end, may under-represent that month versus syncing a few times through it.
 
 `promotions` (the retired collection) is left in place untouched, same convention as the old `metrics` collection — nothing reads or writes it anymore, but historical documents aren't deleted.
+
+### 4.9 Request Accounts & the Request Workflow — rolled out to departments
+
+`request.html` was opened to ~20 shared department logins ("request accounts"), which is why §4.2's rules became role-based. Decisions and their reasons:
+
+- **Generic, randomly-named accounts, not one per department.** Any request account may file a request for any department. Each is a normal Firebase Auth user plus `roles/{uid} = {role:'coordinator', requestAccount:true}`. The username is `rq-xxxxxx@requests.imc.med.sa` (a subdomain of IMC's own domain, so it can't collide with a stranger's real address and no mail is ever routed there); people type just `rq-xxxxxx` and `request.html` appends the domain. The password is 10 random characters from an unambiguous set. Both come from `crypto.getRandomValues` with rejection sampling.
+- **Credentials are stored, in an admin-only collection.** `request_accounts/{uid}` holds the plain-text username/password so an admin can look them up and re-export the credentials sheet later (Settings → Request Accounts). This is a deliberate convenience over the safer "show once at creation" model, mitigated by the collection being admin-only in `firestore.rules` — and it must never be moved into any collection a coordinator can read (`team_members` is admin-only now, but was readable by every signed-in user until this change). These accounts are intentionally *not* in `team_members`, which also keeps them out of every "Assigned To" dropdown. Accounts cannot change their own password; rotating one means deleting it and generating a replacement. Deleting removes the `roles` doc (instant revocation) and the stored credentials; the raw Firebase Auth user remains until removed in Console, same limitation as §4.3.
+- **A coordinator sees only their own requests — enforced server-side.** `requests` read is `isAdmin() || (isCoordinator() && resource.data.submittedBy == request.auth.token.email)`; create must carry the caller's own email, status `Pending`, and a fixed field whitelist (no `handledBy`/`reviewedBy`/rejection fields); after creation a coordinator may only *withdraw* (Pending/Needs Info → Withdrawn) or *answer a Needs Info question* (→ Pending), each limited to an exact set of fields. Only admins can otherwise update or delete. The two permitted writes are mirrored in `withdrawRequest()`/`replyToInfoRequest()`; keep the field sets in sync with the rule.
+- **The 5-per-24-hours limit is client-side, and honest about it.** It is a rolling window (`computeRequestQuota()`), not "since midnight", computed from a single-field query (no composite index). Firestore rules cannot count documents, so someone using the browser console can exceed it; for internal users handed a login this is accepted as a courtesy throttle, not a security boundary. Withdrawing a request does not give the slot back; an admin *deleting* one does.
+- **Statuses**: `Pending → (Needs Info ⇄ Pending) → Accepted | Rejected`, plus `Withdrawn`. "In production" and "Delivered" are not stored — the requester view reads them live off the linked activity's own status, the same no-denormalized-status convention used elsewhere.
+- **Handler, not assignment.** Any admin can act on any request (decided deliberately — no gatekeeper role). The acting admin is stamped as `handledBy` if nobody has claimed it ("Take it" / "Take over", or implicitly on Accept/Reject/Needs Info), purely so the requester and other admins can see who's on it.
+- **Notifications are in-app only.** A red badge on Activities → Requests counts Pending requests (stateless, so it's correct the moment an admin logs in); the browser tab title carries the same count; and a toast fires while the panel is open when a new request arrives or a requester answers a question.
+- **Output escaping.** Coordinator-typed text (title, description, replies) is rendered into `admin.html`, which holds an admin session with access to the API keys — so it is always HTML-escaped (`esc()`), and nothing user-typed is interpolated into an inline `onclick` (handlers take only the document id). Accepting a request into a new activity additionally strips `<`/`>` from the title and carries over only entity names that really exist, because the resulting initiative is shown on the public portal and in tables that do not all escape.
 
 ---
 

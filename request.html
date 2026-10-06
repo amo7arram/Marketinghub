@@ -73,7 +73,16 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .status-Pending{background:#FFF3D6;color:#8A6100}
 .status-Accepted{background:#E8F8F0;color:#0E7A55}
 .status-Rejected{background:#FFE8E8;color:#9B2020}
+.status-NeedsInfo{background:#E3EEFF;color:#1A4FA0}
+.status-Withdrawn{background:#EEF0F5;color:#5A6178}
 .myreq-empty{padding:30px;text-align:center;color:var(--text-3);font-size:12px}
+.quota-note{font-size:12px;margin-bottom:16px;padding:8px 12px;border-radius:var(--radius);background:var(--bg);color:var(--text-2)}
+.quota-note.low{background:#FFF3D6;color:#8A6100}
+.quota-note.empty{background:#FFE8E8;color:#9B2020}
+.info-box{background:#EEF4FF;border-left:3px solid #1A4FA0;padding:8px 10px;border-radius:4px;margin:4px 0;font-size:12px;white-space:pre-wrap}
+.myreq-reply textarea{width:100%;min-height:60px;padding:8px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);font-family:inherit;font-size:12px;margin-top:6px}
+.btn-sm{font-size:11px;padding:4px 10px}
+.btn-danger{color:var(--red);border-color:var(--red)}
 </style>
 </head>
 <body>
@@ -83,7 +92,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
     <img class="login-logo-img" src="logo.jpg" alt="IMC">
     <div class="login-sub">Marketing Request — Coordinator Access</div>
     <div class="login-error" id="login-error"></div>
-    <div class="login-field"><label class="login-label">Email</label><input class="login-input" type="email" id="login-email" placeholder="you@imc.med.sa"></div>
+    <div class="login-field"><label class="login-label">Username</label><input class="login-input" type="text" id="login-email" placeholder="e.g. rq-k4m9x2" autocapitalize="off" autocomplete="username" spellcheck="false"></div>
     <div class="login-field"><label class="login-label">Password</label><input class="login-input" type="password" id="login-password" placeholder="••••••••"></div>
     <button class="login-btn" onclick="doLogin()">Sign In</button>
   </div>
@@ -107,6 +116,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
   <div class="form-card" id="view-submit-el">
     <div class="form-title">New Marketing Request</div>
     <div class="form-sub">Submit a request to the marketing team — they'll follow up directly.</div>
+    <div class="quota-note" id="quota-note"></div>
 
     <div class="field-row">
       <div class="field-group"><label class="field-label">Your Name<span class="req">*</span></label><input class="field-input" id="f-requester-name" placeholder="Dr. / Mr. / Ms. ..."></div>
@@ -153,8 +163,8 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
     <div class="form-title">My Requests</div>
     <div class="form-sub">Every request you've submitted, and its current status.</div>
     <table class="myreq-table">
-      <thead><tr><th>Submitted</th><th>Title</th><th>Type</th><th>Status</th><th>Details</th></tr></thead>
-      <tbody id="myreq-table-body"><tr><td colspan="5" class="myreq-empty">Loading...</td></tr></tbody>
+      <thead><tr><th>Submitted</th><th>Title</th><th>Department</th><th>Type</th><th>Status</th><th>Details</th></tr></thead>
+      <tbody id="myreq-table-body"><tr><td colspan="6" class="myreq-empty">Loading...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -162,7 +172,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { login, logout, watchAuth, getUserRole, addRequest, getTodayRequestCount, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS, watchEntities, watchInitiatives, watchMyRequests } from './firebase-data.js';
+import { login, logout, watchAuth, getUserRole, addRequest, getRequestQuota, computeRequestQuota, withdrawRequest, replyToInfoRequest, REQUEST_ACCOUNT_DOMAIN, DAILY_REQUEST_LIMIT, REQUEST_TYPES, PRIORITIES, DEPARTMENTS, watchEntities, watchInitiatives, watchMyRequests } from './firebase-data.js';
 
 let currentUserEmail = null;
 let selectedEntities = [];
@@ -171,13 +181,24 @@ let ALL_INITIATIVES = [];
 let unsubMyRequests = null, unsubEntities = null, unsubInitiatives = null;
 let myRequestsData = [];
 
+// Everything rendered below that came from a database field goes through
+// this — other people's text (admin questions, rejection notes) lands in this
+// page, and a request's own title/description lands in the admin page.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
 window.doLogin = async function() {
-  const email = document.getElementById('login-email').value.trim();
+  let username = document.getElementById('login-email').value.trim().toLowerCase();
+  // Department logins are handed out as a short code ("rq-k4m9x2"); the
+  // real Firebase identity is that code at the fixed request-accounts domain.
+  // A full email (existing coordinators/admins) is used as typed.
+  if(username && !username.includes('@')) username = `${username}@${REQUEST_ACCOUNT_DOMAIN}`;
   const password = document.getElementById('login-password').value;
   const errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
-  try { await login(email, password); }
-  catch(e) { errEl.textContent = 'Sign-in failed — check your email and password.'; errEl.style.display = 'block'; }
+  try { await login(username, password); }
+  catch(e) { errEl.textContent = 'Sign-in failed — check your username and password.'; errEl.style.display = 'block'; }
 }
 window.doLogout = async function() { await logout(); }
 
@@ -258,7 +279,36 @@ window.showView = function(view) {
   document.getElementById('view-btn-myrequests').classList.toggle('active', view==='myrequests');
 }
 
-const REQ_STATUS_CLASS = {'Pending':'status-Pending','Accepted':'status-Accepted','Rejected':'status-Rejected'};
+const REQ_STATUS_CLASS = {'Pending':'status-Pending','Needs Info':'status-NeedsInfo','Accepted':'status-Accepted','Rejected':'status-Rejected','Withdrawn':'status-Withdrawn'};
+const replyDrafts = {}; // request id -> in-progress reply text, so a live update doesn't wipe what's being typed
+
+function renderQuotaNote() {
+  const el = document.getElementById('quota-note');
+  if(!el) return;
+  const q = computeRequestQuota(myRequestsData.map(r => r.createdAt?.toMillis?.() || 0));
+  el.className = 'quota-note' + (q.remaining === 0 ? ' empty' : q.remaining <= 1 ? ' low' : '');
+  el.textContent = q.remaining === 0
+    ? `You've used all ${q.limit} requests allowed per 24 hours — your next slot opens at ${new Date(q.nextSlotAt).toLocaleString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}.`
+    : `${q.remaining} of ${q.limit} requests left (limit is ${q.limit} per rolling 24 hours).`;
+}
+
+window.setReplyDraft = function(id, value) { replyDrafts[id] = value; }
+
+window.withdrawMyRequest = async function(id) {
+  if(!confirm('Withdraw this request? The marketing team will no longer act on it. (It still counts toward your 24-hour limit.)')) return;
+  try { await withdrawRequest(id); showToast('Request withdrawn'); }
+  catch(e) { showToast('Could not withdraw: ' + e.message, true); }
+}
+
+window.sendInfoReply = async function(id) {
+  const text = (replyDrafts[id] || '').trim();
+  if(!text) { showToast('Type your reply first', true); return; }
+  try {
+    await replyToInfoRequest(id, text);
+    delete replyDrafts[id];
+    showToast('Reply sent — the request is back with the marketing team');
+  } catch(e) { showToast('Could not send reply: ' + e.message, true); }
+}
 
 // Looks up the linked initiative's CURRENT title+status, never the possibly-
 // stale denormalized linkedInitiativeTitle — same convention as admin.html's
@@ -271,32 +321,51 @@ function myReqInitiativeInfo(id) {
 }
 
 function renderMyRequests() {
+  renderQuotaNote();
   const tbody = document.getElementById('myreq-table-body');
   if(!tbody) return;
   if(!myRequestsData.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="myreq-empty">You haven\'t submitted any requests yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="myreq-empty">You haven\'t submitted any requests yet.</td></tr>';
     return;
   }
   tbody.innerHTML = myRequestsData.map(r => {
     const submitted = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-GB') : '—';
     const status = r.status || (r.done ? 'Accepted' : 'Pending'); // legacy done-only docs, pre-migration
-    let details = '—';
+    const parts = [];
+    if(r.handledBy) parts.push(`<div style="color:var(--text-3);margin-bottom:4px">Handled by <strong style="color:var(--text-2)">${esc(r.handledBy)}</strong></div>`);
+
     if(status === 'Rejected') {
-      details = `<strong>${r.rejectionReason||'No reason given'}</strong>${r.rejectionNote?`<br><span style="color:var(--text-3)">${r.rejectionNote}</span>`:''}`;
+      parts.push(`<strong>${esc(r.rejectionReason||'No reason given')}</strong>${r.rejectionNote?`<br><span style="color:var(--text-3)">${esc(r.rejectionNote)}</span>`:''}`);
+    } else if(status === 'Needs Info') {
+      parts.push(`<div style="font-weight:600;color:#1A4FA0">The marketing team needs more information:</div>
+        <div class="info-box">${esc(r.infoRequest||'Please get in touch with the marketing team.')}</div>
+        <div class="myreq-reply">
+          <textarea placeholder="Type your reply…" oninput="setReplyDraft('${r.id}', this.value)">${esc(replyDrafts[r.id]||'')}</textarea>
+          <button class="btn btn-sm" style="margin-top:6px;background:var(--navy);color:#fff;border-color:var(--navy)" onclick="sendInfoReply('${r.id}')">Send reply</button>
+        </div>`);
+    } else if(status === 'Withdrawn') {
+      parts.push('<span style="color:var(--text-3)">You withdrew this request</span>');
     } else if(r.linkedInitiativeId) {
       const info = myReqInitiativeInfo(r.linkedInitiativeId);
-      details = info
-        ? `Now: <strong>${info.title}</strong> <span style="color:var(--text-3)">(${info.status})</span>`
-        : `<s>${r.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3)">(deleted)</span>`;
+      parts.push(info
+        ? `Now: <strong>${esc(info.title)}</strong> <span style="color:var(--text-3)">(${esc(info.status)})</span>`
+        : `<s>${esc(r.linkedInitiativeTitle||'Untitled')}</s> <span style="color:var(--text-3)">(deleted)</span>`);
     } else if(status === 'Accepted') {
-      details = '<span style="color:var(--text-3)">Accepted — not yet linked to an activity</span>';
+      parts.push('<span style="color:var(--text-3)">Accepted — not yet linked to an activity</span>');
+    } else if(status === 'Pending' && r.infoReply) {
+      parts.push(`<span style="color:var(--text-3)">You replied: ${esc(r.infoReply)}</span>`);
+    }
+
+    if(status === 'Pending' || status === 'Needs Info') {
+      parts.push(`<div style="margin-top:6px"><button class="btn btn-sm btn-danger" onclick="withdrawMyRequest('${r.id}')">Withdraw</button></div>`);
     }
     return `<tr>
       <td style="white-space:nowrap;color:var(--text-3)">${submitted}</td>
-      <td style="font-weight:600">${r.title||''}</td>
-      <td style="color:var(--text-3)">${r.type||''}</td>
-      <td><span class="status-badge ${REQ_STATUS_CLASS[status]||'status-Pending'}">${status}</span></td>
-      <td>${details}</td>
+      <td style="font-weight:600">${esc(r.title)}</td>
+      <td style="color:var(--text-3)">${esc(r.department)}</td>
+      <td style="color:var(--text-3)">${esc(r.type)}</td>
+      <td><span class="status-badge ${REQ_STATUS_CLASS[status]||'status-Pending'}">${esc(status)}</span></td>
+      <td>${parts.join('') || '—'}</td>
     </tr>`;
   }).join('');
 }
@@ -337,9 +406,10 @@ window.submitRequest = async function() {
   submitBtn.disabled = true;
 
   try {
-    const todayCount = await getTodayRequestCount(currentUserEmail);
-    if(todayCount >= DAILY_REQUEST_LIMIT) {
-      showToast(`Daily limit reached — you can submit up to ${DAILY_REQUEST_LIMIT} requests per day. Please try again tomorrow.`, true);
+    const quota = await getRequestQuota(currentUserEmail);
+    if(quota.remaining <= 0) {
+      const when = new Date(quota.nextSlotAt).toLocaleString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+      showToast(`Limit reached — ${DAILY_REQUEST_LIMIT} requests per 24 hours. Your next slot opens at ${when}.`, true);
       submitBtn.disabled = false;
       return;
     }

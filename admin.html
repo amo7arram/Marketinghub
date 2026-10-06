@@ -57,6 +57,7 @@ html,body{height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(--bg
 .tab-group-label{padding:10px 18px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;user-select:none}
 .tab-group-label.active{color:var(--navy);border-bottom-color:var(--navy)}
 .tab-group-arrow{font-size:9px;transition:transform 0.15s}
+.tab-badge{background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;line-height:1.4;margin-left:3px}
 .tab-group.open .tab-group-arrow{transform:rotate(180deg)}
 .tab-dropdown{display:none;position:absolute;top:100%;left:0;background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);box-shadow:var(--shadow-lg);min-width:180px;z-index:50;padding:6px 0}
 .tab-group.open .tab-dropdown{display:block}
@@ -238,11 +239,11 @@ tr.row-overdue:hover td{background:#FFD6D6}
   </div>
   <div class="tabs" id="admin-tabs">
     <div class="tab-group" id="group-initiatives">
-      <div class="tab-group-label" onclick="toggleTabGroup('group-initiatives')">Activities <span class="tab-group-arrow">▾</span></div>
+      <div class="tab-group-label" onclick="toggleTabGroup('group-initiatives')">Activities <span class="tab-badge" id="req-badge-group" style="display:none" title="Requests waiting for a response"></span><span class="tab-group-arrow">▾</span></div>
       <div class="tab-dropdown">
         <div class="tab-dropdown-item active" onclick="switchTab('initiatives',this,'group-initiatives')">Activities</div>
         <div class="tab-dropdown-item" onclick="switchTab('healthdays',this,'group-initiatives')">Health Days</div>
-        <div class="tab-dropdown-item" onclick="switchTab('requests',this,'group-initiatives')">Requests</div>
+        <div class="tab-dropdown-item" onclick="switchTab('requests',this,'group-initiatives')">Requests <span class="tab-badge" id="req-badge-item" style="display:none"></span></div>
         <div class="tab-dropdown-item" onclick="switchTab('marketingactions',this,'group-initiatives')">Marketing Actions</div>
       </div>
     </div>
@@ -661,9 +662,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <table>
         <thead><tr>
           <th onclick="toggleReqSort()" style="cursor:pointer;user-select:none">Submitted <span id="req-sort-arrow">↓</span></th>
-          <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Entity</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th>Status</th><th>Linked Initiative</th><th></th>
+          <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Entity</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th>Status</th><th>Handled By</th><th>Linked Initiative</th><th></th>
         </tr></thead>
-        <tbody id="requests-table-body"><tr><td colspan="13" class="empty">Loading...</td></tr></tbody>
+        <tbody id="requests-table-body"><tr><td colspan="14" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -1026,6 +1027,26 @@ tr.row-overdue:hover td{background:#FFD6D6}
           </table>
         </div>
 
+        <!-- Request Accounts — shared coordinator logins for request.html -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">🔑 Request Accounts</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:16px">Generic logins for the request form (<code>request.html</code>), handed out to departments. Any account can submit a request for any department, and sees only the requests it submitted itself.</div>
+
+          <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:16px;line-height:1.6">
+            🔒 Passwords are stored in plain text so you can look them up here — readable by admins only (a coordinator cannot read this list). Deleting an account revokes its access immediately; the raw record stays in Firebase Console → Authentication, remove it there too for full removal. Accounts can't change their own password; to rotate one, delete it and generate a replacement.
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="openReqAcctForm()">+ Generate Accounts</button>
+            <button class="btn" onclick="downloadRequestCredentials()">⬇️ Download Credentials Sheet</button>
+          </div>
+
+          <table>
+            <thead><tr><th>#</th><th>Label</th><th>Username</th><th>Password</th><th>Actions</th></tr></thead>
+            <tbody id="reqacct-table-body"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
+
         <!-- Department Revenue Estimates (ROI fallback) -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">💰 Department Revenue Estimates</div>
@@ -1312,12 +1333,54 @@ tr.row-overdue:hover td{background:#FFD6D6}
             <div class="field-group"><label class="field-label">Status</label><select class="field-select" id="fld-req-init-status"></select></div>
             <div class="field-group"><label class="field-label">Start Date</label><input class="field-input" type="date" id="fld-req-init-startDate"></div>
           </div>
+          <div class="field-group"><label class="field-label">Assign activity to</label><select class="field-select" id="fld-req-init-assignedTo"><option value="">— Unassigned —</option></select></div>
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeRequestAcceptForm()">Cancel</button>
       <button class="btn btn-primary" onclick="saveRequestAccept()">Accept Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── REQUEST NEEDS-INFO MODAL ── -->
+<div class="modal-overlay" id="request-info-overlay">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Ask for More Information</div>
+      <button class="modal-close" onclick="closeRequestInfoForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="req-info-summary" style="font-size:12px;color:var(--text-2);background:var(--bg);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px"></div>
+      <div class="field-group"><label class="field-label">Your question<span style="color:var(--red)">*</span></label><textarea class="field-textarea" id="fld-req-infoQuestion" placeholder="What do you need to know before you can decide?"></textarea></div>
+      <div style="font-size:11px;color:var(--text-3)">The requester sees this in their "My Requests" view and can reply there — the request returns to Pending when they do.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeRequestInfoForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRequestInfo()">Send Question</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── REQUEST ACCOUNTS GENERATOR MODAL ── -->
+<div class="modal-overlay" id="reqacct-overlay">
+  <div class="modal" style="width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Generate Request Accounts</div>
+      <button class="modal-close" onclick="closeReqAcctForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:14px">
+        Creates generic coordinator logins with random usernames and passwords. Any of them can submit a request for any department. Nothing is named after a department.
+      </div>
+      <div class="field-group"><label class="field-label">How many accounts?</label><input class="field-input" type="number" id="reqacct-count" min="1" max="50" value="20"></div>
+      <div id="reqacct-progress" style="display:none;font-size:12px;font-weight:600;color:var(--navy);margin-top:10px"></div>
+      <div id="reqacct-result" style="display:none;font-size:12px;margin-top:10px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeReqAcctForm()">Close</button>
+      <button class="btn btn-primary" id="reqacct-go-btn" onclick="runGenerateRequestAccounts()">Generate</button>
     </div>
   </div>
 </div>
@@ -1826,8 +1889,9 @@ import {
   login, logout, watchAuth, getUserRole,
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
-  watchRequests, deleteRequest, reviewRequest, REQUEST_TYPES,
+  watchRequests, deleteRequest, reviewRequest, updateRequest, REQUEST_TYPES,
   REQUEST_STATUSES, REQUEST_REJECTION_REASONS, migrateLegacyRequestStatuses,
+  watchRequestAccounts, createRequestAccounts, deleteRequestAccount,
   watchLandingPages, createLandingPage, saveLandingPage, deleteLandingPage,
   getLandingPageBySlug, slugify, LANDING_PAGE_STATUSES,
   watchExpenses, addExpense, updateExpense, deleteExpense, EXPENSE_TYPES,
@@ -1914,6 +1978,9 @@ let unsubTeamMembers = null;
 let unsubDeptRevenue = null;
 let unsubResources = null;
 let unsubRequests = null;
+let unsubRequestAccounts = null;
+let ALL_REQUEST_ACCOUNTS = [];
+let knownRequestIds = null; // null until the first snapshot lands, so loading the page doesn't toast every existing request
 let unsubExpenses = null;
 let unsubBdCards = null;
 let unsubWellspan = null;
@@ -1994,6 +2061,8 @@ watchAuth(async user => {
     if(unsubDeptRevenue) unsubDeptRevenue();
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
+    if(unsubRequestAccounts) unsubRequestAccounts();
+    knownRequestIds = null;
     if(unsubExpenses) unsubExpenses();
     if(unsubOffersCatalogMeta) unsubOffersCatalogMeta();
     if(unsubBdCards) unsubBdCards();
@@ -2019,7 +2088,8 @@ function initData() {
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); renderCampaignPerformance(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
-  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; renderRequestsTable(); });
+  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); });
+  unsubRequestAccounts = watchRequestAccounts(data => { ALL_REQUEST_ACCOUNTS = data; renderRequestAccountsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
   unsubOffersCatalogMeta = watchOffersCatalogMeta(data => { OFFERS_CATALOG_META = data; renderOffersCatalogStatus(); });
   unsubBdCards      = watchBdCards(data      => { ALL_BD_CARDS    = data; renderBdTable(); });
@@ -4278,11 +4348,64 @@ window.renderResourcesTable = function() {
 
 // ── REQUESTS (filters, sort, accept/reject + initiative link, delete) ────
 const PRIORITY_CLASS = {'Urgent':'b-cancelled','High':'b-production','Normal':'b-ready'};
-const REQUEST_STATUS_CLASS = {'Pending':'b-planned','Accepted':'b-published','Rejected':'b-cancelled'};
+const REQUEST_STATUS_CLASS = {'Pending':'b-planned','Needs Info':'b-production','Accepted':'b-published','Rejected':'b-cancelled','Withdrawn':'b-ready'};
+const ADMIN_BASE_TITLE = document.title;
+
+// Everything a coordinator typed (title, description, notes, replies) is
+// untrusted text rendered into THIS page, which holds an admin session — so it
+// is always escaped before going into innerHTML, never interpolated raw.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 
 // Legacy requests created before the accept/reject workflow only ever had a
 // boolean `done` — treat as Pending until migrated (see the migration button).
 function requestStatusOf(r) { return r.status || (r.done ? 'Accepted' : 'Pending'); }
+
+// ── Notifications ────────────────────────────────────────────────────────
+// Badge = how many requests are Pending right now (stateless, so it's always
+// correct on login with nothing to remember). A toast additionally fires when
+// a new request arrives, or a requester answers a Needs Info question, while
+// an admin has the panel open.
+const requestStatusSeen = new Map(); // id -> last seen status, for the toast diff
+function onRequestsChanged() {
+  const pending = ALL_REQUESTS.filter(r => requestStatusOf(r) === 'Pending').length;
+  ['req-badge-group', 'req-badge-item'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = pending;
+    el.style.display = pending ? 'inline-block' : 'none';
+  });
+  document.title = (pending ? `(${pending}) ` : '') + ADMIN_BASE_TITLE;
+
+  if(knownRequestIds) { // not the first snapshot
+    const fresh = ALL_REQUESTS.filter(r => requestStatusOf(r) === 'Pending' && !requestStatusSeen.has(r.id));
+    const replied = ALL_REQUESTS.filter(r => requestStatusOf(r) === 'Pending' && requestStatusSeen.get(r.id) === 'Needs Info');
+    if(fresh.length) showToast(fresh.length === 1 ? `🔔 New request: "${fresh[0].title}" — ${fresh[0].department}` : `🔔 ${fresh.length} new requests`, false, 6000);
+    else if(replied.length) showToast(`💬 ${replied[0].requesterName || 'A requester'} replied on "${replied[0].title}"`, false, 6000);
+  }
+  knownRequestIds = new Set(ALL_REQUESTS.map(r => r.id));
+  requestStatusSeen.clear();
+  ALL_REQUESTS.forEach(r => requestStatusSeen.set(r.id, requestStatusOf(r)));
+}
+
+// The acting admin, stamped as "handled by" when nobody has claimed a request
+// yet — so the requester can see who's on it even if it was decided without
+// an explicit Take-it click.
+function handlerStampFor(r) {
+  if(r && r.handledBy) return {};
+  return { handledBy: myMemberName() || currentAdminEmail || 'Admin', handledByUid: currentAdminUid || null };
+}
+
+window.claimRequest = async function(id) {
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  if(!r) return;
+  if(r.handledByUid && r.handledByUid !== currentAdminUid && !confirm(`${r.handledBy} is already handling this request. Take it over?`)) return;
+  try {
+    await updateRequest(id, { handledBy: myMemberName() || currentAdminEmail || 'Admin', handledByUid: currentAdminUid || null });
+    showToast('You are now handling this request');
+  } catch(e) { showToast('Could not claim: ' + e.message, true); }
+}
 
 window.toggleReqSort = function() {
   reqSortDir = reqSortDir==='asc' ? 'desc' : 'asc';
@@ -4290,10 +4413,39 @@ window.toggleReqSort = function() {
   renderRequestsTable();
 }
 
-window.removeRequest = async function(id, title) {
-  if(!confirm(`Delete request "${title}" from the log? This does NOT delete its linked initiative, if any.`)) return;
+window.removeRequest = async function(id) {
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  const title = r?.title || 'this request';
+  if(!confirm(`Delete request "${title}" from the log? This does NOT delete its linked initiative, if any. (Deleting also frees up one of the requester's 5 requests per 24 hours.)`)) return;
   try { await deleteRequest(id); showToast('Request removed'); }
   catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+
+// ── Needs Info modal ──
+let editingRequestInfoId = null;
+window.openRequestInfoForm = function(id) {
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  if(!r) return;
+  editingRequestInfoId = id;
+  document.getElementById('req-info-summary').innerHTML = `<strong>${esc(r.title)}</strong><br>${esc(r.requesterName||'—')} — ${esc(r.department||'')} / ${esc(r.type||'')}` +
+    (r.infoReply ? `<br><br><strong>Their last reply:</strong> ${esc(r.infoReply)}` : '');
+  document.getElementById('fld-req-infoQuestion').value = (requestStatusOf(r) === 'Needs Info' ? r.infoRequest : '') || '';
+  document.getElementById('request-info-overlay').classList.add('open');
+}
+window.closeRequestInfoForm = function() {
+  document.getElementById('request-info-overlay').classList.remove('open');
+}
+window.saveRequestInfo = async function() {
+  const id = editingRequestInfoId;
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  const question = document.getElementById('fld-req-infoQuestion').value.trim();
+  if(!r) return;
+  if(!question) { showToast('Write your question first', true); return; }
+  try {
+    await reviewRequest(id, { status: 'Needs Info', infoRequest: question, infoReply: null, infoRepliedAt: null, reviewedBy: currentAdminEmail, ...handlerStampFor(r) });
+    showToast('Question sent to the requester');
+    closeRequestInfoForm();
+  } catch(e) { showToast('Save failed: ' + e.message, true); }
 }
 
 window.runMigrateLegacyRequestStatuses = async function() {
@@ -4312,8 +4464,8 @@ window.openRequestAcceptForm = function(id) {
   pendingRequestUnlink = false;
 
   document.getElementById('req-accept-summary').innerHTML =
-    `<strong>${r.title||''}</strong><br>${r.requesterName||'—'}${r.email?` (${r.email})`:''} — ${r.department||''} / ${r.type||''}` +
-    (r.description ? `<br><span style="color:var(--text-3)">${r.description}</span>` : '');
+    `<strong>${esc(r.title)}</strong><br>${esc(r.requesterName||'—')}${r.email?` (${esc(r.email)})`:''} — ${esc(r.department)} / ${esc(r.type)}` +
+    (r.description ? `<br><span style="color:var(--text-3)">${esc(r.description)}</span>` : '');
 
   document.getElementById('fld-req-autocreate').checked = false;
   document.getElementById('fld-req-autocreate').disabled = false;
@@ -4322,6 +4474,10 @@ window.openRequestAcceptForm = function(id) {
   document.getElementById('fld-req-init-dept').value = r.department || '';
   document.getElementById('fld-req-init-status').value = 'Planned';
   document.getElementById('fld-req-init-startDate').value = '';
+  // Default the new activity's owner to whoever is handling the request (or
+  // the person accepting it) — the activity is the real work item.
+  document.getElementById('fld-req-init-assignedTo').value =
+    ALL_TEAM_MEMBERS.some(m => m.name === r.handledBy) ? r.handledBy : (myMemberName() || '');
 
   populateLinkExistingSelect('fld-req-linkExisting', null);
   document.getElementById('fld-req-linkExisting').value = '';
@@ -4357,15 +4513,23 @@ window.saveRequestAccept = async function() {
     if (autocreate) {
       // Create the initiative FIRST — if this throws, bail out entirely so
       // the request is never left half-linked.
-      const initTitle = document.getElementById('fld-req-init-title').value.trim() || r.title;
+      // The request's text is coordinator-typed. The new initiative is shown on
+      // the public site and other tables, which don't all escape output — so
+      // strip angle brackets from the title and only carry over entity names
+      // that really exist, rather than copying arbitrary strings across.
+      const initTitle = (document.getElementById('fld-req-init-title').value.trim() || r.title || '').replace(/[<>]/g, '');
       const initData = {
         title: initTitle,
         type: document.getElementById('fld-req-init-type').value,
         department: document.getElementById('fld-req-init-dept').value,
         status: document.getElementById('fld-req-init-status').value,
         startDate: document.getElementById('fld-req-init-startDate').value,
-        entity: r.entity || [],
+        entity: (r.entity || []).filter(e => ALL_ENTITIES.some(x => x.name === e)),
+        assignedTo: document.getElementById('fld-req-init-assignedTo').value,
+        createdByUid: currentAdminUid || null,
+        createdByName: myMemberName() || currentAdminEmail || 'Unknown',
       };
+      initData.assignedToUid = ALL_TEAM_MEMBERS.find(m => m.name === initData.assignedTo)?.authUid || null;
       const docRef = await addInitiative(initData);
       linkedInitiativeId = docRef.id;
       linkedInitiativeTitle = initTitle;
@@ -4381,7 +4545,7 @@ window.saveRequestAccept = async function() {
     }
     // else: no link, or an explicit Unlink — both stay null.
 
-    await reviewRequest(id, { status: 'Accepted', linkedInitiativeId, linkedInitiativeTitle, reviewedBy: currentAdminEmail });
+    await reviewRequest(id, { status: 'Accepted', linkedInitiativeId, linkedInitiativeTitle, reviewedBy: currentAdminEmail, ...handlerStampFor(r) });
     showToast('Request accepted');
     closeRequestAcceptForm();
   } catch (e) {
@@ -4407,7 +4571,7 @@ window.saveRequestReject = async function() {
   const rejectionReason = document.getElementById('fld-req-rejectReason').value;
   const rejectionNote = document.getElementById('fld-req-rejectNote').value.trim();
   try {
-    await reviewRequest(id, { status: 'Rejected', rejectionReason, rejectionNote, reviewedBy: currentAdminEmail });
+    await reviewRequest(id, { status: 'Rejected', rejectionReason, rejectionNote, reviewedBy: currentAdminEmail, ...handlerStampFor(ALL_REQUESTS.find(x => x.id === id)) });
     showToast('Request rejected');
     closeRequestRejectForm();
   } catch (e) {
@@ -4439,38 +4603,52 @@ window.renderRequestsTable = function() {
         const status = requestStatusOf(r);
         const info = r.linkedInitiativeId ? initiativeInfoFor(r.linkedInitiativeId) : null;
         const linkCell = !r.linkedInitiativeId ? '—'
-          : info ? `${info.title} <span class="badge ${STATUS_CLASS[info.status]||'b-planned'}">${info.status}</span>`
-          : `<s>${r.linkedInitiativeTitle||'Untitled'}</s> <span style="color:var(--text-3);font-size:10px">(deleted)</span>`;
-        let actions = `<button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}','${(r.title||'').replace(/'/g,"\\'")}')">Delete</button>`;
-        if (status === 'Pending') {
-          actions = `<button class="btn btn-sm" style="color:var(--green);border-color:var(--green)" onclick="openRequestAcceptForm('${r.id}')">✓ Accept</button>
-            <button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openRequestRejectForm('${r.id}')">✕ Reject</button>` + actions;
-        } else if (status === 'Accepted') {
-          actions = `<button class="btn btn-sm" onclick="openRequestAcceptForm('${r.id}')">✏️ Edit Link</button>
-            <button class="btn btn-sm" style="color:var(--red);border-color:var(--red)" onclick="openRequestRejectForm('${r.id}')">✕ Reject</button>` + actions;
-        } else if (status === 'Rejected') {
-          actions = `<button class="btn btn-sm" style="color:var(--green);border-color:var(--green)" onclick="openRequestAcceptForm('${r.id}')">✓ Accept</button>` + actions;
+          : info ? `${esc(info.title)} <span class="badge ${STATUS_CLASS[info.status]||'b-planned'}">${esc(info.status)}</span>`
+          : `<s>${esc(r.linkedInitiativeTitle||'Untitled')}</s> <span style="color:var(--text-3);font-size:10px">(deleted)</span>`;
+        const green = 'color:var(--green);border-color:var(--green)', red = 'color:var(--red);border-color:var(--red)';
+        const btnAccept = `<button class="btn btn-sm" style="${green}" onclick="openRequestAcceptForm('${r.id}')">✓ Accept</button>`;
+        const btnReject = `<button class="btn btn-sm" style="${red}" onclick="openRequestRejectForm('${r.id}')">✕ Reject</button>`;
+        const btnInfo   = `<button class="btn btn-sm" onclick="openRequestInfoForm('${r.id}')">❓ ${status === 'Needs Info' ? 'Re-ask' : 'Need Info'}</button>`;
+        const btnTake   = !r.handledBy
+          ? `<button class="btn btn-sm" onclick="claimRequest('${r.id}')">✋ Take it</button>`
+          : (r.handledByUid !== currentAdminUid ? `<button class="btn btn-sm" onclick="claimRequest('${r.id}')">Take over</button>` : '');
+        const btnDelete = `<button class="btn btn-sm btn-danger" onclick="removeRequest('${r.id}')">Delete</button>`;
+        let actions = btnDelete;
+        if (status === 'Pending')         actions = btnTake + btnAccept + btnInfo + btnReject + btnDelete;
+        else if (status === 'Needs Info') actions = btnTake + btnAccept + btnInfo + btnReject + btnDelete;
+        else if (status === 'Accepted')   actions = `<button class="btn btn-sm" onclick="openRequestAcceptForm('${r.id}')">✏️ Edit Link</button>` + btnReject + btnDelete;
+        else if (status === 'Rejected')   actions = btnAccept + btnDelete;
+        // Withdrawn: nothing to decide — Delete only.
+
+        let statusCell = `<span class="badge ${REQUEST_STATUS_CLASS[status]||'b-planned'}">${esc(status)}</span>`;
+        if (status === 'Rejected' && r.rejectionReason) {
+          statusCell += `<br><span style="font-size:10px;color:var(--text-3)">${esc(r.rejectionReason)}${r.rejectionNote?': '+esc(r.rejectionNote):''}</span>`;
+        } else if (status === 'Needs Info' && r.infoRequest) {
+          statusCell += `<br><span style="font-size:10px;color:var(--text-3)">Asked: ${esc(r.infoRequest)}</span>`;
+        } else if (status === 'Pending' && r.infoReply) {
+          statusCell += `<br><span style="font-size:10px;color:#1A4FA0">💬 Replied: ${esc(r.infoReply)}</span>`;
         }
-        const statusCell = status === 'Rejected' && r.rejectionReason
-          ? `<span class="badge ${REQUEST_STATUS_CLASS[status]}">${status}</span><br><span style="font-size:10px;color:var(--text-3)">${r.rejectionReason}${r.rejectionNote?': '+r.rejectionNote:''}</span>`
-          : `<span class="badge ${REQUEST_STATUS_CLASS[status]||'b-planned'}">${status}</span>`;
+        const handledCell = r.handledBy
+          ? `<strong>${esc(r.handledBy)}</strong>${r.handledByUid && r.handledByUid === currentAdminUid ? ' <span style="color:var(--text-3)">(you)</span>' : ''}`
+          : `<span style="color:var(--text-3)">— nobody yet —</span>`;
         return `<tr>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${submitted}</td>
-          <td style="font-size:11px;color:var(--text-3)">${r.submittedBy||'—'}</td>
-          <td style="font-size:11px">${r.requesterName||'—'}${r.email?`<br><span style="color:var(--text-3)">${r.email}</span>`:''}</td>
-          <td style="font-weight:600">${r.title||''}</td>
-          <td>${r.department||''}</td>
-          <td style="font-size:11px">${(r.entity||[]).join(', ')||'—'}</td>
-          <td style="font-size:11px">${r.type||''}</td>
-          <td><span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${r.priority||'Normal'}</span></td>
-          <td style="font-size:11px;color:var(--text-3)">${r.deadline||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3);max-width:200px">${r.description||''}</td>
+          <td style="font-size:11px;color:var(--text-3)">${esc(r.submittedBy)||'—'}</td>
+          <td style="font-size:11px">${esc(r.requesterName)||'—'}${r.email?`<br><span style="color:var(--text-3)">${esc(r.email)}</span>`:''}</td>
+          <td style="font-weight:600">${esc(r.title)}</td>
+          <td>${esc(r.department)}</td>
+          <td style="font-size:11px">${esc((r.entity||[]).join(', '))||'—'}</td>
+          <td style="font-size:11px">${esc(r.type)}</td>
+          <td><span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${esc(r.priority||'Normal')}</span></td>
+          <td style="font-size:11px;color:var(--text-3)">${esc(r.deadline)||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3);max-width:200px">${esc(r.description)}</td>
           <td style="font-size:11px">${statusCell}</td>
+          <td style="font-size:11px">${handledCell}</td>
           <td style="font-size:11px">${linkCell}</td>
           <td class="row-actions">${actions}</td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="13" class="empty">No requests found</td></tr>';
+    : '<tr><td colspan="14" class="empty">No requests found</td></tr>';
 }
 
 // ── LANDING PAGES ─────────────────────────────────────────────────────────
@@ -6031,13 +6209,17 @@ let editingTeamMemberId = null;
 // Populates the "Assigned To" dropdown on the activity form from active
 // team members. Safe to call repeatedly — always fully rebuilds.
 function populateAssignedToSelect() {
-  const sel = document.getElementById('fld-assignedTo');
-  if(!sel) return;
-  const prevVal = sel.value;
   const active = ALL_TEAM_MEMBERS.filter(m=>m.active!==false);
-  sel.innerHTML = '<option value="">— Unassigned —</option>' +
-    active.map(m=>`<option value="${m.name}">${m.name}</option>`).join('');
-  if(active.some(m=>m.name===prevVal)) sel.value = prevVal;
+  // Both selects list the same people: the activity form's, and the one on the
+  // Accept Request modal's "create a new linked initiative" sub-form.
+  ['fld-assignedTo', 'fld-req-init-assignedTo'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const prevVal = sel.value;
+    sel.innerHTML = '<option value="">— Unassigned —</option>' +
+      active.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
+    if(active.some(m=>m.name===prevVal)) sel.value = prevVal;
+  });
 }
 
 window.renderTeamMembersTable = function() {
@@ -6157,6 +6339,126 @@ window.removeTeamMember = async function(id, authUid, name) {
     await deleteTeamMember(id, authUid || null);
     showToast(`✓ ${name} removed`);
   } catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+
+// ── SETTINGS TAB — Request Accounts ──────────────────────────────────────
+// Shared coordinator logins for request.html. Usernames are shown as the
+// short code people actually type (the real Firebase identity is that code at
+// REQUEST_ACCOUNT_DOMAIN, which request.html appends automatically).
+const revealedReqAcctIds = new Set();
+const shortUsername = u => String(u || '').split('@')[0];
+const requestPageUrl = () => new URL('request.html', location.href).href;
+
+window.renderRequestAccountsTable = function() {
+  const el = document.getElementById('reqacct-table-body');
+  if(!el) return;
+  el.innerHTML = ALL_REQUEST_ACCOUNTS.length
+    ? ALL_REQUEST_ACCOUNTS.map(a => {
+        const shown = revealedReqAcctIds.has(a.id);
+        return `<tr>
+          <td style="font-size:11px;color:var(--text-3)">${esc(a.number)}</td>
+          <td style="font-weight:600">${esc(a.label)}</td>
+          <td style="font-family:monospace;font-size:12px" title="${esc(a.username)}">${esc(shortUsername(a.username))}</td>
+          <td style="font-family:monospace;font-size:12px">${shown ? esc(a.password) : '••••••••••'}
+            <button class="btn btn-sm" style="margin-left:6px" onclick="toggleReqAcctPw('${a.id}')">${shown ? 'Hide' : 'Show'}</button></td>
+          <td class="row-actions">
+            <button class="btn btn-sm" onclick="copyReqAcct('${a.id}')">Copy</button>
+            <button class="btn btn-sm btn-danger" onclick="removeRequestAccount('${a.id}')">Delete</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" class="empty">No request accounts yet — click "Generate Accounts"</td></tr>';
+}
+
+window.toggleReqAcctPw = function(id) {
+  if(revealedReqAcctIds.has(id)) revealedReqAcctIds.delete(id); else revealedReqAcctIds.add(id);
+  renderRequestAccountsTable();
+}
+
+window.copyReqAcct = async function(id) {
+  const a = ALL_REQUEST_ACCOUNTS.find(x => x.id === id);
+  if(!a) return;
+  try {
+    await navigator.clipboard.writeText(`Request form: ${requestPageUrl()}\nUsername: ${shortUsername(a.username)}\nPassword: ${a.password}`);
+    showToast('✓ Login details copied');
+  } catch(e) { showToast('Could not copy — use Show and copy by hand', true); }
+}
+
+window.removeRequestAccount = async function(id) {
+  const a = ALL_REQUEST_ACCOUNTS.find(x => x.id === id);
+  if(!a) return;
+  if(!confirm(`Delete "${a.label}" (${shortUsername(a.username)})? Whoever holds this login loses access immediately. Requests it already submitted stay on file. (Its raw record stays in Firebase Console → Authentication — remove it there too for full removal.)`)) return;
+  try {
+    await deleteRequestAccount(id);
+    revealedReqAcctIds.delete(id);
+    showToast(`✓ ${a.label} deleted`);
+  } catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+
+function exportCredentialsSheet(accounts) {
+  const rows = accounts.map(a => ({
+    '#': a.number,
+    Label: a.label,
+    Username: shortUsername(a.username),
+    Password: a.password,
+    'Request Form': requestPageUrl(),
+    'Handed To (fill in)': '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:4},{wch:18},{wch:16},{wch:14},{wch:48},{wch:24}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
+  XLSX.writeFile(wb, `request-accounts-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+window.downloadRequestCredentials = function() {
+  if(!ALL_REQUEST_ACCOUNTS.length) { showToast('No request accounts yet', true); return; }
+  exportCredentialsSheet(ALL_REQUEST_ACCOUNTS);
+  showToast(`✓ Credentials sheet downloaded (${ALL_REQUEST_ACCOUNTS.length} accounts) — it contains plain-text passwords, keep it private`);
+}
+
+window.openReqAcctForm = function() {
+  document.getElementById('reqacct-progress').style.display = 'none';
+  document.getElementById('reqacct-result').style.display = 'none';
+  document.getElementById('reqacct-go-btn').disabled = false;
+  document.getElementById('reqacct-overlay').classList.add('open');
+}
+window.closeReqAcctForm = function() {
+  document.getElementById('reqacct-overlay').classList.remove('open');
+}
+
+window.runGenerateRequestAccounts = async function() {
+  const count = parseInt(document.getElementById('reqacct-count').value, 10);
+  if(!(count >= 1 && count <= 50)) { showToast('Enter a number between 1 and 50', true); return; }
+  if(!confirm(`Create ${count} new request account${count===1?'':'s'}? This creates real logins immediately.`)) return;
+
+  const btn = document.getElementById('reqacct-go-btn');
+  const progress = document.getElementById('reqacct-progress');
+  const resultEl = document.getElementById('reqacct-result');
+  btn.disabled = true;
+  resultEl.style.display = 'none';
+  progress.style.display = 'block';
+  progress.textContent = 'Creating accounts… 0 / ' + count;
+
+  const startNumber = ALL_REQUEST_ACCOUNTS.reduce((max, a) => Math.max(max, a.number || 0), 0) + 1;
+  try {
+    const results = await createRequestAccounts({
+      count, startNumber, createdBy: currentAdminEmail,
+      onProgress: (done, total) => { progress.textContent = `Creating accounts… ${done} / ${total}`; },
+    });
+    const ok = results.filter(r => r.ok), failed = results.filter(r => !r.ok);
+    progress.style.display = 'none';
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = `<div style="color:var(--green);font-weight:600">✓ ${ok.length} account${ok.length===1?'':'s'} created${ok.length ? ' — the credentials sheet is downloading' : ''}.</div>`
+      + (failed.length ? `<div style="color:var(--red);margin-top:8px"><strong>${failed.length} failed:</strong><br>${failed.map(f => `#${f.number}: ${esc(f.error)}`).join('<br>')}</div>` : '')
+      + `<div style="color:var(--text-3);margin-top:8px">You can see them all (and re-download the sheet) in the table below at any time.</div>`;
+    if(ok.length) exportCredentialsSheet(ok);
+  } catch(e) {
+    progress.style.display = 'none';
+    showToast('Generation failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── SETTINGS TAB — Entities Management ───────────────────────────────────
@@ -8118,11 +8420,13 @@ function computeAndPublishLeadStats() {
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
-function showToast(msg, isError=false) {
+let _toastTimer = null;
+function showToast(msg, isError=false, ms=2500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show' + (isError ? ' error' : '');
-  setTimeout(()=>t.className='toast', 2500);
+  clearTimeout(_toastTimer); // so an earlier toast's timer can't cut a newer one short
+  _toastTimer = setTimeout(()=>t.className='toast', ms);
 }
 </script>
 </body>

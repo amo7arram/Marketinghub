@@ -716,17 +716,30 @@ export function reviewRequest(id, data) {
 
 export const DAILY_REQUEST_LIMIT = 5;
 
-// Returns how many requests this email has submitted since midnight today
-export async function getTodayRequestCount(email) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0,0,0,0);
-  const q = query(
-    collection(db, REQUESTS),
-    where("submittedBy", "==", email),
-    where("createdAt", ">=", Timestamp.fromDate(startOfDay))
-  );
-  const snap = await getDocs(q);
-  return snap.size;
+// Rolling 24-hour window (not "since midnight"): a request stops counting
+// exactly 24h after it was submitted, so there is no midnight cliff where a
+// user could burn 5 at 23:59 and 5 more at 00:01. Counts every request still
+// on file regardless of status, so withdrawing one doesn't hand the slot
+// back (an admin deleting one does — an accepted gap, see DATA_MODEL.md).
+// `nextSlotAt` (ms) is only set when the limit is reached: when the oldest
+// counted request ages out.
+export function computeRequestQuota(createdAtMillis, now = Date.now()) {
+  const windowMs = 24 * 60 * 60 * 1000;
+  const recent = createdAtMillis.filter(t => t && t > now - windowMs).sort((a, b) => a - b);
+  const used = recent.length;
+  return {
+    used,
+    limit: DAILY_REQUEST_LIMIT,
+    remaining: Math.max(0, DAILY_REQUEST_LIMIT - used),
+    nextSlotAt: used >= DAILY_REQUEST_LIMIT ? recent[used - DAILY_REQUEST_LIMIT] + windowMs : null,
+  };
+}
+
+// Single-field query (submittedBy only) filtered client-side — the old
+// submittedBy + createdAt range query needed a composite index.
+export async function getRequestQuota(email) {
+  const snap = await getDocs(query(collection(db, REQUESTS), where("submittedBy", "==", email)));
+  return computeRequestQuota(snap.docs.map(d => d.data().createdAt?.toMillis?.() || 0));
 }
 
 export const REQUEST_TYPES = [
@@ -737,7 +750,10 @@ export const REQUEST_TYPES = [
 ];
 export const PRIORITIES = ["Normal","High","Urgent"];
 
-export const REQUEST_STATUSES = ["Pending", "Accepted", "Rejected"];
+// Pending → (Needs Info ⇄ Pending) → Accepted | Rejected; Withdrawn is the
+// requester pulling it back. "In production"/"Delivered" are deliberately NOT
+// stored — they're read live from the linked initiative's own status.
+export const REQUEST_STATUSES = ["Pending", "Needs Info", "Accepted", "Rejected", "Withdrawn"];
 export const REQUEST_REJECTION_REASONS = [
   "Insufficient Detail / Needs Clarification", "Outside Marketing Scope", "Duplicate Request",
   "Budget Not Available", "Lower Priority Than Current Workload",
@@ -754,6 +770,110 @@ export function watchMyRequests(email, callback) {
     data.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
     callback(data);
   });
+}
+
+// The only two writes a coordinator is allowed to make to a request after
+// creating it — firestore.rules permits exactly these field sets and nothing
+// else, so keep the written keys in sync with the rule.
+export function withdrawRequest(id) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Withdrawn", withdrawnAt: Timestamp.now() });
+}
+export function replyToInfoRequest(id, text) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Pending", infoReply: text, infoRepliedAt: Timestamp.now() });
+}
+
+// ── REQUEST ACCOUNTS (shared department logins for request.html) ─────────
+// Generic coordinator logins with random credentials, deliberately not named
+// after departments — any of them can file a request for any department.
+// Each is a normal Firebase Auth account + roles/{uid} {role:'coordinator'}.
+// The credentials are ALSO stored (plain text, request_accounts/{uid}) so an
+// admin can look them up and re-export the sheet later; that collection is
+// admin-only in firestore.rules, and it is deliberately NOT in team_members,
+// which every signed-in user could otherwise read.
+const REQUEST_ACCOUNTS = "request_accounts";
+export const REQUEST_ACCOUNT_DOMAIN = "requests.imc.med.sa";
+const CRED_USER_CHARS = "abcdefghjkmnpqrstuvwxyz23456789";                          // no 0/o/1/l/i
+const CRED_PASS_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";   // no 0/O/1/l/I
+
+// Rejection sampling so every character is equally likely (no modulo bias).
+function randomString(chars, len) {
+  const limit = Math.floor(256 / chars.length) * chars.length;
+  const out = [];
+  while (out.length < len) {
+    for (const b of crypto.getRandomValues(new Uint8Array(len * 2))) {
+      if (b < limit && out.length < len) out.push(chars[b % chars.length]);
+    }
+  }
+  return out.join('');
+}
+
+export function generateRequestCredentials() {
+  return {
+    username: `rq-${randomString(CRED_USER_CHARS, 6)}@${REQUEST_ACCOUNT_DOMAIN}`,
+    password: randomString(CRED_PASS_CHARS, 10),
+  };
+}
+
+export function watchRequestAccounts(callback) {
+  return onSnapshot(collection(db, REQUEST_ACCOUNTS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a, b) => (a.number || 0) - (b.number || 0));
+    callback(data);
+  }, err => { console.error('watchRequestAccounts:', err.code); callback([]); });
+}
+
+// Creates `count` accounts one after another (sequential on purpose — gentler
+// on Firebase Auth's signup rate limiting than firing 20 at once), using a
+// secondary app instance each time so the admin's own session is untouched.
+// Never throws for a single failed account — returns a per-account result
+// list so a partial batch is reported honestly instead of lost.
+export async function createRequestAccounts({ count, startNumber, createdBy, onProgress }) {
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    const number = startNumber + i;
+    let created = null, lastErr = null;
+    for (let attempt = 0; attempt < 3 && !created; attempt++) {
+      const { username, password } = generateRequestCredentials();
+      const secondaryApp = initializeApp(firebaseConfig, `reqacct-${Date.now()}-${i}-${attempt}`);
+      try {
+        const secondaryAuth = getAuth(secondaryApp);
+        const cred = await createUserWithEmailAndPassword(secondaryAuth, username, password);
+        created = { uid: cred.user.uid, username, password };
+        await signOut(secondaryAuth);
+      } catch (e) {
+        lastErr = e;
+        if (e.code !== 'auth/email-already-in-use') break; // only a username collision is worth retrying
+      } finally {
+        await deleteApp(secondaryApp);
+      }
+    }
+    if (!created) {
+      results.push({ ok: false, number, error: lastErr?.message || 'Could not create account' });
+    } else {
+      try {
+        await setDoc(doc(db, "roles", created.uid), { role: "coordinator", requestAccount: true });
+        await setDoc(doc(db, REQUEST_ACCOUNTS, created.uid), {
+          number, label: `Request User ${String(number).padStart(2, '0')}`,
+          username: created.username, password: created.password,
+          createdBy: createdBy || '', createdAt: Timestamp.now(),
+        });
+        results.push({ ok: true, number, label: `Request User ${String(number).padStart(2, '0')}`, username: created.username, password: created.password });
+      } catch (e) {
+        results.push({ ok: false, number, error: `Auth account ${created.username} was created but saving it failed: ${e.message}` });
+      }
+    }
+    if (onProgress) onProgress(i + 1, count);
+  }
+  return results;
+}
+
+// Revokes access immediately (the login flow blocks anyone with no roles doc)
+// and removes the stored credentials. The raw Firebase Auth user stays —
+// client code can only delete the currently signed-in user — so for full
+// removal also delete it in Firebase Console → Authentication.
+export async function deleteRequestAccount(uid) {
+  await deleteDoc(doc(db, "roles", uid));
+  await deleteDoc(doc(db, REQUEST_ACCOUNTS, uid));
 }
 
 // One-time migration for requests created before the accept/reject workflow

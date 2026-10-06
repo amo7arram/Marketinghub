@@ -226,17 +226,39 @@ Marketing requests submitted by coordinators via `request.html`, reviewed (accep
 | `type` | string | From `REQUEST_TYPES` constant |
 | `deadline` | string | |
 | `priority` | string | From `PRIORITIES` constant — `Normal`/`High`/`Urgent` (previously documented here as including `Low`, which doesn't exist in the actual constant) |
-| `status` | string | One of `REQUEST_STATUSES` (`firebase-data.js`): `Pending`, `Accepted`, `Rejected` |
+| `submittedBy` | string | The submitter's Firebase Auth email — set by the form, and **pinned by the Firestore create rule to the caller's real `request.auth.token.email`**, so it can't be forged. This is what scopes a coordinator's view and their 5-per-24h quota. |
+| `status` | string | One of `REQUEST_STATUSES` (`firebase-data.js`): `Pending`, `Needs Info`, `Accepted`, `Rejected`, `Withdrawn`. Created as `Pending` (the rule insists). "In production"/"Delivered" are deliberately not statuses — they're read live from the linked initiative. |
+| `handledBy` / `handledByUid` | string \| null | The admin handling this request: set by "Take it"/"Take over", or stamped automatically on Accept/Reject/Needs Info if nobody has claimed it (an existing handler is never overwritten by those). Admin-only fields (not in the create whitelist). Shown to the requester as "Handled by". |
+| `infoRequest` | string \| null | The admin's question, when `status === "Needs Info"` |
+| `infoReply` / `infoRepliedAt` | string / Timestamp \| null | The requester's answer; written by the requester via `replyToInfoRequest()`, which also flips `status` back to `Pending`. A re-ask clears them. Only the latest question/answer is kept — no thread history. |
+| `withdrawnAt` | Timestamp | Set when the requester withdraws (only possible from Pending/Needs Info) |
 | `rejectionReason` | string \| null | From `REQUEST_REJECTION_REASONS`, only meaningful when `status === "Rejected"` |
 | `rejectionNote` | string | Optional free-text elaboration alongside `rejectionReason` |
 | `linkedInitiativeId` | string \| null | Raw `initiatives` doc id, or `null` — same convention as `marketing_actions.linkedInitiativeId`. Set either by auto-creating a new initiative at Accept time, or by linking to an existing one. **No referential integrity** (same accepted gap as `marketing_actions`/`leads.campaignId`) — deleting the linked initiative leaves this dangling; both `admin.html` and `request.html`'s "My Requests" view render an explicit "(deleted)" label rather than going silently blank. |
 | `linkedInitiativeTitle` | string \| null | Denormalized display title. The *live* status shown anywhere is always a fresh lookup against `initiatives`, never a stored/denormalized status field. |
 | `reviewedAt` | Timestamp | Set when an admin accepts or rejects |
 | `reviewedBy` | string | Admin's email |
-| `createdAt` | Timestamp | Used to enforce `DAILY_REQUEST_LIMIT` per submitter |
+| `createdAt` | Timestamp | Drives the rolling-24h `DAILY_REQUEST_LIMIT` (5) per `submittedBy` — see `computeRequestQuota()`. Client-side only (Firestore rules can't count); an admin deleting a request frees one slot, withdrawing does not. |
 | `done` | boolean | ⚠️ Legacy — predates `status`. Requests created before the accept/reject workflow existed only ever had this boolean. `migrateLegacyRequestStatuses()` converts them one time (`done:true`→`Accepted`, `done:false`/missing→`Pending`); until migrated, `requestStatusOf()` in `admin.html` interprets `done` on the fly so old rows still render correctly. |
 
-The submitting coordinator can see their own requests and their live status/outcome via `request.html`'s "My Requests" panel (`watchMyRequests(email, ...)`, scoped client-side by `submittedBy` — the Firestore rule itself is the same blanket authenticated-read as every other internal collection, not a per-document restriction; see `docs/ARCHITECTURE.md` §4.2).
+The submitting coordinator can see their own requests and their live status/outcome via `request.html`'s "My Requests" panel (`watchMyRequests(email, ...)`). **That scoping is now enforced by the Firestore rule**, not just the query: a coordinator may only read documents whose `submittedBy` equals their own login email. The same rule limits what they can create (fixed field whitelist, `Pending` only) and update (withdraw, or answer a Needs Info question — nothing else); see `docs/ARCHITECTURE.md` §4.9.
+
+---
+
+## `request_accounts`
+
+The ~20 shared coordinator logins for `request.html`, managed in admin.html → Settings → Request Accounts. **Doc ID = the Firebase Auth UID** (deterministic, `setDoc`). **Admin-only** in `firestore.rules` — it holds plain-text passwords, so never move this data anywhere a coordinator can read.
+
+| Field | Type | Notes |
+|---|---|---|
+| `number` | number | Sequence number; new batches continue from the highest existing one |
+| `label` | string | `Request User 07` — deliberately not a department name |
+| `username` | string | Full Firebase identity, `rq-xxxxxx@requests.imc.med.sa`. Shown/typed as just the `rq-xxxxxx` part |
+| `password` | string | Plain text, 10 random chars — stored so admins can re-read it and re-export the credentials sheet |
+| `createdBy` | string | Admin's email |
+| `createdAt` | Timestamp | |
+
+Each account also has `roles/{uid} = { role: "coordinator", requestAccount: true }` (the extra flag is informational — nothing keys off it). Deleting an account removes both documents; the raw Firebase Auth user is not deleted (client code can't), so remove it in Console → Authentication for a full cleanup.
 
 ---
 

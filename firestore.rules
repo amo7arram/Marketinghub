@@ -5,93 +5,175 @@ rules_version = '2';
 // CLI deploy wired up for this repo, so this file and Console must be kept
 // in sync manually; see docs/ARCHITECTURE.md §4.2).
 //
-// Two patterns are used throughout (see CLAUDE.md):
-//   - Public read, authenticated write: anything the public portal (index.html)
-//     needs to display, or that must be readable *before* a user logs in
-//     (e.g. the public access gate password hash).
-//   - Authenticated read and write: PII or internal-only data.
+// ROLE-BASED, not just "signed in". Every real account has a roles/{uid}
+// document ('admin' | 'agent' | 'coordinator') and these rules check it.
+// This matters since request.html was rolled out to ~20 shared department
+// logins (role 'coordinator'): under the previous "any signed-in user"
+// rules, any of them could have read every lead (PII), the Anthropic API
+// key and Metricool token, and could have edited or deleted initiatives and
+// other people's requests straight from the browser console. Now:
+//   - admin       → everything
+//   - agent       → leads (read/update) only — what call-center.html uses
+//   - coordinator → create + read their OWN requests, withdraw/answer their
+//                   own, read their own roles doc. Nothing else.
+//   - nobody (public pages) → only the explicit public-read documents below
+// An account with NO roles document gets nothing beyond the public reads.
+//
+// Patterns:
+//   - Public read, ADMIN write: anything the public portal (index.html) shows
+//     or that must be readable before login (e.g. the access gate hash).
+//   - Admin only: PII, secrets, and internal-only data.
 //
 // `config` is a single collection holding several unrelated documents
 // (see docs/DATA_MODEL.md's "config" section) — each one needs its own
 // explicit rule below. A blanket `match /config/{doc}` rule is exactly the
 // bug that exposed the Anthropic API key earlier: Firestore rules are OR'd
 // across every matching block, so a blanket public-read rule silently wins
-// over a more specific authenticated-only rule for the same path. Never
+// over a more specific admin-only rule for the same path. Never
 // reintroduce a blanket config rule — add a new document below instead.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── PUBLIC READ, AUTHENTICATED WRITE ─────────────────────────────────
+    // ── ROLE HELPERS ─────────────────────────────────────────────────────
+    function hasRole(r) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/roles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == r;
+    }
+    function isAdmin()       { return hasRole('admin'); }
+    function isAgent()       { return hasRole('agent'); }
+    function isCoordinator() { return hasRole('coordinator'); }
+
+    // ── PUBLIC READ, ADMIN WRITE ─────────────────────────────────────────
     match /initiatives/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /metrics/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /resources/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /offers_catalog/{doc} {
-      // Excel-driven public price/discount catalog — replaces the retired
-      // promotions feature below. Only an authenticated admin ever writes
-      // (via the admin.html import), so this needs none of landing.html's
-      // anonymous-create complexity — plain public-read/authenticated-write.
+      // Excel-driven public price/discount catalog — only an admin ever
+      // writes it (via the admin.html import).
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /promotions/{doc} {
       // ⚠️ Legacy — retired, superseded by offers_catalog above. Rule left
-      // in place only so existing historical documents remain readable by
-      // an authenticated admin if ever needed; no UI writes here anymore.
+      // in place only so existing historical documents remain readable; no
+      // UI writes here anymore.
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /bd_cards/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /wellspan_packages/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /loyalty_cards/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /entities/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /health_days/{doc} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
 
-    // ── AUTHENTICATED READ AND WRITE (PII / internal-only) ───────────────
+    // ── REQUESTS — the coordinator-facing collection ─────────────────────
+    // A coordinator sees only requests they submitted (matched on the
+    // submittedBy email, which they can't forge on create — see below).
+    // watchMyRequests()/getRequestQuota() query `where submittedBy == email`,
+    // which is exactly what makes this rule satisfiable for a list query.
     match /requests/{doc} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if isAdmin()
+        || (isCoordinator() && resource.data.submittedBy == request.auth.token.email);
+
+      // Field-whitelisted, always Pending, always stamped with the real
+      // caller's own email — so a coordinator can't file as someone else,
+      // pre-accept their own request, or smuggle in admin-only fields
+      // (handledBy, reviewedBy, rejectionReason, …).
+      allow create: if (isAdmin() || isCoordinator())
+        && request.resource.data.submittedBy == request.auth.token.email
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.keys().hasOnly([
+             'requesterName','email','title','department','type','entity','targetAudience',
+             'description','referenceLink','deadline','priority','submittedBy','status','createdAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 300
+        && request.resource.data.description is string && request.resource.data.description.size() <= 5000
+        && request.resource.data.entity is list
+        && request.resource.data.priority in ['Normal','High','Urgent'];
+
+      // Admins can change anything. A coordinator can do exactly two things
+      // to their own request, nothing else: withdraw it (only while it's
+      // still Pending or Needs Info), or answer an admin's Needs Info
+      // question (which puts it back to Pending). Keep these field sets in
+      // sync with withdrawRequest()/replyToInfoRequest() in firebase-data.js.
+      allow update: if isAdmin()
+        || (isCoordinator() && resource.data.submittedBy == request.auth.token.email && (
+             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','withdrawnAt'])
+               && request.resource.data.status == 'Withdrawn'
+               && resource.data.status in ['Pending','Needs Info'])
+             ||
+             (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','infoReply','infoRepliedAt'])
+               && resource.data.status == 'Needs Info'
+               && request.resource.data.status == 'Pending'
+               && request.resource.data.infoReply is string
+               && request.resource.data.infoReply.size() > 0
+               && request.resource.data.infoReply.size() <= 2000)
+           ));
+
+      allow delete: if isAdmin();
     }
+
+    // ── ADMIN ONLY (PII / secrets / internal) ────────────────────────────
     match /expenses/{doc} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
     match /social_comments/{doc} {
       // Comments/reviews pulled from Metricool's Inbox API, sentiment-
-      // classified by Claude. Authenticated-only by product decision, not a
+      // classified by Claude. Admin-only by product decision, not a
       // technical PII rule — the content was posted publicly, but some of
-      // it is patient-adjacent complaints, so it's admin-only and never
-      // read by any public page.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      // it is patient-adjacent complaints, so it's never read by any public
+      // page.
+      allow read, write: if isAdmin();
     }
+    match /team_members/{doc} {
+      allow read, write: if isAdmin();
+    }
+    match /marketing_actions/{doc} {
+      // Executive/marketing action-item tracker — admin.html's tab and the
+      // read-only actions.html leadership view both run on an admin session.
+      allow read, write: if isAdmin();
+    }
+    match /request_accounts/{uid} {
+      // Plain-text credentials of the shared coordinator logins, kept so an
+      // admin can look them up / re-export the sheet. MUST stay admin-only —
+      // never move this into team_members or any collection a coordinator
+      // can read, or every department could read every other's password.
+      allow read, write: if isAdmin();
+    }
+
+    // ── LEADS ─────────────────────────────────────────────────────────────
     match /leads/{doc} {
-      allow read: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      // Agents (call-center.html) read and update leads; only admins create
+      // or delete them directly.
+      allow read: if isAdmin() || isAgent();
+      allow update: if isAdmin() || isAgent();
+      allow delete: if isAdmin();
       // First unauthenticated write path in this app: a landing.html visitor
       // is nobody, not even a coordinator, so lead capture there can't
       // require auth. Narrowly scoped — fixed source/contactStatus/outcome
@@ -104,7 +186,7 @@ service cloud.firestore {
       // not a hard boundary" tradeoff already accepted for the Public
       // Access Gate (see ARCHITECTURE.md §4.5). See ARCHITECTURE.md for the
       // full writeup of this exception.
-      allow create: if request.auth != null || (
+      allow create: if isAdmin() || (
         request.resource.data.source == 'Landing Page' &&
         request.resource.data.contactStatus == 'Untouched' &&
         request.resource.data.outcome == 'Pending' &&
@@ -118,99 +200,76 @@ service cloud.firestore {
       // Anonymous visitors may fetch exactly one Published page by known
       // slug (landing.html), never list the collection — so Draft titles/
       // content stay invisible and a slug can't be discovered by browsing.
-      allow get: if resource.data.status == 'Published' || request.auth != null;
-      allow list: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-    match /team_members/{doc} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-    match /marketing_actions/{doc} {
-      // Executive/marketing action-item tracker — both admin.html's tab and
-      // the read-only actions.html leadership view sit behind a real
-      // Firebase Auth email/password login, so authenticated read/write is
-      // correct here — no public-read needed, unlike initiatives.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow get: if resource.data.status == 'Published' || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
     }
 
-    // ── ROLES — write restricted to existing admins only ─────────────────
+    // ── ROLES — read your own doc (or any, if admin); write admin only ───
     match /roles/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null &&
-        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
     }
 
     // ── CONFIG — one explicit rule per document, never a blanket rule ────
     match /config/access_gate {
       // Must be public-read: index.html checks this gate before login exists.
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     // config/admin_passcode — the admin "Magic Word" passcode login was
     // removed once every admin had an individual email/password account
     // (see docs/ARCHITECTURE.md §4.4). No rule is defined, so the abandoned
     // document (if still present in Firestore) is now default-deny.
     match /config/advisor_brief {
-      // Authenticated-only — the AI advisor briefing is derived from leads
-      // (PII-adjacent) and internal performance data; never public-read.
-      // Any admin can regenerate it.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      // Derived from leads (PII-adjacent) and internal performance data.
+      allow read, write: if isAdmin();
     }
     match /config/sentiment_stats {
-      // Authenticated-only — same reasoning as social_comments above.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      // Same reasoning as social_comments above.
+      allow read, write: if isAdmin();
     }
     match /config/lead_stats {
       // Public-readable aggregate, zero PII by design (see DATA_MODEL.md).
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /config/metricool_stats {
       // Public-readable aggregate, zero PII by design (see DATA_MODEL.md).
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /config/analytics_settings {
-      // Public-read like the two above — a GA4 Measurement ID isn't a
-      // secret, landing.html (unauthenticated) needs to read it.
+      // Public-read — a GA4 Measurement ID isn't a secret, landing.html
+      // (unauthenticated) needs to read it.
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /config/offers_catalog_meta {
       // Public-readable — lists which offers_catalog branch documents exist
       // so offers.html can fetch them without listing the whole collection.
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
     match /config/budget {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
     match /config/bd_targets {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
     match /config/brand_voice {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
     match /config/ai_settings {
       // Raw Anthropic API key — same sensitivity as metricool_settings below.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
     match /config/metricool_settings {
       // Raw Metricool API token — same sensitivity as ai_settings above.
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
     match /config/department_revenue_estimates {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read, write: if isAdmin();
     }
   }
 }
