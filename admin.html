@@ -149,6 +149,24 @@ tr.row-overdue:hover td{background:#FFD6D6}
 .cgen-section-label{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:20px 0 10px}
 .field-section-title:first-child{margin-top:0;padding-top:0;border-top:none}
 .empty{text-align:center;padding:40px;color:var(--text-3);font-size:12px}
+/* REQUEST DETAIL SIDE PANEL — same look as the public portal's campaign detail panel */
+.rd-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.45);z-index:60;backdrop-filter:blur(2px)}
+.rd-overlay.open{display:block}
+.rd-panel{position:fixed;right:0;top:0;bottom:0;width:560px;max-width:100vw;background:var(--surface);box-shadow:-8px 0 40px rgba(15,20,35,0.2);z-index:61;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.4,0,0.2,1)}
+.rd-panel.open{transform:translateX(0)}
+.rd-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-shrink:0}
+.rd-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--text);line-height:1.25;word-break:break-word}
+.rd-close{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:14px;color:var(--text-3);flex-shrink:0}
+.rd-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.rd-body{flex:1;overflow-y:auto;padding:20px 24px}
+.rd-section{margin-bottom:22px}
+.rd-section-title{font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.rd-row{display:flex;gap:10px;margin-bottom:8px;font-size:12px}
+.rd-label{min-width:110px;color:var(--text-3);font-weight:500}
+.rd-val{color:var(--text);font-weight:500;flex:1;word-break:break-word}
+.rd-text{font-size:13px;color:var(--text-2);line-height:1.65;white-space:pre-wrap;word-break:break-word;background:var(--bg);border-radius:var(--radius);padding:12px 14px}
+.rd-more{color:var(--navy);font-weight:600;cursor:pointer;white-space:nowrap}
+.rd-more:hover{text-decoration:underline}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:8px;font-size:12px;box-shadow:var(--shadow-lg);z-index:200;display:none}
 .toast.show{display:block}
 .toast.error{background:var(--red)}
@@ -662,9 +680,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <table>
         <thead><tr>
           <th onclick="toggleReqSort()" style="cursor:pointer;user-select:none">Submitted <span id="req-sort-arrow">↓</span></th>
-          <th>By</th><th>Requester</th><th>Title</th><th>Department</th><th>Entity</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th>Status</th><th>Handled By</th><th>Linked Initiative</th><th></th>
+          <th>Requester</th><th>Title</th><th>Department</th><th>Entity</th><th>Type</th><th>Priority</th><th>Deadline</th><th>Description</th><th>Status</th><th>Handled By</th><th>Linked Initiative</th><th></th>
         </tr></thead>
-        <tbody id="requests-table-body"><tr><td colspan="14" class="empty">Loading...</td></tr></tbody>
+        <tbody id="requests-table-body"><tr><td colspan="13" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
 
@@ -1342,6 +1360,16 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <button class="btn btn-primary" onclick="saveRequestAccept()">Accept Request</button>
     </div>
   </div>
+</div>
+
+<!-- ── REQUEST DETAIL SIDE PANEL ── -->
+<div class="rd-overlay" id="rd-overlay" onclick="closeRequestDetail()"></div>
+<div class="rd-panel" id="rd-panel">
+  <div class="rd-header">
+    <div><div class="rd-title" id="rd-title">Request</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap" id="rd-badges"></div></div>
+    <button class="rd-close" onclick="closeRequestDetail()" title="Close (Esc)">✕</button>
+  </div>
+  <div class="rd-body" id="rd-body"></div>
 </div>
 
 <!-- ── REQUEST NEEDS-INFO MODAL ── -->
@@ -2088,7 +2116,7 @@ function initData() {
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); renderCampaignPerformance(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
-  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); });
+  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); if(currentRequestDetailId) renderRequestDetail(); });
   unsubRequestAccounts = watchRequestAccounts(data => { ALL_REQUEST_ACCOUNTS = data; renderRequestAccountsTable(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
   unsubOffersCatalogMeta = watchOffersCatalogMeta(data => { OFFERS_CATALOG_META = data; renderOffersCatalogStatus(); });
@@ -4624,16 +4652,15 @@ window.renderRequestsTable = function() {
         if (status === 'Rejected' && r.rejectionReason) {
           statusCell += `<br><span style="font-size:10px;color:var(--text-3)">${esc(r.rejectionReason)}${r.rejectionNote?': '+esc(r.rejectionNote):''}</span>`;
         } else if (status === 'Needs Info' && r.infoRequest) {
-          statusCell += `<br><span style="font-size:10px;color:var(--text-3)">Asked: ${esc(r.infoRequest)}</span>`;
+          statusCell += `<br><span style="font-size:10px;color:var(--text-3)">Asked: ${previewWithMore(r.infoRequest, 80, r.id)}</span>`;
         } else if (status === 'Pending' && r.infoReply) {
-          statusCell += `<br><span style="font-size:10px;color:#1A4FA0">💬 Replied: ${esc(r.infoReply)}</span>`;
+          statusCell += `<br><span style="font-size:10px;color:#1A4FA0">💬 Replied: ${previewWithMore(r.infoReply, 80, r.id)}</span>`;
         }
         const handledCell = r.handledBy
           ? `<strong>${esc(r.handledBy)}</strong>${r.handledByUid && r.handledByUid === currentAdminUid ? ' <span style="color:var(--text-3)">(you)</span>' : ''}`
           : `<span style="color:var(--text-3)">— nobody yet —</span>`;
         return `<tr>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${submitted}</td>
-          <td style="font-size:11px;color:var(--text-3)">${esc(r.submittedBy)||'—'}</td>
           <td style="font-size:11px">${esc(r.requesterName)||'—'}${r.email?`<br><span style="color:var(--text-3)">${esc(r.email)}</span>`:''}</td>
           <td style="font-weight:600">${esc(r.title)}</td>
           <td>${esc(r.department)}</td>
@@ -4641,14 +4668,97 @@ window.renderRequestsTable = function() {
           <td style="font-size:11px">${esc(r.type)}</td>
           <td><span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${esc(r.priority||'Normal')}</span></td>
           <td style="font-size:11px;color:var(--text-3)">${esc(r.deadline)||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3);max-width:200px">${esc(r.description)}</td>
+          <td style="font-size:11px;color:var(--text-3);min-width:200px;max-width:260px;word-break:break-word">${previewWithMore(r.description, REQ_PREVIEW_CHARS, r.id)}</td>
           <td style="font-size:11px">${statusCell}</td>
           <td style="font-size:11px">${handledCell}</td>
           <td style="font-size:11px">${linkCell}</td>
           <td class="row-actions">${actions}</td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="14" class="empty">No requests found</td></tr>';
+    : '<tr><td colspan="13" class="empty">No requests found</td></tr>';
+}
+
+// ── Request detail side panel ──
+// The table keeps long free-text to a short preview so rows stay readable;
+// the full request opens here. Same slide-in pattern as the public portal's
+// campaign detail panel.
+const REQ_PREVIEW_CHARS = 150;
+
+// First `limit` characters (counted by real characters, so an emoji or Arabic
+// letter is never cut in half), then a "more" link that opens the panel.
+function previewWithMore(text, limit, id) {
+  const chars = Array.from(String(text ?? ''));
+  if(chars.length <= limit) return esc(chars.join(''));
+  return `${esc(chars.slice(0, limit).join('').trimEnd())}… <a class="rd-more" onclick="openRequestDetail('${id}')">more</a>`;
+}
+
+let currentRequestDetailId = null;
+const fmtReqTs = ts => ts?.toDate ? ts.toDate().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+window.openRequestDetail = function(id) {
+  currentRequestDetailId = id;
+  renderRequestDetail();
+  document.getElementById('rd-overlay').classList.add('open');
+  document.getElementById('rd-panel').classList.add('open');
+}
+window.closeRequestDetail = function() {
+  currentRequestDetailId = null;
+  document.getElementById('rd-overlay').classList.remove('open');
+  document.getElementById('rd-panel').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && currentRequestDetailId) closeRequestDetail(); });
+
+// Re-rendered on every live update while open, so a status change made
+// elsewhere (or by the requester) shows up without reopening it.
+function renderRequestDetail() {
+  const r = ALL_REQUESTS.find(x => x.id === currentRequestDetailId);
+  if(!r) { closeRequestDetail(); return; } // deleted while open
+  const status = requestStatusOf(r);
+  const row = (label, valueHtml) => `<div class="rd-row"><span class="rd-label">${label}</span><span class="rd-val">${valueHtml}</span></div>`;
+  // Coordinator-supplied URL: only http(s) becomes a link — never javascript: etc.
+  const ref = r.referenceLink
+    ? (/^https?:\/\//i.test(r.referenceLink) ? `<a href="${esc(r.referenceLink)}" target="_blank" rel="noopener noreferrer" style="color:var(--navy)">${esc(r.referenceLink)}</a>` : esc(r.referenceLink))
+    : '—';
+  const info = r.linkedInitiativeId ? initiativeInfoFor(r.linkedInitiativeId) : null;
+  const linked = !r.linkedInitiativeId ? '—'
+    : info ? `${esc(info.title)} <span class="badge ${STATUS_CLASS[info.status]||'b-planned'}">${esc(info.status)}</span>`
+    : `<s>${esc(r.linkedInitiativeTitle||'Untitled')}</s> <span style="color:var(--text-3)">(deleted)</span>`;
+
+  document.getElementById('rd-title').textContent = r.title || 'Request';
+  document.getElementById('rd-badges').innerHTML =
+    `<span class="badge ${REQUEST_STATUS_CLASS[status]||'b-planned'}">${esc(status)}</span> <span class="badge ${PRIORITY_CLASS[r.priority]||'b-ready'}">${esc(r.priority||'Normal')}</span>`;
+
+  document.getElementById('rd-body').innerHTML = `
+    <div class="rd-section">
+      <div class="rd-section-title">Request</div>
+      ${row('Requester', esc(r.requesterName)||'—')}
+      ${row('Email', esc(r.email)||'—')}
+      ${row('Submitted via', esc((r.submittedBy||'').split('@')[0])||'—')}
+      ${row('Submitted', fmtReqTs(r.createdAt))}
+      ${row('Department', esc(r.department)||'—')}
+      ${row('Entity', esc((r.entity||[]).join(', '))||'—')}
+      ${row('Type', esc(r.type)||'—')}
+      ${row('Target audience', esc(r.targetAudience)||'—')}
+      ${row('Deadline', esc(r.deadline)||'—')}
+      ${row('Reference link', ref)}
+    </div>
+    <div class="rd-section">
+      <div class="rd-section-title">Description</div>
+      <div class="rd-text">${esc(r.description)||'—'}</div>
+    </div>
+    <div class="rd-section">
+      <div class="rd-section-title">Handling</div>
+      ${row('Handled by', r.handledBy ? esc(r.handledBy) : '<span style="color:var(--text-3)">— nobody yet —</span>')}
+      ${row('Linked initiative', linked)}
+      ${r.reviewedBy ? row('Last reviewed', `${esc(r.reviewedBy)} · ${fmtReqTs(r.reviewedAt)}`) : ''}
+      ${status === 'Rejected' ? row('Rejection', `<strong>${esc(r.rejectionReason||'No reason given')}</strong>${r.rejectionNote?`<br>${esc(r.rejectionNote)}`:''}`) : ''}
+      ${status === 'Withdrawn' ? row('Withdrawn', fmtReqTs(r.withdrawnAt)) : ''}
+    </div>
+    ${(r.infoRequest || r.infoReply) ? `<div class="rd-section">
+      <div class="rd-section-title">Information exchange</div>
+      ${r.infoRequest ? `<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Your question</div><div class="rd-text" style="margin-bottom:12px">${esc(r.infoRequest)}</div>` : ''}
+      ${r.infoReply ? `<div style="font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Their reply · ${fmtReqTs(r.infoRepliedAt)}</div><div class="rd-text">${esc(r.infoReply)}</div>` : ''}
+    </div>` : ''}`;
 }
 
 // ── LANDING PAGES ─────────────────────────────────────────────────────────
