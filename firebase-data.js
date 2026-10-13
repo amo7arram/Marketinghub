@@ -1297,6 +1297,25 @@ export function watchDepartmentRevenueEstimates(callback) {
   );
 }
 
+// ── ENTITY PROFILES (admin-only; the monthly planner's knowledge of each entity) ──
+// Stored as ONE document, config/entity_profiles → { profiles: { "<entity name>": {...} } },
+// keyed by entity NAME because that's how every other collection references an
+// entity. A separate admin-only document rather than fields on `entities`,
+// because `entities` is public-read (the portal lists them) and these briefs —
+// competitors, constraints, partnerships — are internal strategy.
+// Saved with a deep merge so editing one entity never overwrites another's.
+export function watchEntityProfiles(callback) {
+  return onSnapshot(doc(db, CONFIG, "entity_profiles"),
+    snap => callback(snap.exists() ? (snap.data().profiles || {}) : {}),
+    err => { console.error('watchEntityProfiles:', err.code); callback({}); }
+  );
+}
+export function saveEntityProfile(entityName, profile, updatedBy) {
+  return setDoc(doc(db, CONFIG, "entity_profiles"),
+    { profiles: { [entityName]: { ...profile, updatedBy: updatedBy || '', updatedAt: Timestamp.now() } } },
+    { merge: true });
+}
+
 // ── PUBLIC LEAD STATS (aggregated, no PII) ────────────────────────────────
 // Written by the admin app whenever leads change (see admin.html). Stored
 // separately from the leads collection itself so the public portal never

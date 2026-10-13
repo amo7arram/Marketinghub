@@ -229,6 +229,12 @@ service cloud.firestore {
       // Same reasoning as social_comments above.
       allow read, write: if isAdmin();
     }
+    match /config/entity_profiles {
+      // Internal strategy briefs per entity (competitors, constraints,
+      // partnerships) that feed the monthly planner. `entities` itself is
+      // public-read, which is exactly why this lives in its own document.
+      allow read, write: if isAdmin();
+    }
     match /config/lead_stats {
       // Public-readable aggregate, zero PII by design (see DATA_MODEL.md).
       allow read: if true;

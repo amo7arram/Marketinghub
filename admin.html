@@ -1028,6 +1028,54 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <div id="entities-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
         </div>
 
+        <!-- Entity Profiles — what the monthly planner knows about each entity -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">🏢 Entity Profiles</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:16px;line-height:1.6">A brief about each entity — who it serves, what it focuses on, where it is, who it partners with. The monthly activity planner builds its plans from these, so the more specific you are, the less generic the plan. Internal only: never shown on the public site.</div>
+
+          <div id="ep-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px"></div>
+          <div id="ep-legend" style="font-size:10px;color:var(--text-3);margin-bottom:16px">✓ = core fields filled (ready for planning) · ○ = still needs the core fields</div>
+
+          <div id="ep-form" style="display:none" oninput="markEntityProfileDirty()">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+              <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--navy)" id="ep-title"></div>
+              <div style="font-size:10px;color:var(--text-3)" id="ep-updated"></div>
+            </div>
+
+            <div class="field-group"><label class="field-label">Positioning <span style="color:var(--red)">*</span> <span style="color:var(--text-3);font-weight:400;font-size:11px">— what this entity is known for, how it wants to be seen</span></label>
+              <textarea class="field-textarea" id="ep-positioning" maxlength="1200" placeholder="e.g. A full-service hospital known for … / a neighbourhood clinic focused on … "></textarea></div>
+            <div class="field-group"><label class="field-label">Who it serves <span style="color:var(--red)">*</span> <span style="color:var(--text-3);font-weight:400;font-size:11px">— target audiences and what they care about</span></label>
+              <textarea class="field-textarea" id="ep-audience" maxlength="1200" placeholder="e.g. Families in the area, corporate employees, women 25–45, expats … and what drives their choices"></textarea></div>
+            <div class="field-row">
+              <div class="field-group"><label class="field-label">Location &amp; catchment</label>
+                <input class="field-input" id="ep-location" maxlength="300" placeholder="e.g. City, district, mall, who is nearby"></div>
+              <div class="field-group"><label class="field-label">Activities per month <span style="color:var(--red)">*</span> <span style="color:var(--text-3);font-weight:400;font-size:11px">— realistic target</span></label>
+                <input class="field-input" type="number" id="ep-volume" min="0" max="100" placeholder="e.g. 10"></div>
+            </div>
+            <div class="field-group"><label class="field-label">Focus departments <span style="color:var(--red)">*</span> <span style="color:var(--text-3);font-weight:400;font-size:11px">— where this entity most needs growth or attention</span></label>
+              <div class="chip-select" id="ep-focus"></div></div>
+            <div class="field-group"><label class="field-label">Partnerships, corporate clients &amp; local relationships</label>
+              <textarea class="field-textarea" id="ep-partnerships" maxlength="1200" placeholder="e.g. insurers, employers, schools, community groups, local events we take part in"></textarea></div>
+            <div class="field-group"><label class="field-label">Competitors &amp; market notes</label>
+              <textarea class="field-textarea" id="ep-competitors" maxlength="1200" placeholder="e.g. who competes for the same patients and where we are stronger or weaker"></textarea></div>
+            <div class="field-group"><label class="field-label">Constraints &amp; sensitivities</label>
+              <textarea class="field-textarea" id="ep-constraints" maxlength="1200" placeholder="e.g. things to avoid, approvals needed, services not offered, audience sensitivities"></textarea></div>
+            <div class="field-row">
+              <div class="field-group"><label class="field-label">Monthly budget guide (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional</span></label>
+                <input class="field-input" type="number" id="ep-budget" min="0" placeholder="e.g. 20000"></div>
+              <div></div>
+            </div>
+            <div class="field-group"><label class="field-label">Anything else the planner should know</label>
+              <textarea class="field-textarea" id="ep-notes" maxlength="1200" placeholder="Goals for this year, recurring seasonal peaks, lessons from past campaigns …"></textarea></div>
+
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="btn btn-primary" id="ep-save-btn" onclick="saveEntityProfileForm()">Save Profile</button>
+              <span id="ep-status" style="font-size:11px;color:var(--text-3)"></span>
+            </div>
+          </div>
+          <div id="ep-empty" style="font-size:12px;color:var(--text-3)">Select an entity above to write its profile.</div>
+        </div>
+
         <!-- Team Members -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
           <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">👥 Team Members</div>
@@ -1947,6 +1995,7 @@ import {
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
+  watchEntityProfiles, saveEntityProfile,
   DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
   HEALTH_DAY_CATEGORIES, getDeptColor
 } from './firebase-data.js';
@@ -2008,6 +2057,8 @@ let unsubResources = null;
 let unsubRequests = null;
 let unsubRequestAccounts = null;
 let ALL_REQUEST_ACCOUNTS = [];
+let unsubEntityProfiles = null;
+let ENTITY_PROFILES = {};
 let knownRequestIds = null; // null until the first snapshot lands, so loading the page doesn't toast every existing request
 let unsubExpenses = null;
 let unsubBdCards = null;
@@ -2090,6 +2141,7 @@ watchAuth(async user => {
     if(unsubResources) unsubResources();
     if(unsubRequests) unsubRequests();
     if(unsubRequestAccounts) unsubRequestAccounts();
+    if(unsubEntityProfiles) unsubEntityProfiles();
     knownRequestIds = null;
     if(unsubExpenses) unsubExpenses();
     if(unsubOffersCatalogMeta) unsubOffersCatalogMeta();
@@ -2118,6 +2170,7 @@ function initData() {
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); if(currentRequestDetailId) renderRequestDetail(); });
   unsubRequestAccounts = watchRequestAccounts(data => { ALL_REQUEST_ACCOUNTS = data; renderRequestAccountsTable(); });
+  unsubEntityProfiles = watchEntityProfiles(data => { ENTITY_PROFILES = data; onEntityProfilesChanged(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
   unsubOffersCatalogMeta = watchOffersCatalogMeta(data => { OFFERS_CATALOG_META = data; renderOffersCatalogStatus(); });
   unsubBdCards      = watchBdCards(data      => { ALL_BD_CARDS    = data; renderBdTable(); });
@@ -2125,7 +2178,7 @@ function initData() {
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
   unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
   unsubBrandVoice   = watchBrandVoice(data   => { BRAND_VOICE     = data; loadBrandVoiceForm(); });
-  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); });
+  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); renderEntityProfileChips(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
   unsubAnalyticsSettings = watchAnalyticsSettings(data => { ANALYTICS_SETTINGS = data; loadAnalyticsSettingsForm(); });
@@ -6449,6 +6502,122 @@ window.removeTeamMember = async function(id, authUid, name) {
     await deleteTeamMember(id, authUid || null);
     showToast(`✓ ${name} removed`);
   } catch(e) { showToast('Delete failed: ' + e.message, true); }
+}
+
+// ── SETTINGS TAB — Entity Profiles ───────────────────────────────────────
+// One brief per entity, stored in config/entity_profiles keyed by entity name.
+// Shown one entity at a time (chips on top, one form below) so a live update
+// can never wipe a half-written brief in some other, collapsed card: the form
+// is only reloaded from the database when it has no unsaved edits.
+let epSelected = null;      // entity name shown in the form
+let epDirty = false;
+let epFocusSelected = [];
+
+// "Core" = the minimum the planner can't do without. The rest sharpen it.
+const EP_CORE_LABELS = { positioning:'Positioning', audience:'Who it serves', focusDepartments:'Focus departments', monthlyVolume:'Activities per month' };
+function epMissingCore(p) {
+  p = p || {};
+  const missing = [];
+  if(!String(p.positioning||'').trim()) missing.push(EP_CORE_LABELS.positioning);
+  if(!String(p.audience||'').trim()) missing.push(EP_CORE_LABELS.audience);
+  if(!(p.focusDepartments||[]).length) missing.push(EP_CORE_LABELS.focusDepartments);
+  if(!(Number(p.monthlyVolume) > 0)) missing.push(EP_CORE_LABELS.monthlyVolume);
+  return missing;
+}
+
+window.renderEntityProfileChips = function() {
+  const el = document.getElementById('ep-chips');
+  if(!el) return;
+  if(epSelected && !ALL_ENTITIES.some(e => e.name === epSelected)) { // selected entity was deleted
+    epSelected = null; epDirty = false;
+    document.getElementById('ep-form').style.display = 'none';
+    document.getElementById('ep-empty').style.display = 'block';
+  }
+  el.innerHTML = ALL_ENTITIES.length
+    ? ALL_ENTITIES.map(e => {
+        const ready = epMissingCore(ENTITY_PROFILES[e.name]).length === 0;
+        return `<div class="chip${epSelected === e.name ? ' active' : ''}" data-entity="${esc(e.name)}" onclick="selectEntityProfile(this.dataset.entity)"
+          title="${ready ? 'Core fields filled' : 'Missing: ' + esc(epMissingCore(ENTITY_PROFILES[e.name]).join(', '))}">${ready ? '✓' : '○'} ${esc(e.name)}</div>`;
+      }).join('')
+    : '<div style="font-size:12px;color:var(--text-3)">No entities yet — add one in the Entities section above</div>';
+}
+
+function renderEpFocusChips() {
+  document.getElementById('ep-focus').innerHTML = DEPARTMENTS.map(d =>
+    `<div class="chip${epFocusSelected.includes(d) ? ' active' : ''}" data-dept="${esc(d)}" onclick="toggleEpFocus(this.dataset.dept)">${esc(d)}</div>`
+  ).join('');
+}
+window.toggleEpFocus = function(dept) {
+  const i = epFocusSelected.indexOf(dept);
+  if(i === -1) epFocusSelected.push(dept); else epFocusSelected.splice(i, 1);
+  renderEpFocusChips();
+  markEntityProfileDirty();
+}
+
+window.markEntityProfileDirty = function() {
+  epDirty = true;
+  document.getElementById('ep-status').textContent = 'Unsaved changes';
+}
+
+function loadEntityProfileForm(name, keepStatus = false) {
+  const p = ENTITY_PROFILES[name] || {};
+  const set = (id, v) => { document.getElementById(id).value = v ?? ''; };
+  set('ep-positioning', p.positioning); set('ep-audience', p.audience); set('ep-location', p.location);
+  set('ep-volume', p.monthlyVolume); set('ep-partnerships', p.partnerships); set('ep-competitors', p.competitors);
+  set('ep-constraints', p.constraints); set('ep-budget', p.monthlyBudget); set('ep-notes', p.notes);
+  epFocusSelected = [...(p.focusDepartments || [])];
+  renderEpFocusChips();
+  document.getElementById('ep-title').textContent = name;
+  document.getElementById('ep-updated').textContent = p.updatedBy
+    ? `Last updated by ${p.updatedBy}${p.updatedAt?.toDate ? ' · ' + p.updatedAt.toDate().toLocaleDateString('en-GB') : ''}`
+    : 'Not written yet';
+  if(!keepStatus) document.getElementById('ep-status').textContent = ''; // a post-save snapshot reload mustn't erase "Saved ✓"
+  document.getElementById('ep-form').style.display = 'block';
+  document.getElementById('ep-empty').style.display = 'none';
+  epDirty = false;
+}
+
+window.selectEntityProfile = function(name) {
+  if(epSelected === name) return;
+  if(epDirty && !confirm(`Discard the unsaved changes to ${epSelected}'s profile?`)) return;
+  epSelected = name;
+  loadEntityProfileForm(name);
+  renderEntityProfileChips();
+}
+
+// Live update from Firestore: refresh the ✓/○ chips always, but only reload the
+// form when there is nothing unsaved in it.
+window.onEntityProfilesChanged = function() {
+  renderEntityProfileChips();
+  if(epSelected && !epDirty) loadEntityProfileForm(epSelected, true);
+}
+
+window.saveEntityProfileForm = async function() {
+  if(!epSelected) return;
+  const val = id => document.getElementById(id).value.trim();
+  const volRaw = val('ep-volume'), budRaw = val('ep-budget');
+  const monthlyVolume = volRaw === '' ? null : Number(volRaw);
+  const monthlyBudget = budRaw === '' ? null : Number(budRaw);
+  if(monthlyVolume !== null && !(Number.isInteger(monthlyVolume) && monthlyVolume >= 0 && monthlyVolume <= 100)) {
+    showToast('Activities per month must be a whole number from 0 to 100', true); return;
+  }
+  if(monthlyBudget !== null && !(monthlyBudget >= 0)) { showToast('Budget must be zero or more', true); return; }
+
+  const profile = {
+    positioning: val('ep-positioning'), audience: val('ep-audience'), location: val('ep-location'),
+    focusDepartments: [...epFocusSelected], partnerships: val('ep-partnerships'), competitors: val('ep-competitors'),
+    constraints: val('ep-constraints'), monthlyVolume, monthlyBudget, notes: val('ep-notes'),
+  };
+  const btn = document.getElementById('ep-save-btn');
+  btn.disabled = true;
+  try {
+    await saveEntityProfile(epSelected, profile, myMemberName() || currentAdminEmail);
+    epDirty = false;
+    const missing = epMissingCore(profile);
+    document.getElementById('ep-status').textContent = missing.length ? `Saved — still missing: ${missing.join(', ')}` : 'Saved ✓ ready for planning';
+    showToast(`✓ ${epSelected} profile saved`);
+  } catch(e) { showToast('Save failed: ' + e.message, true); }
+  finally { btn.disabled = false; }
 }
 
 // ── SETTINGS TAB — Request Accounts ──────────────────────────────────────
