@@ -149,6 +149,24 @@ tr.row-overdue:hover td{background:#FFD6D6}
 .cgen-section-label{font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin:20px 0 10px}
 .field-section-title:first-child{margin-top:0;padding-top:0;border-top:none}
 .empty{text-align:center;padding:40px;color:var(--text-3);font-size:12px}
+/* MONTHLY PLANNER */
+.pl-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.pl-entity-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.pl-entity-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--navy)}
+.pl-strategy{background:var(--bg);border-left:3px solid var(--navy);border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:14px;white-space:pre-wrap}
+.pl-theme{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
+.pl-theme-head{background:#F0F4FF;padding:10px 12px}
+.pl-theme-grid{display:grid;grid-template-columns:1fr 140px 140px;gap:8px;margin-bottom:6px}
+.pl-item{padding:10px 12px;border-top:1px solid var(--border);font-size:12px}
+.pl-item.off{opacity:.45}
+.pl-row{display:grid;grid-template-columns:22px 132px 140px 175px 1fr;gap:8px;align-items:center}
+.pl-sub{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 0 30px}
+.pl-why{font-size:11px;color:var(--text-3);margin:6px 0 0 30px;line-height:1.5}
+.pl-flag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:#FFF3D6;color:#8A6100;margin:0 4px 4px 0}
+.pl-flag.bad{background:#FFE8E8;color:#9B2020}
+.pl-in{padding:5px 8px !important;font-size:12px !important;width:100%}
+.pl-prog-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.pl-summary{position:sticky;bottom:0;background:var(--surface);border:1px solid var(--navy);border-radius:var(--radius-lg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 -4px 18px rgba(15,20,35,0.12);margin-top:8px;z-index:5}
 /* REQUEST DETAIL SIDE PANEL — same look as the public portal's campaign detail panel */
 .rd-overlay{display:none;position:fixed;inset:0;background:rgba(15,20,35,0.45);z-index:60;backdrop-filter:blur(2px)}
 .rd-overlay.open{display:block}
@@ -280,6 +298,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
     <div class="tab" onclick="switchTab('resources',this)">Brand Resources</div>
     <div class="tab" onclick="switchTab('metrics',this)">Dashboard Metrics</div>
     <div class="tab" onclick="switchTab('contentgen',this)" style="display:none">✨ Content Generator</div>
+    <div class="tab" id="tab-planner" onclick="switchTab('planner',this)" style="display:none">📅 Monthly Planner</div>
     <div class="tab" onclick="switchTab('campaigngen',this)">🎬 Campaign Generator</div>
     <div class="tab" onclick="switchTab('advisor',this)">🧭 Advisor</div>
     <div class="tab" onclick="switchTab('aireports',this)" style="display:none">📊 AI Reports</div>
@@ -914,6 +933,76 @@ tr.row-overdue:hover td{background:#FFD6D6}
             <button class="btn btn-primary" id="cgen-save-all-btn" onclick="saveCampaignContent()" style="flex:1">✓ Create Campaign & Save All Content</button>
           </div>
           <div id="cgen-save-status" style="font-size:12px;color:var(--text-3);display:none;margin-top:10px;text-align:center"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MONTHLY PLANNER PAGE -->
+    <div class="page" id="page-planner">
+      <div style="max-width:1100px">
+        <div style="background:linear-gradient(135deg,#F0F4FF,#E8EEFF);border:1px solid #C5D5FF;border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px">
+          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px">📅 Monthly Planner</div>
+          <div style="font-size:12px;color:var(--text-3);line-height:1.6">Plans a month of proactive activities for each entity, acting like that entity's account manager: it reads the entity's profile (Settings → Entity Profiles), your calendar of health days and occasions, what's already planned or was recently done, and recent lead performance — then proposes themed campaigns and activities. <strong>Nothing is created until you review and approve it below.</strong> No patient or lead details are ever sent, only counts.</div>
+        </div>
+
+        <!-- STEP 1: SETUP -->
+        <div id="pl-setup">
+          <div class="pl-card">
+            <div class="field-row">
+              <div class="field-group"><label class="field-label">Month to plan<span style="color:var(--red)">*</span></label><input class="field-input" type="month" id="pl-month" onchange="onPlannerMonthChange()"></div>
+              <div></div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Entities to plan <span style="color:var(--text-3);font-weight:400;font-size:11px">— "Activities to plan" defaults to the profile's monthly target minus what's already planned that month</span></label>
+              <div id="pl-entities"></div>
+            </div>
+            <div class="field-group">
+              <label class="field-label">This month's context <span style="color:var(--text-3);font-weight:400;font-size:11px">— optional but valuable: local events, partner commitments, priorities, anything to avoid</span></label>
+              <textarea class="field-textarea" id="pl-context" maxlength="2500" style="min-height:90px" placeholder="e.g. Partnership with … runs an employee wellness day on the 14th. Focus on women's health this month. No promotions during …"></textarea>
+            </div>
+            <details style="margin-bottom:14px">
+              <summary style="font-size:12px;font-weight:600;color:var(--navy);cursor:pointer">What the planner will see from your calendar</summary>
+              <div id="pl-calendar-preview" style="font-size:12px;color:var(--text-2);line-height:1.7;margin-top:8px"></div>
+            </details>
+            <button class="btn btn-primary" id="pl-generate-btn" onclick="startPlanGeneration()" style="padding:11px 22px;font-size:13px">Generate plan</button>
+            <span id="pl-setup-msg" style="font-size:12px;color:var(--red);margin-left:12px"></span>
+          </div>
+
+          <div class="pl-card" id="pl-history-card" style="display:none">
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">Plans created with this tool</div>
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Undo removes only the items still in <strong>Planned</strong> status — anything already in production, ready or published is left alone.</div>
+            <div id="pl-history"></div>
+          </div>
+        </div>
+
+        <!-- STEP 2: GENERATING -->
+        <div id="pl-progress-section" style="display:none">
+          <div class="pl-card">
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px" id="pl-progress-title">Planning…</div>
+            <div id="pl-progress"></div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:10px">Each entity takes a minute or two. You can stay on this tab; switching away is fine, but reloading the page loses the plan.</div>
+          </div>
+        </div>
+
+        <!-- STEP 3: REVIEW -->
+        <div id="pl-review-section" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+            <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--text)" id="pl-review-title">Review plan</div>
+            <button class="btn btn-sm" onclick="plannerBackToSetup()">← Back to setup</button>
+          </div>
+          <div id="pl-review"></div>
+          <div class="pl-summary" id="pl-summary-bar">
+            <div id="pl-summary-text" style="font-size:12px;color:var(--text-2)"></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="pl-apply-msg" style="font-size:12px;color:var(--text-3)"></span>
+              <button class="btn btn-primary" id="pl-apply-btn" onclick="applyPlan()">✓ Create in Activities</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4: DONE -->
+        <div id="pl-done-section" style="display:none">
+          <div class="pl-card" id="pl-done"></div>
         </div>
       </div>
     </div>
@@ -2143,6 +2232,7 @@ watchAuth(async user => {
     if(unsubRequestAccounts) unsubRequestAccounts();
     if(unsubEntityProfiles) unsubEntityProfiles();
     knownRequestIds = null;
+    PLAN = null; // an unreviewed plan must not survive a logout into the next person's session
     if(unsubExpenses) unsubExpenses();
     if(unsubOffersCatalogMeta) unsubOffersCatalogMeta();
     if(unsubBdCards) unsubBdCards();
@@ -2163,9 +2253,9 @@ watchAuth(async user => {
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderCampaignPerformance(); renderMarketingActionsTable(); });
-  unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); });
-  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderCampaignPerformance(); renderMarketingActionsTable(); refreshPlannerSetupIfOpen(); });
+  unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); refreshPlannerSetupIfOpen(); });
+  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); refreshPlannerAccess(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); renderCampaignPerformance(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); if(currentRequestDetailId) renderRequestDetail(); });
@@ -2178,7 +2268,7 @@ function initData() {
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
   unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
   unsubBrandVoice   = watchBrandVoice(data   => { BRAND_VOICE     = data; loadBrandVoiceForm(); });
-  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); renderEntityProfileChips(); });
+  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); renderEntityProfileChips(); refreshPlannerSetupIfOpen(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
   unsubAnalyticsSettings = watchAnalyticsSettings(data => { ANALYTICS_SETTINGS = data; loadAnalyticsSettingsForm(); });
@@ -2204,6 +2294,7 @@ window.switchTab = function(id, el, groupId) {
   document.getElementById('page-'+id).classList.add('active');
   if(id==='contentgen') initContentGenTab();
   if(id==='campaigngen') initCampaignGenTab();
+  if(id==='planner') initPlannerTab();
   if(id==='aireports') initAiReportsTab();
   if(id==='advisor') initAdvisorTab();
   if(id==='settings') initSettingsTab();
@@ -5414,6 +5505,758 @@ window.saveCampaignContent = async function() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// MONTHLY PLANNER — plans a month of proactive activities per entity.
+// For each chosen entity it assembles that entity's profile (Settings →
+// Entity Profiles), the health-days/occasions calendar, what is already
+// planned or was recently done, and recent lead counts (aggregates only — no
+// lead names, phones or notes ever leave the browser), asks Claude for a plan,
+// then STRICTLY validates the answer against the real lists (departments,
+// types, channels, dates) before showing an editable review board. Nothing is
+// written to Firestore until the admin approves; everything created is tagged
+// with a planId so a whole plan can be undone.
+// One entity per call (not one giant call): better focus per entity, and a
+// single failure or truncation costs one entity, not the month.
+// ══════════════════════════════════════════════════════════════════════════
+// (ADVISOR_MODEL is declared further down this file, so it is read lazily at
+// call time — referencing it here at load time would throw before it exists.)
+const plModel = () => ADVISOR_MODEL;
+const PLANNER_ACTIVITY_TYPES = TYPES.filter(t => t !== 'Campaign');
+const PLANNER_OVERSHOOT = 2;          // tolerate the model returning a couple more than asked
+const PLANNER_CALENDAR_LEAD_DAYS = 10; // also show occasions just after month-end, for prep
+let PLAN = null;                       // review state — in memory only, lost on reload
+let plApplying = false;
+const plSetup = { selected: new Set(), touched: {}, seen: new Set() };
+
+// ── Access: Super Admin only ─────────────────────────────────────────────
+// The planner spends API credit and creates activities in bulk, so it's limited
+// to the Super Admin (the team_members.superAdmin flag, via iAmSuperAdmin()).
+// Like every other Super Admin power in this app that is a UI-level guard, not
+// a Firestore rule: the tab is hidden and every planner action re-checks, but
+// another admin who really wanted to could still call the underlying functions
+// from the browser console. (The rules can't express it: team_members is keyed
+// by its own id, not the login uid, so a rule can't look the flag up.)
+function plRequireSuperAdmin() {
+  if(iAmSuperAdmin()) return true;
+  showToast('The Monthly Planner is limited to the Super Admin', true);
+  return false;
+}
+window.refreshPlannerAccess = function() {
+  const allowed = iAmSuperAdmin();
+  const tab = document.getElementById('tab-planner');
+  if(tab) tab.style.display = allowed ? '' : 'none';
+  // If the flag was removed while they were on the planner, move them off it.
+  if(!allowed && document.getElementById('page-planner')?.classList.contains('active')) {
+    switchTab('initiatives', document.querySelector('#group-initiatives .tab-dropdown-item'), 'group-initiatives');
+  }
+}
+
+const plEsc = esc;
+const plPad = n => String(n).padStart(2, '0');
+const plYmd = d => `${d.getFullYear()}-${plPad(d.getMonth()+1)}-${plPad(d.getDate())}`;
+
+function plMonthBounds(month) {
+  const [y, m] = month.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return { y, m, start: `${y}-${plPad(m)}-01`, end: `${y}-${plPad(m)}-${plPad(last)}`,
+           label: new Date(y, m-1, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' }) };
+}
+function plDefaultMonth() {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + 1); // plan ahead: next month
+  return `${d.getFullYear()}-${plPad(d.getMonth()+1)}`;
+}
+function plIsDate(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  if(!m) return false;
+  const d = new Date(+m[1], +m[2]-1, +m[3]);
+  return d.getFullYear() === +m[1] && d.getMonth() === +m[2]-1 && d.getDate() === +m[3];
+}
+// Strip angle brackets (this text ends up on the public portal and in tables
+// that don't all escape), collapse whitespace, cap the length.
+function plClean(s, max) { return String(s ?? '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max); }
+const plOneOf = (v, list) => list.find(x => x.toLowerCase() === String(v ?? '').trim().toLowerCase()) || null;
+
+// ── Calendar ──────────────────────────────────────────────────────────────
+function plCalendar(month, healthDays) {
+  const b = plMonthBounds(month);
+  const endLimit = plYmd(new Date(b.y, b.m - 1, Number(b.end.slice(8)) + PLANNER_CALENDAR_LEAD_DAYS));
+  return (healthDays || [])
+    .filter(h => h.date && h.date >= b.start && h.date <= endLimit)
+    .sort((a, c) => a.date.localeCompare(c.date))
+    .map(h => ({ name: h.name, nameAr: h.nameAr || '', date: h.date, category: h.category || '', department: h.department || '', afterMonthEnd: h.date > b.end }));
+}
+
+// ── Per-entity context (aggregates only — see the header comment) ────────
+function plEntityContext(name, month, d) {
+  const b = plMonthBounds(month);
+  const hasEntity = i => Array.isArray(i.entity) ? i.entity.includes(name) : i.entity === name;
+  const inits = (d.initiatives || []).filter(hasEntity);
+
+  const monthItems = inits.filter(i => (i.startDate || '').startsWith(month) ||
+    (i.type === 'Campaign' && i.startDate <= b.end && (i.endDate || i.startDate) >= b.start));
+  const alreadyPlanned = monthItems.slice(0, 60).map(i => ({
+    title: i.title, type: i.type, department: i.department || '', date: i.startDate || '',
+    ...(i.type === 'Campaign' && i.endDate ? { endDate: i.endDate } : {}),
+  }));
+
+  const prior1 = plMonthBounds(plYmd(new Date(b.y, b.m - 2, 1)).slice(0, 7));
+  const prior2 = plMonthBounds(plYmd(new Date(b.y, b.m - 3, 1)).slice(0, 7));
+  const recent = inits.filter(i => i.type !== 'Campaign' &&
+      ((i.startDate || '').startsWith(prior1.start.slice(0, 7)) || (i.startDate || '').startsWith(prior2.start.slice(0, 7))))
+    .sort((a, c) => (c.startDate || '').localeCompare(a.startDate || '')).slice(0, 40)
+    .map(i => ({ title: i.title, type: i.type, department: i.department || '', month: (i.startDate || '').slice(0, 7) }));
+
+  const cutoff = plYmd(new Date(d.now.getTime() - 90 * 86400000));
+  const leads = (d.leads || []).filter(l => l.entity === name && (l.dateCreated || '') >= cutoff);
+  const byDept = {};
+  leads.forEach(l => {
+    const k = l.department || '(none)';
+    byDept[k] = byDept[k] || { department: k, leads: 0, booked: 0 };
+    byDept[k].leads++; if(l.outcome === 'Booked') byDept[k].booked++;
+  });
+  const profile = (d.profiles || {})[name] || {};
+  const lookbackStart = plYmd(new Date(d.now.getTime() - 90 * 86400000));
+  const coverage = (profile.focusDepartments || []).map(dep => ({
+    department: dep,
+    activitiesLast90d: inits.filter(i => i.type !== 'Campaign' && i.department === dep && (i.startDate || '') >= lookbackStart && (i.startDate || '') < b.start).length,
+    leadsLast90d: (byDept[dep] || {}).leads || 0,
+  }));
+
+  const bv = d.brandVoice || {};
+  return {
+    entity: name, month, monthLabel: b.label,
+    profile: {
+      positioning: profile.positioning || '', audience: profile.audience || '', location: profile.location || '',
+      focusDepartments: profile.focusDepartments || [], partnerships: profile.partnerships || '',
+      competitors: profile.competitors || '', constraints: profile.constraints || '',
+      monthlyBudgetSAR: profile.monthlyBudget ?? null, notes: profile.notes || '',
+    },
+    calendar: plCalendar(month, d.healthDays),
+    alreadyPlannedThisMonth: alreadyPlanned,
+    recentActivities: recent,
+    leadPerformanceLast90Days: {
+      totalLeads: leads.length, booked: leads.filter(l => l.outcome === 'Booked').length,
+      byDepartment: Object.values(byDept).sort((a, c) => c.leads - a.leads).slice(0, 10),
+    },
+    focusDepartmentCoverage: coverage,
+    brandVoice: { formality: bv.formality || '', tone: bv.toneNotes || '', wordsToNeverUse: bv.avoidWords || '' },
+  };
+}
+
+// ── Prompt ────────────────────────────────────────────────────────────────
+function plBuildPrompt(ctx, count, monthNote) {
+  const system =
+`You are a senior marketing account manager at an in-house agency serving IMC, a private healthcare group in Saudi Arabia. Each IMC entity (hospital, clinic, branch) is your client. You are planning ONE client's marketing activities for ONE month.
+
+How to think:
+1. Read the client brief — who they serve, how they position themselves, which departments matter most, what constrains them. Everything you propose must make sense for THIS audience and THIS entity. A plan that would work unchanged for another entity has failed.
+2. Anchor activities in real hooks: the supplied calendar of health days and occasions, the entity's partnerships, seasonal demand, and gaps visible in recent activity or lead data (a focus department with few recent activities is a gap). NEVER invent partners, events, doctors, prices, offers or statistics. You may use an occasion that is NOT in the supplied calendar only if its date is fixed and certain; then set "unverifiedDate": true so a human checks it. Islamic occasions move with the moon — never place one yourself.
+3. Mix purposes across the month: awareness, patient acquisition (lead generation), retention and community, and reputation (physician videos, patient education). Weight toward the entity's focus departments, without ignoring the rest.
+4. Group related work into 1 to 3 themed campaigns ("themes": each has a clear objective and date range) with supporting activities under each. Standalone activities are fine for one-offs.
+5. Spread the work across the month; do not cluster. The Saudi work week is Sunday to Thursday; Friday and Saturday are the weekend (social posts can still go out; avoid events on Fridays). Leave lead time before any date an activity is tied to.
+6. Respect the brand voice and healthcare marketing norms: no guarantees, no "cure", nothing alarmist; never use the listed banned words.
+7. Do not repeat what is already planned or was recently done; avoid near-duplicates.
+8. Keep titles short and concrete. Do not name specific doctors (leave physician fields out).
+
+Respond with ONLY valid JSON. No markdown, no code fences, no commentary.`;
+
+  const lists = {
+    departments: DEPARTMENTS, activityTypes: PLANNER_ACTIVITY_TYPES, channels: CHANNELS.filter(c => c !== 'Multi-channel'),
+    contentTypes: CONTENT_TYPES, printTypes: PRINT_TYPES, eventScopes: ['Internal', 'External'], websiteUpdateTypes: WEBSITE_UPDATE_TYPES,
+  };
+  const b = plMonthBounds(ctx.month);
+  const user =
+`Plan ${ctx.monthLabel} (${b.start} to ${b.end}) for the entity "${ctx.entity}".
+
+Create EXACTLY ${count} new activities (these do not include theme containers). Theme containers are separate: 1 to 3 of them, each with at least 2 activities under it.
+
+CLIENT AND CONTEXT (JSON):
+${JSON.stringify(ctx)}
+
+${monthNote ? `THE ACCOUNT MANAGER'S NOTES FOR THIS MONTH (treat as facts and priorities):\n${monthNote}\n` : ''}
+ALLOWED VALUES (use these exact spellings):
+${JSON.stringify(lists)}
+
+Rules for fields:
+- type SM Content: set contentType and channels (one or more of the allowed channels).
+- type Physician Video: contentType must be "Video" or "Reel"; set channels; do not name a doctor.
+- type Print: set printType.
+- type Event: set eventScope.
+- type Website Update: set websiteUpdateType.
+- Every date must be inside ${b.start} to ${b.end}. A theme's endDate must be on or after its startDate and inside the month.
+- "anchor.kind" is one of: calendar, partnership, season, focus-department, gap, brand. For kind "calendar", "anchor.name" must be a name from the supplied calendar exactly. For "partnership", name the partner from the brief.
+
+Return ONLY this JSON:
+{
+  "strategy": "3 to 5 sentences: your read of this entity's audience and what this month should achieve for it",
+  "themes": [
+    {"key":"t1","title":"...","objective":"...","department":"<allowed department>","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}
+  ],
+  "activities": [
+    {"themeKey":"t1 or null","title":"...","type":"...","department":"...","date":"YYYY-MM-DD",
+     "channels":["..."],"contentType":null,"printType":null,"eventScope":null,"websiteUpdateType":null,
+     "objective":"what this achieves and the message","rationale":"why this, why now, for this audience",
+     "anchor":{"kind":"...","name":"..."},"unverifiedDate":false}
+  ]
+}`;
+  return { system, user };
+}
+
+// ── Validation: never trust the model's output ────────────────────────────
+function plApplyTypeDefaults(it) {
+  it.contentType = it.printType = it.eventScope = it.websiteUpdateType = null;
+  if(it.type === 'SM Content')          { it.contentType = 'Post'; if(!it.channels.length) it.channels = ['Instagram']; }
+  else if(it.type === 'Physician Video'){ it.contentType = 'Video'; if(!it.channels.length) it.channels = ['Instagram']; }
+  else if(it.type === 'Print')          { it.printType = 'Flyer'; it.channels = ['Print']; }
+  else if(it.type === 'Event')          { it.eventScope = 'External'; }
+  else if(it.type === 'Website Update') { it.websiteUpdateType = 'Other'; it.channels = []; }
+}
+
+function plNormalize(raw, o) {
+  // o: { month, entityName, toPlan, existingTitles[], calendarNames[], fallbackDept }
+  const b = plMonthBounds(o.month);
+  const warnings = [];
+  const inMonth = d => plIsDate(d) && d >= b.start && d <= b.end;
+  const deptOf = v => matchDepartment(v) || null;
+  raw = raw && typeof raw === 'object' ? raw : {};
+
+  const themes = [];
+  const seen = new Set();
+  (Array.isArray(raw.themes) ? raw.themes : []).slice(0, 5).forEach((t, n) => {
+    if(!t || typeof t !== 'object') return;
+    let key = plClean(t.key, 20) || `t${n+1}`;
+    while(seen.has(key)) key += '_';
+    seen.add(key);
+    const start = inMonth(t.startDate) ? t.startDate : b.start;
+    let end = inMonth(t.endDate) ? t.endDate : b.end;
+    if(end < start) end = start;
+    themes.push({ key, title: plClean(t.title, 140) || `Theme ${n+1}`, objective: plClean(t.objective, 500),
+                  department: deptOf(t.department) || o.fallbackDept, startDate: start, endDate: end });
+  });
+
+  const calNames = (o.calendarNames || []).map(s => s.toLowerCase());
+  const existing = new Set((o.existingTitles || []).map(s => String(s).toLowerCase().trim()));
+  let rawActs = Array.isArray(raw.activities) ? raw.activities : [];
+  if(rawActs.length > o.toPlan + PLANNER_OVERSHOOT) {
+    warnings.push(`The planner returned ${rawActs.length} activities; kept the first ${o.toPlan + PLANNER_OVERSHOOT}.`);
+    rawActs = rawActs.slice(0, o.toPlan + PLANNER_OVERSHOOT);
+  }
+  if(rawActs.length < o.toPlan) warnings.push(`Asked for ${o.toPlan} activities but got ${rawActs.length}.`);
+
+  const items = [];
+  rawActs.forEach((a, n) => {
+    if(!a || typeof a !== 'object') return;
+    const flags = [];
+    const ALIAS = { 'social media':'SM Content', 'social':'SM Content', 'social post':'SM Content', 'post':'SM Content', 'reel':'SM Content', 'video':'Physician Video' };
+    let type = plOneOf(a.type, PLANNER_ACTIVITY_TYPES) || ALIAS[String(a.type || '').trim().toLowerCase()];
+    if(!type) { flags.push({ text: `Type "${plClean(a.type, 30) || '(none)'}" wasn't recognised — set to SM Content`, level: 'warn' }); type = 'SM Content'; }
+
+    const it = { id: `${o.entityName}#${n}`, include: true, themeKey: null, type, channels: [] };
+    const chans = (Array.isArray(a.channels) ? a.channels : []).map(c => plOneOf(c, CHANNELS)).filter(Boolean);
+    it.channels = [...new Set(chans)];
+    plApplyTypeDefaults(it);
+    if(type === 'SM Content' || type === 'Physician Video') {
+      const ct = plOneOf(a.contentType, type === 'Physician Video' ? ['Video', 'Reel'] : CONTENT_TYPES);
+      if(ct) it.contentType = ct; else flags.push({ text: `Content type set to ${it.contentType}`, level: 'warn' });
+      if(!chans.length) flags.push({ text: 'No valid channel given — set to Instagram', level: 'warn' });
+    } else if(type === 'Print') {
+      const pt = plOneOf(a.printType, PRINT_TYPES);
+      if(pt) it.printType = pt; else flags.push({ text: `Print type set to ${it.printType}`, level: 'warn' });
+    } else if(type === 'Event') {
+      it.eventScope = plOneOf(a.eventScope, ['Internal', 'External']) || it.eventScope;
+      it.channels = it.channels.length ? it.channels : [];
+    } else if(type === 'Website Update') {
+      it.websiteUpdateType = plOneOf(a.websiteUpdateType, WEBSITE_UPDATE_TYPES) || it.websiteUpdateType;
+    }
+
+    it.title = plClean(a.title, 140);
+    if(!it.title) { it.title = `Untitled activity ${n+1}`; it.fixTitle = true; flags.push({ text: 'No title — please name it', level: 'bad', tag: 'title' }); }
+    const dep = deptOf(a.department);
+    it.department = dep || o.fallbackDept;
+    if(!dep) flags.push({ text: `Department "${plClean(a.department, 30) || '(none)'}" wasn't recognised — set to ${o.fallbackDept}`, level: 'warn' });
+    else if(dep.toLowerCase() !== String(a.department).trim().toLowerCase()) flags.push({ text: `Department "${plClean(a.department, 30)}" was matched to ${dep} — check it`, level: 'warn' });
+    if(inMonth(a.date)) it.date = a.date;
+    else { it.date = b.start; it.fixDate = true; flags.push({ text: 'Date was missing or outside the month — set to the 1st, please pick one', level: 'bad', tag: 'date' }); }
+    it.objective = plClean(a.objective, 500);
+    it.rationale = plClean(a.rationale, 500);
+    const tk = a.themeKey == null ? null : String(a.themeKey);
+    it.themeKey = tk && themes.some(t => t.key === tk) ? tk : null;
+
+    const anchor = a.anchor && typeof a.anchor === 'object' ? a.anchor : {};
+    it.anchorKind = plClean(anchor.kind, 30); it.anchorName = plClean(anchor.name, 120);
+    if(it.anchorKind === 'calendar' && !calNames.includes(it.anchorName.toLowerCase()))
+      flags.push({ text: `"${it.anchorName || 'calendar item'}" isn't in your calendar — check the date`, level: 'warn' });
+    if(a.unverifiedDate === true) flags.push({ text: 'Date not in your calendar — verify it', level: 'warn' });
+    if(existing.has(it.title.toLowerCase().trim())) { flags.push({ text: 'Same title as something already planned this month — left unticked', level: 'warn' }); it.include = false; }
+    it.flags = flags;
+    items.push(it);
+  });
+
+  return { strategy: plClean(raw.strategy, 900), themes, items, warnings };
+}
+
+// Blocking problems for an item/theme the admin has (possibly) edited.
+function plItemProblems(it, month) {
+  const b = plMonthBounds(month), p = [];
+  // fixTitle/fixDate: the planner couldn't give a real value (we put a
+  // placeholder in), so Apply stays blocked until the admin edits that field —
+  // otherwise a made-up "1st of the month" could be created without anyone looking.
+  if(it.fixTitle || !String(it.title || '').trim()) p.push('title');
+  if(it.fixDate || !plIsDate(it.date) || it.date < b.start || it.date > b.end) p.push('date');
+  if(!it.department) p.push('department');
+  return p;
+}
+function plThemeProblems(t, month) {
+  const b = plMonthBounds(month), p = [];
+  if(!String(t.title || '').trim()) p.push('title');
+  if(!plIsDate(t.startDate) || t.startDate < b.start || t.startDate > b.end) p.push('start date');
+  if(!plIsDate(t.endDate) || t.endDate < t.startDate || t.endDate > b.end) p.push('end date');
+  return p;
+}
+
+// ── Turn an approved plan into documents (pure; no writes here) ───────────
+function plBuildWrites(plan, who) {
+  const base = { status: 'Planned', planId: plan.planId, planSource: 'monthly-planner', planMonth: plan.month,
+                 createdByUid: who.createdByUid || null, createdByName: who.createdByName || 'Unknown' };
+  const themes = [], items = [];
+  plan.order.forEach(name => {
+    const e = plan.entities[name];
+    if(!e || e.status !== 'done') return;
+    const chosen = e.items.filter(i => i.include);
+    const usedKeys = new Set(chosen.map(i => i.themeKey).filter(Boolean));
+    e.themes.filter(t => usedKeys.has(t.key)).forEach(t => {
+      const kids = chosen.filter(i => i.themeKey === t.key);
+      themes.push({ entity: name, key: t.key, doc: {
+        ...base, type: 'Campaign', title: t.title, department: t.department, entity: [name],
+        startDate: t.startDate, endDate: t.endDate, objective: t.objective,
+        channels: [...new Set(kids.flatMap(k => k.channels))],
+      } });
+    });
+    chosen.forEach(i => {
+      const doc = {
+        ...base, type: i.type, title: i.title, department: i.department, entity: [name], startDate: i.date,
+        objective: i.objective, channels: [...i.channels],
+        plannerNote: [i.rationale, i.anchorKind ? `Anchor: ${i.anchorKind}${i.anchorName ? ' — ' + i.anchorName : ''}` : ''].filter(Boolean).join(' · '),
+      };
+      if(i.contentType) doc.contentType = i.contentType;
+      if(i.printType) doc.printType = i.printType;
+      if(i.eventScope) doc.eventScope = i.eventScope;
+      if(i.websiteUpdateType) doc.websiteUpdateType = i.websiteUpdateType;
+      items.push({ entity: name, themeKey: i.themeKey && usedKeys.has(i.themeKey) ? i.themeKey : null, doc });
+    });
+  });
+  return { themes, items };
+}
+
+// What "Undo plan" may delete: only items still in Planned. A campaign
+// container goes only if every child went too.
+function plUndoTargets(initiatives, planId) {
+  const mine = initiatives.filter(i => i.planId === planId);
+  const children = mine.filter(i => i.type !== 'Campaign');
+  const delChildren = children.filter(i => i.status === 'Planned');
+  const delIds = new Set(delChildren.map(i => i.id));
+  const containers = mine.filter(i => i.type === 'Campaign');
+  const delContainers = containers.filter(c => c.status === 'Planned' &&
+    !initiatives.some(k => k.parentCampaignId === c.id && !delIds.has(k.id)));
+  return {
+    deleteIds: [...delChildren, ...delContainers].map(i => i.id),
+    keptCount: mine.length - delChildren.length - delContainers.length,
+    total: mine.length,
+  };
+}
+function plPlansFrom(initiatives) {
+  const map = {};
+  initiatives.filter(i => i.planId).forEach(i => {
+    const p = map[i.planId] = map[i.planId] || { planId: i.planId, month: i.planMonth || '', total: 0, planned: 0, entities: new Set(), created: 0 };
+    p.total++; if(i.status === 'Planned') p.planned++;
+    (Array.isArray(i.entity) ? i.entity : []).forEach(e => p.entities.add(e));
+    p.created = Math.max(p.created, i.createdAt?.toMillis?.() || 0);
+  });
+  return Object.values(map).sort((a, c) => c.created - a.created);
+}
+
+// ── Setup screen ──────────────────────────────────────────────────────────
+function plData() {
+  return { initiatives: ALL_INITIATIVES, leads: ALL_LEADS, healthDays: ALL_HEALTH_DAYS, profiles: ENTITY_PROFILES, brandVoice: BRAND_VOICE, now: new Date() };
+}
+function plExistingCount(name, month) {
+  return ALL_INITIATIVES.filter(i => i.type !== 'Campaign' && (i.startDate || '').startsWith(month) &&
+    (Array.isArray(i.entity) ? i.entity.includes(name) : i.entity === name)).length;
+}
+function plSetupVisible() {
+  return document.getElementById('page-planner')?.classList.contains('active') &&
+         document.getElementById('pl-setup')?.style.display !== 'none';
+}
+window.refreshPlannerSetupIfOpen = function() {
+  if(!plSetupVisible()) return;
+  if(document.activeElement?.closest('#pl-entities')) return; // never rebuild a number box someone is typing in
+  renderPlannerSetup();
+}
+
+window.initPlannerTab = function() {
+  if(!plRequireSuperAdmin()) { refreshPlannerAccess(); return; }
+  const mi = document.getElementById('pl-month');
+  if(!mi.value) mi.value = plDefaultMonth();
+  renderPlannerSetup();
+}
+window.onPlannerMonthChange = function() { plSetup.touched = {}; renderPlannerSetup(); }
+
+window.renderPlannerSetup = function() {
+  const month = document.getElementById('pl-month').value;
+  const listEl = document.getElementById('pl-entities');
+  if(!listEl) return;
+  if(!/^\d{4}-\d{2}$/.test(month)) { listEl.innerHTML = '<div style="font-size:12px;color:var(--text-3)">Pick a month first.</div>'; return; }
+  listEl.innerHTML = ALL_ENTITIES.length ? ALL_ENTITIES.map(e => {
+    const prof = ENTITY_PROFILES[e.name];
+    const missing = epMissingCore(prof);
+    const ready = missing.length === 0;
+    const existing = plExistingCount(e.name, month);
+    const dflt = ready ? Math.max(0, Number(prof.monthlyVolume) - existing) : 0;
+    if(!plSetup.seen.has(e.name)) { plSetup.seen.add(e.name); if(ready && dflt > 0) plSetup.selected.add(e.name); }
+    const count = plSetup.touched[e.name] ?? dflt;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);${ready ? '' : 'opacity:.7'}">
+      <input type="checkbox" ${plSetup.selected.has(e.name) && ready ? 'checked' : ''} ${ready ? '' : 'disabled'} data-entity="${plEsc(e.name)}" onchange="plToggleEntity(this.dataset.entity, this.checked)" style="width:16px;height:16px">
+      <div style="min-width:130px;font-weight:700;font-size:13px">${plEsc(e.name)}</div>
+      <div style="flex:1;font-size:11px;color:var(--text-3)">${ready
+        ? `Target ${plEsc(prof.monthlyVolume)}/month · ${existing} already planned in ${plMonthBounds(month).label}`
+        : `Profile incomplete — missing ${plEsc(missing.join(', '))}. Fill it in under Settings → Entity Profiles.`}</div>
+      <label style="font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:6px">Activities to plan
+        <input class="field-input pl-in" type="number" min="0" max="40" style="width:70px" ${ready ? '' : 'disabled'} value="${count}" data-entity="${plEsc(e.name)}" onchange="plSetCount(this.dataset.entity, this.value)"></label>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--text-3)">No entities yet.</div>';
+
+  const cal = plCalendar(month, ALL_HEALTH_DAYS);
+  document.getElementById('pl-calendar-preview').innerHTML = cal.length
+    ? cal.map(c => `<div>${plEsc(c.date)} — <strong>${plEsc(c.name)}</strong> <span style="color:var(--text-3)">(${plEsc(c.category)}${c.department ? ' · ' + plEsc(c.department) : ''})${c.afterMonthEnd ? ' · just after month-end, for prep' : ''}</span></div>`).join('')
+    : `<div style="color:var(--text-3)">Nothing in your Health Days calendar for ${plEsc(plMonthBounds(month).label)}. The planner won't invent occasions — add them under Activities → Health Days, or describe local events in the context box.</div>`;
+  renderPlannerHistory();
+}
+window.plToggleEntity = function(name, checked) { if(checked) plSetup.selected.add(name); else plSetup.selected.delete(name); }
+window.plSetCount = function(name, v) { const n = parseInt(v, 10); plSetup.touched[name] = Number.isFinite(n) && n >= 0 ? Math.min(n, 40) : 0; }
+
+function renderPlannerHistory() {
+  const plans = plPlansFrom(ALL_INITIATIVES);
+  const card = document.getElementById('pl-history-card');
+  if(!card) return;
+  card.style.display = plans.length ? 'block' : 'none';
+  document.getElementById('pl-history').innerHTML = plans.map(p => `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--border);font-size:12px">
+      <div style="flex:1"><strong>${p.month ? plEsc(plMonthBounds(p.month).label) : 'Plan'}</strong> · ${[...p.entities].map(plEsc).join(', ') || '—'}
+        <span style="color:var(--text-3)"> · ${p.total} item${p.total === 1 ? '' : 's'}, ${p.planned} still Planned${p.created ? ' · created ' + new Date(p.created).toLocaleDateString('en-GB') : ''}</span></div>
+      <button class="btn btn-sm btn-danger" data-plan="${plEsc(p.planId)}" onclick="undoPlan(this.dataset.plan)" ${p.planned ? '' : 'disabled'}>Undo plan</button>
+    </div>`).join('');
+}
+
+// ── Generation ────────────────────────────────────────────────────────────
+function plShow(section) {
+  ['pl-setup', 'pl-progress-section', 'pl-review-section', 'pl-done-section'].forEach(id => {
+    document.getElementById(id).style.display = id === section ? 'block' : 'none';
+  });
+}
+window.plannerBackToSetup = function() {
+  if(PLAN && !plApplying && !confirm('Leave this plan? Anything you have not created will be lost.')) return;
+  PLAN = null; plShow('pl-setup'); renderPlannerSetup();
+}
+
+window.startPlanGeneration = async function() {
+  if(!plRequireSuperAdmin()) return;
+  const msg = document.getElementById('pl-setup-msg');
+  msg.textContent = '';
+  const month = document.getElementById('pl-month').value;
+  if(!/^\d{4}-\d{2}$/.test(month)) { msg.textContent = 'Pick a month.'; return; }
+  if(!ANTHROPIC_API_KEY) { msg.textContent = 'No API key configured — set it in Campaign Generator → AI Setup.'; return; }
+  const chosen = ALL_ENTITIES.map(e => e.name).filter(n => plSetup.selected.has(n) && epMissingCore(ENTITY_PROFILES[n]).length === 0)
+    .map(name => {
+      const dflt = Math.max(0, Number(ENTITY_PROFILES[name].monthlyVolume) - plExistingCount(name, month));
+      return { name, count: plSetup.touched[name] ?? dflt };
+    }).filter(c => c.count > 0);
+  if(!chosen.length) { msg.textContent = 'Tick at least one entity with a profile ready and more than 0 activities to plan.'; return; }
+
+  const bounds = plMonthBounds(month);
+  PLAN = { month, bounds, planId: `plan-${month}-${Date.now().toString(36)}`, contextNote: document.getElementById('pl-context').value.trim(),
+           order: chosen.map(c => c.name), entities: {} };
+  chosen.forEach(c => { PLAN.entities[c.name] = { name: c.name, toPlan: c.count, status: 'queued', startedAt: 0, error: '', strategy: '', themes: [], items: [], warnings: [] }; });
+  document.getElementById('pl-progress-title').textContent = `Planning ${bounds.label}…`;
+  plShow('pl-progress-section');
+  renderPlanProgress();
+  const myPlan = PLAN;
+  const tick = setInterval(() => { if(PLAN === myPlan) renderPlanProgress(); else clearInterval(tick); }, 1000);
+
+  const queue = [...myPlan.order];
+  const worker = async () => { while(queue.length && PLAN === myPlan) await plRunEntity(myPlan, queue.shift()); };
+  await Promise.all([worker(), worker()]); // two entities at a time: faster, but gentle on the rate limit
+  clearInterval(tick);
+  if(PLAN !== myPlan) return;
+  renderPlanProgress();
+  if(myPlan.order.some(n => myPlan.entities[n].status === 'done')) {
+    document.getElementById('pl-review-title').textContent = `Review plan — ${bounds.label}`;
+    plShow('pl-review-section');
+    renderPlanReview();
+  }
+}
+
+async function plRunEntity(plan, name) {
+  const e = plan.entities[name];
+  e.status = 'running'; e.startedAt = Date.now(); e.error = '';
+  renderPlanProgress();
+  try {
+    const d = plData();
+    const ctx = plEntityContext(name, plan.month, d);
+    const { system, user } = plBuildPrompt(ctx, e.toPlan, plan.contextNote);
+    const raw = await advisorClaudeCall({ system, messages: [{ role: 'user', content: user }], maxTokens: 9000, expectJson: true, model: plModel() });
+    const fallbackDept = DEPARTMENTS.includes('General / Brand') ? 'General / Brand' : DEPARTMENTS[0];
+    const norm = plNormalize(raw, {
+      month: plan.month, entityName: name, toPlan: e.toPlan, fallbackDept,
+      existingTitles: ctx.alreadyPlannedThisMonth.map(x => x.title), calendarNames: ctx.calendar.map(c => c.name),
+    });
+    Object.assign(e, norm, { status: 'done' });
+    if(!norm.items.length) { e.status = 'failed'; e.error = 'The planner returned no usable activities — try again.'; }
+  } catch(err) {
+    e.status = 'failed'; e.error = err.message || 'Unknown error';
+  }
+  if(PLAN === plan) renderPlanProgress();
+}
+
+function renderPlanProgress() {
+  if(!PLAN) return;
+  const icon = { queued: '⏳', running: '🧠', done: '✅', failed: '⚠️' };
+  document.getElementById('pl-progress').innerHTML = PLAN.order.map(n => {
+    const e = PLAN.entities[n];
+    const secs = e.status === 'running' ? Math.round((Date.now() - e.startedAt) / 1000) : 0;
+    return `<div class="pl-prog-row"><span style="font-size:15px">${icon[e.status]}</span>
+      <strong style="min-width:130px">${plEsc(n)}</strong>
+      <span style="flex:1;color:${e.status === 'failed' ? 'var(--red)' : 'var(--text-3)'}">${
+        e.status === 'queued' ? 'Waiting…' : e.status === 'running' ? `Thinking… ${secs}s` :
+        e.status === 'done' ? `${e.items.length} activities, ${e.themes.length} theme${e.themes.length === 1 ? '' : 's'}` : plEsc(e.error)}</span>
+      ${e.status === 'failed' ? `<button class="btn btn-sm" data-entity="${plEsc(n)}" onclick="plRetryEntity(this.dataset.entity)">Retry</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+window.plRetryEntity = async function(name) {
+  if(!plRequireSuperAdmin()) return;
+  const plan = PLAN;
+  if(!plan || !plan.entities[name] || plan.entities[name].status === 'running') return;
+  await plRunEntity(plan, name);
+  if(PLAN !== plan) return;
+  const reviewing = document.getElementById('pl-review-section').style.display !== 'none';
+  if(plan.entities[name].status === 'done' && !reviewing) {
+    document.getElementById('pl-review-title').textContent = `Review plan — ${plan.bounds.label}`;
+    plShow('pl-review-section');
+  }
+  if(document.getElementById('pl-review-section').style.display !== 'none') renderPlanReview();
+}
+
+// ── Review board ──────────────────────────────────────────────────────────
+const PL_CHANNEL_CHOICES = CHANNELS.filter(c => c !== 'Print' && c !== 'Multi-channel');
+const plOptions = (list, selected) => list.map(x => `<option${x === selected ? ' selected' : ''}>${plEsc(x)}</option>`).join('');
+
+function plItemHtml(e, it) {
+  const probs = plItemProblems(it, PLAN.month);
+  const sub = [];
+  if(it.type === 'SM Content' || it.type === 'Physician Video') {
+    sub.push(`<select class="field-select pl-in" style="width:120px" onchange="planEditItem(this,'contentType')">${plOptions(it.type === 'Physician Video' ? ['Video', 'Reel'] : CONTENT_TYPES, it.contentType)}</select>`);
+    sub.push(`<span style="display:flex;gap:4px;flex-wrap:wrap">${PL_CHANNEL_CHOICES.map(c =>
+      `<span class="chip${it.channels.includes(c) ? ' active' : ''}" style="padding:2px 9px;font-size:11px" onclick="planToggleChannel(this,'${c}')">${c}</span>`).join('')}</span>`);
+  } else if(it.type === 'Print') {
+    sub.push(`<select class="field-select pl-in" style="width:140px" onchange="planEditItem(this,'printType')">${plOptions(PRINT_TYPES, it.printType)}</select>`);
+  } else if(it.type === 'Event') {
+    sub.push(`<select class="field-select pl-in" style="width:120px" onchange="planEditItem(this,'eventScope')">${plOptions(['Internal', 'External'], it.eventScope)}</select>`);
+  } else if(it.type === 'Website Update') {
+    sub.push(`<select class="field-select pl-in" style="width:210px" onchange="planEditItem(this,'websiteUpdateType')">${plOptions(WEBSITE_UPDATE_TYPES, it.websiteUpdateType)}</select>`);
+  }
+  sub.push(`<select class="field-select pl-in" style="width:190px" onchange="planEditItem(this,'themeKey')"><option value="">Standalone</option>${e.themes.map(t =>
+    `<option value="${plEsc(t.key)}"${t.key === it.themeKey ? ' selected' : ''}>${plEsc(t.title)}</option>`).join('')}</select>`);
+  const flags = [...it.flags.map(f => `<span class="pl-flag${f.level === 'bad' ? ' bad' : ''}">${plEsc(f.text)}</span>`),
+                 ...probs.filter(p => !it.flags.some(f => f.tag === p)).map(p => `<span class="pl-flag bad">Needs a valid ${plEsc(p)}</span>`)].join('');
+  return `<div class="pl-item${it.include ? '' : ' off'}" data-pl-item="1" data-e="${plEsc(e.name)}" data-i="${plEsc(it.id)}">
+    <div class="pl-row">
+      <input type="checkbox" ${it.include ? 'checked' : ''} onchange="planEditItem(this,'include')" style="width:16px;height:16px">
+      <input class="field-input pl-in" type="date" value="${plEsc(it.date)}" min="${PLAN.bounds.start}" max="${PLAN.bounds.end}" onchange="planEditItem(this,'date')">
+      <select class="field-select pl-in" onchange="planEditItem(this,'type')">${plOptions(PLANNER_ACTIVITY_TYPES, it.type)}</select>
+      <select class="field-select pl-in" onchange="planEditItem(this,'department')">${plOptions(DEPARTMENTS, it.department)}</select>
+      <input class="field-input pl-in" value="${plEsc(it.title)}" maxlength="140" onchange="planEditItem(this,'title')">
+    </div>
+    <div class="pl-sub">${sub.join('')}</div>
+    <div class="pl-sub"><input class="field-input pl-in" value="${plEsc(it.objective)}" maxlength="500" placeholder="Objective / message" onchange="planEditItem(this,'objective')"></div>
+    ${it.rationale ? `<div class="pl-why"><strong>Why:</strong> ${plEsc(it.rationale)}${it.anchorKind ? ` <span style="color:var(--navy)">· ${plEsc(it.anchorKind)}${it.anchorName ? ': ' + plEsc(it.anchorName) : ''}</span>` : ''}</div>` : ''}
+    ${flags ? `<div class="pl-why">${flags}</div>` : ''}
+  </div>`;
+}
+
+function renderPlanReview() {
+  if(!PLAN) return;
+  document.getElementById('pl-review').innerHTML = PLAN.order.map(name => {
+    const e = PLAN.entities[name];
+    if(e.status !== 'done') {
+      return `<div class="pl-card"><div class="pl-entity-head"><div class="pl-entity-name">${plEsc(name)}</div>
+        <button class="btn btn-sm" data-entity="${plEsc(name)}" onclick="plRetryEntity(this.dataset.entity)" ${e.status === 'running' ? 'disabled' : ''}>${e.status === 'running' ? 'Planning…' : 'Retry'}</button></div>
+        <div style="font-size:12px;color:var(--red)">${plEsc(e.error || 'Not planned yet')}</div></div>`;
+    }
+    const themeBlocks = e.themes.map(t => {
+      const kids = e.items.filter(i => i.themeKey === t.key);
+      const tp = plThemeProblems(t, PLAN.month);
+      return `<div class="pl-theme" data-pl-theme="1" data-e="${plEsc(name)}" data-k="${plEsc(t.key)}">
+        <div class="pl-theme-head">
+          <div class="pl-theme-grid">
+            <input class="field-input pl-in" value="${plEsc(t.title)}" maxlength="140" style="font-weight:700" onchange="planEditTheme(this,'title')">
+            <input class="field-input pl-in" type="date" value="${plEsc(t.startDate)}" min="${PLAN.bounds.start}" max="${PLAN.bounds.end}" onchange="planEditTheme(this,'startDate')">
+            <input class="field-input pl-in" type="date" value="${plEsc(t.endDate)}" min="${PLAN.bounds.start}" max="${PLAN.bounds.end}" onchange="planEditTheme(this,'endDate')">
+          </div>
+          <input class="field-input pl-in" value="${plEsc(t.objective)}" maxlength="500" placeholder="Campaign objective" onchange="planEditTheme(this,'objective')">
+          <div style="font-size:10px;color:var(--text-3);margin-top:5px">Campaign · ${plEsc(t.department)} · ${kids.filter(k => k.include).length} of ${kids.length} activities selected${kids.some(k => k.include) ? '' : ' — nothing selected, so this campaign will not be created'}
+            ${tp.map(p => `<span class="pl-flag bad">Needs a valid ${plEsc(p)}</span>`).join('')}</div>
+        </div>
+        ${kids.map(k => plItemHtml(e, k)).join('') || '<div class="pl-item" style="color:var(--text-3)">No activities under this campaign.</div>'}
+      </div>`;
+    }).join('');
+    const loose = e.items.filter(i => !i.themeKey);
+    return `<div class="pl-card" data-pl-entity="${plEsc(name)}">
+      <div class="pl-entity-head"><div class="pl-entity-name">${plEsc(name)}</div>
+        <div style="font-size:11px;color:var(--text-3)" data-pl-count="${plEsc(name)}"></div></div>
+      ${e.strategy ? `<div class="pl-strategy"><strong>Strategy:</strong> ${plEsc(e.strategy)}</div>` : ''}
+      ${e.warnings.map(w => `<div style="margin-bottom:8px"><span class="pl-flag">${plEsc(w)}</span></div>`).join('')}
+      ${themeBlocks}
+      ${loose.length ? `<div class="pl-theme"><div class="pl-theme-head" style="background:var(--bg)"><strong style="font-size:12px">Standalone activities</strong></div>${loose.map(k => plItemHtml(e, k)).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+  refreshPlanSummary();
+}
+
+function plFindItem(el) {
+  const row = el.closest('[data-pl-item]');
+  const e = PLAN.entities[row.dataset.e];
+  return { row, e, it: e.items.find(i => i.id === row.dataset.i) };
+}
+window.planEditItem = function(el, field) {
+  const { row, e, it } = plFindItem(el);
+  if(!it) return;
+  if(field === 'include') { it.include = el.checked; row.classList.toggle('off', !it.include); refreshPlanSummary(); return; }
+  if(field === 'type') {
+    it.type = el.value;
+    it.channels = it.channels.filter(c => PL_CHANNEL_CHOICES.includes(c)); // e.g. drop "Print" when switching away from a print piece
+    plApplyTypeDefaults(it);
+    renderPlanReview(); return;
+  }
+  if(field === 'themeKey') { it.themeKey = el.value || null; renderPlanReview(); return; }
+  it[field] = el.value;
+  if(field === 'title' || field === 'date') {
+    // Editing the field is the admin acknowledging it: lift the placeholder block + its flag.
+    if(field === 'title') it.fixTitle = false; else it.fixDate = false;
+    it.flags = it.flags.filter(f => f.tag !== field);
+    renderPlanReview(); // re-evaluate the "needs a valid …" flags
+  }
+  else refreshPlanSummary();
+}
+window.planToggleChannel = function(el, ch) {
+  const { it } = plFindItem(el);
+  if(!it) return;
+  const i = it.channels.indexOf(ch);
+  if(i === -1) it.channels.push(ch); else it.channels.splice(i, 1);
+  el.classList.toggle('active', it.channels.includes(ch));
+}
+window.planEditTheme = function(el, field) {
+  const box = el.closest('[data-pl-theme]');
+  const t = PLAN.entities[box.dataset.e].themes.find(x => x.key === box.dataset.k);
+  if(!t) return;
+  t[field] = el.value;
+  renderPlanReview();
+}
+
+function plPlanProblems() {
+  let n = 0;
+  PLAN.order.forEach(name => {
+    const e = PLAN.entities[name];
+    if(e.status !== 'done') return;
+    e.items.filter(i => i.include).forEach(i => { n += plItemProblems(i, PLAN.month).length; });
+    const used = new Set(e.items.filter(i => i.include).map(i => i.themeKey).filter(Boolean));
+    e.themes.filter(t => used.has(t.key)).forEach(t => { n += plThemeProblems(t, PLAN.month).length; });
+  });
+  return n;
+}
+function refreshPlanSummary(keepMessage = false) {
+  if(!PLAN) return;
+  const w = plBuildWrites(PLAN, {});
+  const problems = plPlanProblems();
+  PLAN.order.forEach(name => {
+    const e = PLAN.entities[name];
+    const el = document.querySelector(`[data-pl-count="${CSS.escape(name)}"]`);
+    if(el && e.status === 'done') el.textContent = `${e.items.filter(i => i.include).length} of ${e.items.length} selected · target ${e.toPlan}`;
+  });
+  document.getElementById('pl-summary-text').innerHTML =
+    `<strong>${w.items.length}</strong> activit${w.items.length === 1 ? 'y' : 'ies'} and <strong>${w.themes.length}</strong> campaign${w.themes.length === 1 ? '' : 's'} will be created as <strong>Planned</strong>` +
+    (problems ? ` · <span style="color:var(--red);font-weight:600">${problems} thing${problems === 1 ? '' : 's'} to fix first</span>` : '');
+  const btn = document.getElementById('pl-apply-btn');
+  btn.disabled = plApplying || !w.items.length || problems > 0;
+  if(!keepMessage) document.getElementById('pl-apply-msg').textContent = ''; // an error from a failed apply must survive the refresh that follows it
+}
+
+// ── Apply + undo ──────────────────────────────────────────────────────────
+window.applyPlan = async function() {
+  if(!plRequireSuperAdmin()) return;
+  if(!PLAN || plApplying) return;
+  const w = plBuildWrites(PLAN, { createdByUid: currentAdminUid, createdByName: myMemberName() || currentAdminEmail || 'Unknown' });
+  if(!w.items.length || plPlanProblems() > 0) return;
+  if(!confirm(`Create ${w.items.length} activit${w.items.length === 1 ? 'y' : 'ies'} and ${w.themes.length} campaign${w.themes.length === 1 ? '' : 's'} in Activities, all as Planned?`)) return;
+  plApplying = true;
+  const btn = document.getElementById('pl-apply-btn'), msg = document.getElementById('pl-apply-msg');
+  btn.disabled = true;
+  msg.style.color = 'var(--text-3)'; msg.textContent = '';
+  let done = 0;
+  const total = w.themes.length + w.items.length;
+  try {
+    const idByKey = {};
+    for(const t of w.themes) {
+      const ref = await addInitiative(t.doc);
+      idByKey[`${t.entity}|${t.key}`] = ref.id;
+      msg.textContent = `Creating… ${++done} / ${total}`;
+    }
+    for(let i = 0; i < w.items.length; i += 5) {
+      await Promise.all(w.items.slice(i, i + 5).map(async it => {
+        const doc = { ...it.doc };
+        const pid = it.themeKey ? idByKey[`${it.entity}|${it.themeKey}`] : null;
+        if(pid) doc.parentCampaignId = pid;
+        await addInitiative(doc);
+        msg.textContent = `Creating… ${++done} / ${total}`;
+      }));
+    }
+    const planId = PLAN.planId, label = PLAN.bounds.label;
+    PLAN = null;
+    document.getElementById('pl-done').innerHTML = `
+      <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--green);margin-bottom:6px">✓ ${plEsc(label)} plan created</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:14px">${w.items.length} activit${w.items.length === 1 ? 'y' : 'ies'} and ${w.themes.length} campaign${w.themes.length === 1 ? '' : 's'} are now in Activities as <strong>Planned</strong>, unassigned — assign owners from there.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="switchTab('initiatives', document.querySelector('#group-initiatives .tab-dropdown-item'), 'group-initiatives')">View in Activities</button>
+        <button class="btn" onclick="plannerBackToSetup()">Plan another month</button>
+        <button class="btn btn-danger" data-plan="${plEsc(planId)}" onclick="undoPlan(this.dataset.plan)">Undo this plan</button>
+      </div>`;
+    plShow('pl-done-section');
+    showToast(`✓ ${w.items.length} activities created`);
+  } catch(e) {
+    // Partial failure: some documents exist. Say so plainly and keep the plan
+    // on screen — the tagged items can be removed with "Undo plan".
+    msg.textContent = `Stopped after ${done} of ${total}: ${e.message}. The ${done} already created can be removed with Undo plan.`;
+    msg.style.color = 'var(--red)';
+    showToast('Creation stopped part-way — see the message below the plan', true);
+  } finally {
+    plApplying = false;
+    if(PLAN) refreshPlanSummary(true);
+  }
+}
+
+window.undoPlan = async function(planId) {
+  if(!plRequireSuperAdmin()) return;
+  const t = plUndoTargets(ALL_INITIATIVES, planId);
+  if(!t.total) { showToast('Nothing found for that plan', true); return; }
+  if(!t.deleteIds.length) { showToast('Everything from this plan has already moved past Planned — nothing to undo', true); return; }
+  if(!confirm(`Delete ${t.deleteIds.length} of this plan's ${t.total} items (those still in Planned)?` +
+      (t.keptCount ? `\n\n${t.keptCount} will be kept because they've moved past Planned or have work under them.` : ''))) return;
+  try {
+    for(const id of t.deleteIds) await deleteInitiative(id);
+    showToast(`✓ Removed ${t.deleteIds.length} item${t.deleteIds.length === 1 ? '' : 's'}`);
+    if(!PLAN) { plShow('pl-setup'); renderPlannerSetup(); }
+  } catch(e) { showToast('Undo stopped: ' + e.message, true); }
+}
+
 // ── AI REPORTS ─────────────────────────────────────────────────────────
 function initAiReportsTab() {
   const monthInput = document.getElementById('air-month');
@@ -6590,6 +7433,7 @@ window.selectEntityProfile = function(name) {
 window.onEntityProfilesChanged = function() {
   renderEntityProfileChips();
   if(epSelected && !epDirty) loadEntityProfileForm(epSelected, true);
+  refreshPlannerSetupIfOpen(); // a profile just became "ready" (or not) — the planner's entity list depends on it
 }
 
 window.saveEntityProfileForm = async function() {
