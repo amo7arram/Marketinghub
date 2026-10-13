@@ -5684,6 +5684,7 @@ Rules for fields:
 - type Event: set eventScope.
 - type Website Update: set websiteUpdateType.
 - Every date must be inside ${b.start} to ${b.end}. A theme's endDate must be on or after its startDate and inside the month.
+- Keep every text field short (under 200 characters). Do not put double-quote characters inside text — use single quotes instead.
 - "anchor.kind" is one of: calendar, partnership, season, focus-department, gap, brand. For kind "calendar", "anchor.name" must be a name from the supplied calendar exactly. For "partnership", name the partner from the brief.
 
 Return ONLY this JSON:
@@ -5994,6 +5995,35 @@ window.startPlanGeneration = async function() {
   }
 }
 
+// Output budget grows with the number of activities asked for (each is roughly
+// 250–400 tokens of JSON with its rationale), so a 15-activity plan can't be
+// cut off by a limit sized for a handful.
+const plMaxTokens = count => Math.min(16000, 3000 + count * 600);
+
+// One call, tolerant parse, and ONE automatic retry if the reply can't be
+// parsed at all (not for API/network errors — those fail straight through).
+// Returns { value, repaired, truncated, stopReason }.
+async function plAskModel(system, user, count, name) {
+  let last = null;
+  for(let attempt = 1; attempt <= 2; attempt++) {
+    const sys = attempt === 1 ? system :
+      system + '\n\nIMPORTANT: your previous reply could not be read as JSON. Reply with exactly ONE valid JSON object and nothing else: escape any double quotes inside text (or avoid them), no trailing commas, no comments, no text before or after, and keep every text field short.';
+    const { text, stopReason } = await advisorClaudeCall({
+      system: sys, messages: [{ role: 'user', content: user }], maxTokens: plMaxTokens(count), model: plModel(), returnMeta: true,
+    });
+    try {
+      const parsed = parseModelJson(text);
+      return { ...parsed, stopReason };
+    } catch(err) {
+      last = { text, stopReason, message: err.message };
+      console.error(`Planner (${name}): attempt ${attempt} reply could not be parsed (${err.message}). Raw text was:`, text);
+    }
+  }
+  const t = String(last.text || '');
+  throw new Error(`The planner's reply wasn't valid JSON${last.stopReason === 'max_tokens' ? ' (it was cut off at the length limit)' : ''}, even after one automatic retry. ` +
+    (t ? `It began: "${t.slice(0, 70).replace(/\s+/g, ' ')}…" and ended: "…${t.slice(-70).replace(/\s+/g, ' ')}". ` : 'It was empty. ') + 'Click Retry; if it keeps happening, ask for fewer activities.');
+}
+
 async function plRunEntity(plan, name) {
   const e = plan.entities[name];
   e.status = 'running'; e.startedAt = Date.now(); e.error = '';
@@ -6002,14 +6032,19 @@ async function plRunEntity(plan, name) {
     const d = plData();
     const ctx = plEntityContext(name, plan.month, d);
     const { system, user } = plBuildPrompt(ctx, e.toPlan, plan.contextNote);
-    const raw = await advisorClaudeCall({ system, messages: [{ role: 'user', content: user }], maxTokens: 9000, expectJson: true, model: plModel() });
+    const { value: raw, repaired, truncated, stopReason } = await plAskModel(system, user, e.toPlan, name);
     const fallbackDept = DEPARTMENTS.includes('General / Brand') ? 'General / Brand' : DEPARTMENTS[0];
     const norm = plNormalize(raw, {
       month: plan.month, entityName: name, toPlan: e.toPlan, fallbackDept,
       existingTitles: ctx.alreadyPlannedThisMonth.map(x => x.title), calendarNames: ctx.calendar.map(c => c.name),
     });
     Object.assign(e, norm, { status: 'done' });
-    if(!norm.items.length) { e.status = 'failed'; e.error = 'The planner returned no usable activities — try again.'; }
+    if(truncated || stopReason === 'max_tokens') {
+      e.warnings.unshift(`The planner's reply was cut off at its length limit — ${norm.items.length} complete activit${norm.items.length === 1 ? 'y was' : 'ies were'} recovered (you asked for ${e.toPlan}). Retry, or plan the remainder in a second run.`);
+    } else if(repaired) {
+      e.warnings.unshift('The planner\'s reply had minor formatting problems that were repaired automatically — worth a quick check.');
+    }
+    if(!norm.items.length) { e.status = 'failed'; e.error = truncated ? 'The planner\'s reply was cut off before any activity was complete — try again, or ask for fewer activities.' : 'The planner returned no usable activities — try again.'; }
   } catch(err) {
     e.status = 'failed'; e.error = err.message || 'Unknown error';
   }
@@ -6966,7 +7001,10 @@ function advCollectNotes() {
 // Despite the name (added for the Advisor tab first), this is a general
 // helper — the Offers Catalog Arabic-translation step reuses it too rather
 // than duplicating a 4th copy of this same fetch boilerplate.
-async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJson = false, model = ADVISOR_MODEL }) {
+// `returnMeta: true` returns { text, stopReason } WITHOUT parsing, for callers
+// (the Monthly Planner) that do their own tolerant parsing and need to know
+// whether the reply was cut off at max_tokens.
+async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJson = false, model = ADVISOR_MODEL, returnMeta = false }) {
   if(!ANTHROPIC_API_KEY) throw new Error('No API key configured — set it in Campaign Generator → AI Setup');
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -6986,6 +7024,7 @@ async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJso
   }
   const data = await res.json();
   const text = data.content?.find(b => b.type === 'text')?.text || '';
+  if(returnMeta) return { text, stopReason: data.stop_reason || '' };
   if(!expectJson) return text;
   try { return JSON.parse(extractJsonBlock(text)); }
   catch(e) {
@@ -6995,8 +7034,72 @@ async function advisorClaudeCall({ system, messages, maxTokens = 3000, expectJso
     // devtools instead of a pure guess (this is exactly how the previous
     // occurrence had to be diagnosed).
     console.error('Could not parse AI JSON response. Raw text was:', text);
-    throw new Error('Could not parse the advisor response — try again (raw response logged to console for debugging)');
+    throw new Error(`Could not parse the advisor response${data.stop_reason === 'max_tokens' ? ' (it was cut off at the length limit)' : ''} — try again (raw response logged to console for debugging)`);
   }
+}
+
+// ── Tolerant JSON parsing for model replies (used by the Monthly Planner) ──
+// A model reply that is *almost* JSON is common: a trailing comma, a raw line
+// break inside a string, or a reply cut off at max_tokens part-way through a
+// long list. Throwing the whole plan away for those wastes a slow, paid call,
+// so this repairs what it safely can: it escapes raw control characters inside
+// strings, drops trailing commas, and — if the reply was truncated — rewinds
+// to the last COMPLETE object/array and closes everything still open, keeping
+// every activity that finished. It never invents content; at worst the tail
+// is dropped. (The Advisor keeps its strict parse on purpose: a briefing with
+// a missing tail section would render wrongly, whereas a plan with fewer
+// activities is simply a shorter plan.)
+function repairJsonText(s) {
+  const out = [], stack = [];
+  let inStr = false, esc = false, safeLen = -1, safeStack = null;
+  const dropTrailingComma = () => {
+    let j = out.length - 1;
+    while(j >= 0 && /\s/.test(out[j])) j--;
+    if(j >= 0 && out[j] === ',') out.splice(j, 1);
+  };
+  for(let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if(inStr) {
+      if(esc) { out.push(ch); esc = false; }
+      else if(ch === '\\') { out.push(ch); esc = true; }
+      else if(ch === '"') { out.push(ch); inStr = false; }
+      else if(ch === '\n') out.push('\\n');
+      else if(ch === '\t') out.push('\\t');
+      else if(ch === '\r') { /* dropped */ }
+      else out.push(ch);
+      continue;
+    }
+    if(ch === '"') { inStr = true; out.push(ch); }
+    else if(ch === '{' || ch === '[') { stack.push(ch); out.push(ch); }
+    else if(ch === '}' || ch === ']') {
+      dropTrailingComma();
+      stack.pop(); out.push(ch);
+      safeLen = out.length; safeStack = stack.slice(); // a complete object/array just closed here
+      if(!stack.length) break; // the first top-level value is complete — ignore any chatter after it
+    } else if(ch === ',') {
+      // A comma outside a string always follows a finished value, so cutting
+      // just before it leaves a valid prefix. This is what lets a reply that
+      // was cut off before ANY object had closed still be rewound.
+      safeLen = out.length; safeStack = stack.slice();
+      out.push(ch);
+    } else out.push(ch);
+  }
+  let truncated = false;
+  if(inStr || stack.length) {
+    truncated = true;
+    if(safeLen >= 0) { out.length = safeLen; stack.length = 0; stack.push(...safeStack); }
+    dropTrailingComma();
+    while(stack.length) out.push(stack.pop() === '{' ? '}' : ']');
+  }
+  return { text: out.join(''), truncated };
+}
+
+// Returns { value, repaired, truncated }; throws if even the repaired text isn't JSON.
+function parseModelJson(text) {
+  const block = extractJsonBlock(String(text || ''));
+  try { return { value: JSON.parse(block), repaired: false, truncated: false }; } catch(e) { /* fall through to repair */ }
+  const fixed = repairJsonText(block);
+  return { value: JSON.parse(fixed.text), repaired: true, truncated: fixed.truncated };
 }
 
 // Claude is asked to return ONLY JSON, but a response can still arrive
