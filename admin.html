@@ -478,6 +478,8 @@ tr.row-overdue:hover td{background:#FFD6D6}
 
     <!-- LEADS CRM PAGE -->
     <div class="page" id="page-leads">
+      <!-- Automatic-sync status (set up under Settings → Lead Automation) -->
+      <div id="la-chip" onclick="switchTab('settings', document.querySelector('#admin-tabs .tab[onclick*=settings]'))" title="Open Lead Automation settings" style="display:none;cursor:pointer;font-size:12px;margin-bottom:12px;padding:8px 14px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border)"></div>
       <!-- Month navigator — scopes the stat cards AND the table below to leads
            whose Date Created falls in the chosen month, so the headline numbers
            describe one month, not every lead since day one. The Agent and
@@ -1115,6 +1117,63 @@ tr.row-overdue:hover td{background:#FFD6D6}
           </div>
 
           <div id="entities-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+
+        <!-- Lead Automation — automatic sheet sync + assignment -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow)">
+          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">⚡ Lead Automation</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:14px;line-height:1.6">Keeps leads from going cold. While this admin page <strong>or</strong> the call-center page is open in anyone's browser, it checks your Google Sheet every few minutes, imports the new leads, classifies their department, and assigns them to agents who are online <em>right now</em>. If no agent is online, leads wait unassigned and are handed out the moment one appears.</div>
+
+          <div id="la-status" style="font-size:12px;background:var(--bg);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;line-height:1.7"></div>
+
+          <div oninput="markLeadAutomationDirty()" onchange="markLeadAutomationDirty()">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+              <input type="checkbox" id="la-enabled" style="width:16px;height:16px;cursor:pointer">
+              <label for="la-enabled" style="font-size:13px;font-weight:700;color:var(--text);cursor:pointer">Automatic sync is ON</label>
+            </div>
+            <div class="field-group"><label class="field-label">Google Sheet link <span style="color:var(--text-3);font-weight:400;font-size:11px">— link-sharing must be "Anyone with the link can view"</span></label>
+              <input class="field-input" id="la-sheet" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+            <div class="field-group"><label class="field-label">Which leads to import first</label>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-2)">
+                <label style="cursor:pointer"><input type="radio" name="la-start" id="la-start-new" value="new"> Only leads that arrive <strong>from now on</strong> <span style="color:var(--text-3)">(recommended — your existing leads are left alone)</span></label>
+                <label style="cursor:pointer"><input type="radio" name="la-start" id="la-start-all" value="all"> Also import rows already in the sheet <span style="color:var(--text-3)">(ones you already imported by hand are skipped, up to 300 per check)</span></label>
+              </div>
+              <div id="la-start-note" style="font-size:10px;color:var(--text-3);margin-top:4px"></div>
+            </div>
+            <div class="field-row">
+              <div class="field-group"><label class="field-label">Check every</label>
+                <select class="field-select" id="la-interval"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+              <div class="field-group"><label class="field-label">Default department <span style="color:var(--text-3);font-weight:400;font-size:11px">— when it can't be classified</span></label>
+                <select class="field-select" id="la-dept"></select></div>
+            </div>
+            <div class="field-row">
+              <div class="field-group"><label class="field-label">Default entity <span style="color:var(--text-3);font-weight:400;font-size:11px">— when the sheet has none (optional)</span></label>
+                <select class="field-select" id="la-entity"></select></div>
+              <div></div>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:14px">
+              <input type="checkbox" id="la-ai" style="width:16px;height:16px;margin-top:2px;cursor:pointer">
+              <label for="la-ai" style="font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer">🤖 Classify each lead's department with AI
+                <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5">Runs from admin pages only (the AI key isn't available on the call-center page). If an agent's page imports a lead first, it is marked pending and classified at the next admin check. Same rules as the manual import: names, phones and emails are never sent.</span></label>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:6px">
+              <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px">
+                <input type="checkbox" id="la-assign" style="width:16px;height:16px;margin-top:2px;cursor:pointer">
+                <label for="la-assign" style="font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer">Auto-assign new leads to agents who are online
+                  <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5">"Online" = their call-center page was open in the last 3 minutes. Each lead goes to the online agent with the fewest untouched leads.</span></label>
+              </div>
+              <div class="field-group"><label class="field-label">Max untouched leads per agent <span style="color:var(--text-3);font-weight:400;font-size:11px">— leave blank for no limit; once everyone is at the limit, leads wait unassigned</span></label>
+                <input class="field-input" type="number" id="la-cap" min="1" max="500" style="max-width:160px" placeholder="no limit"></div>
+              <div class="field-group"><label class="field-label">Agents who receive auto-assigned leads</label>
+                <div id="la-agents" style="display:flex;flex-direction:column;gap:6px;font-size:12px"></div></div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="la-save-btn" onclick="saveLeadAutomationForm()">Save settings</button>
+            <button class="btn" onclick="runLeadSyncNow()">⟳ Sync now</button>
+            <span id="la-msg" style="font-size:11px;color:var(--text-3)"></span>
+          </div>
         </div>
 
         <!-- Entity Profiles — what the monthly planner knows about each entity -->
@@ -2090,9 +2149,15 @@ import {
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
   watchEntityProfiles, saveEntityProfile,
+  watchLeadAutomation, saveLeadAutomation, watchLeadSyncState, acquireLeadSyncLock, finishLeadSyncRun, watchAgentPresence,
   DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
   HEALTH_DAY_CATEGORIES, getDeptColor
 } from './firebase-data.js';
+import {
+  parseCSVText, parseExcelDate, matchDepartment, mapLeadStatus,
+  detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover,
+  createLeadAutomationRunner, eligibleAgents, PRESENCE_FRESH_MS
+} from './lead-sync.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
@@ -2236,6 +2301,11 @@ watchAuth(async user => {
     if(unsubRequests) unsubRequests();
     if(unsubRequestAccounts) unsubRequestAccounts();
     if(unsubEntityProfiles) unsubEntityProfiles();
+    stopLeadAutomation(); // before the data goes away, so a tick can't run on a signed-out session
+    if(unsubLeadAutomation) unsubLeadAutomation();
+    if(unsubLeadSyncState) unsubLeadSyncState();
+    if(unsubAgentPresence) unsubAgentPresence();
+    LEAD_AUTOMATION = null; LEAD_SYNC_STATE = null; AGENT_PRESENCE = []; laDirty = false;
     knownRequestIds = null;
     PLAN = null; // an unreviewed plan must not survive a logout into the next person's session
     if(unsubExpenses) unsubExpenses();
@@ -2258,9 +2328,12 @@ watchAuth(async user => {
 
 function initData() {
   populateStaticSelects();
-  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderCampaignPerformance(); renderMarketingActionsTable(); refreshPlannerSetupIfOpen(); });
+  unsubLeadAutomation = watchLeadAutomation(data => { LEAD_AUTOMATION = data; syncAgentDirectory(); loadLeadAutomationForm(); renderLeadAutomationStatus(); laMarkReady('cfg'); });
+  unsubLeadSyncState  = watchLeadSyncState(data => { LEAD_SYNC_STATE = data; renderLeadAutomationStatus(); });
+  unsubAgentPresence  = watchAgentPresence(list => { AGENT_PRESENCE = list; renderLeadAutomationStatus(); laMarkReady('presence'); onAgentPresenceChanged(); });
+  unsubInitiatives  = watchInitiatives(data  => { ALL_INITIATIVES = data; laMarkReady('initiatives'); renderTable(); renderBudgetTab(); refreshCampaignDrilldownIfOpen(); populateLeadCampaignSelects(); renderLeadsTable(); computeAndPublishLeadStats(); renderCampaignPerformance(); renderMarketingActionsTable(); refreshPlannerSetupIfOpen(); });
   unsubHealthDays   = watchHealthDays(data   => { ALL_HEALTH_DAYS = data; renderHealthDaysTable(); refreshPlannerSetupIfOpen(); });
-  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); refreshPlannerAccess(); });
+  unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; syncAgentDirectory(); renderLeadAutomationAgents(); renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); refreshPlannerAccess(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); renderCampaignPerformance(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
   unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); if(currentRequestDetailId) renderRequestDetail(); });
@@ -2277,10 +2350,11 @@ function initData() {
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
   unsubAnalyticsSettings = watchAnalyticsSettings(data => { ANALYTICS_SETTINGS = data; loadAnalyticsSettingsForm(); });
-  unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; renderLeadsTable(); renderLeadsStats(); renderLandingPagesTable(); });
+  unsubLeads        = watchLeads(data        => { ALL_LEADS       = data; laMarkReady('leads'); renderLeadsTable(); renderLeadsStats(); renderLandingPagesTable(); });
   unsubMarketingActions = watchMarketingActions(data => { ALL_MARKETING_ACTIONS = data; renderMarketingActionsTable(); });
   unsubLandingPages = watchLandingPages(data => { ALL_LANDING_PAGES = data; renderLandingPagesTable(); });
   unsubAdvisorBrief = watchAdvisorBrief(data => { ADVISOR_BRIEF = data; if(document.getElementById('page-advisor')?.classList.contains('active')) renderAdvisorBrief(); });
+  startLeadAutomation();
   initMetricsTab();
   initBudgetTab();
 }
@@ -7455,6 +7529,276 @@ window.removeTeamMember = async function(id, authUid, name) {
   } catch(e) { showToast('Delete failed: ' + e.message, true); }
 }
 
+// ── SETTINGS TAB — Lead Automation (automatic sheet sync + assignment) ───
+// The engine (parse, dedupe, assign, scheduler) is in lead-sync.js and runs
+// identically on the call-center page; this is the admin's control panel plus
+// the two things only an admin page can do: AI department classification
+// (the API key is admin-only) and sweeping leads another page imported before
+// it could classify them.
+let LEAD_AUTOMATION = null, LEAD_SYNC_STATE = null, AGENT_PRESENCE = [];
+let unsubLeadAutomation = null, unsubLeadSyncState = null, unsubAgentPresence = null, laTicker = null;
+let leadRunner = null, laDirty = false, laKickedOnce = false, laLastSweepAt = 0;
+let laPrevPresence = new Map();
+const laReady = { cfg: false, leads: false, initiatives: false, presence: false };
+const AUTO_SYNC_MAX_AI_ANSWERS = 120; // distinct answers classified per run — bounds time/cost; the rest stay pending for a later run
+
+function laMarkReady(k) {
+  laReady[k] = true;
+  // First moment everything the sync depends on is loaded: run straight away
+  // (a page open should refresh leads NOW, not a minute from now).
+  if(!laKickedOnce && leadRunner && laReady.cfg && laReady.leads && laReady.initiatives && laReady.presence) {
+    laKickedOnce = true;
+    leadRunner.tick(true).catch(() => {});
+  }
+}
+
+// Classification for an automatic run. Also used by the pending sweep. Sets
+// department/departmentSource on rows it can place and _aiFailed on rows it
+// tried but couldn't (API error, skipped, or over the per-run cap) — a row
+// with nothing to classify is left alone and is NOT failed (it's final).
+async function autoSyncClassify(rows) {
+  const seen = new Set(), inCap = [];
+  rows.forEach(r => {
+    r._classifyText = leadDeptText(r, r.hint);
+    if(!r._classifyText) return;
+    if(seen.has(r._classifyText) || seen.size < AUTO_SYNC_MAX_AI_ANSWERS) { seen.add(r._classifyText); inCap.push(r); }
+    else r._aiFailed = true;
+  });
+  if(inCap.length) await classifyLeadDepartments(inCap);
+}
+
+// Leads another page (call-center) imported before this page could classify
+// them. Classified here, then released from "pending".
+async function sweepPendingDepartments() {
+  const cfg = LEAD_AUTOMATION;
+  if(!cfg || !cfg.classifyWithAI || !ANTHROPIC_API_KEY) return;
+  if(Date.now() - laLastSweepAt < 90000) return;
+  const pending = ALL_LEADS.filter(l => l.deptPending === true).slice(0, 200);
+  if(!pending.length) return;
+  laLastSweepAt = Date.now();
+  const rows = pending.map(l => ({ id: l.id, name: l.name, phone: l.phone, email: l.email, notes: l.notes, hint: l.sourceHint || '', department: null }));
+  try {
+    await autoSyncClassify(rows);
+    for(const r of rows) {
+      const cur = ALL_LEADS.find(x => x.id === r.id);
+      if(!cur || cur.deptPending !== true) continue; // someone fixed it by hand meanwhile
+      if(r.department) await updateLead(r.id, { department: r.department, departmentSource: 'ai', deptPending: false });
+      else if(!r._aiFailed) await updateLead(r.id, { deptPending: false });
+    }
+  } catch(e) { console.error('sweepPendingDepartments:', e); }
+}
+
+function startLeadAutomation() {
+  Object.keys(laReady).forEach(k => { laReady[k] = false; });
+  laKickedOnce = false; laPrevPresence = new Map();
+  leadRunner = createLeadAutomationRunner({
+    page: 'admin',
+    isReady: () => laReady.cfg && laReady.leads && laReady.initiatives && laReady.presence,
+    getCfg: () => LEAD_AUTOMATION,
+    getState: () => LEAD_SYNC_STATE,
+    who: () => myMemberName() || currentAdminEmail || 'Admin',
+    acquireLock: acquireLeadSyncLock,
+    finishRun: finishLeadSyncRun,
+    buildDeps: (state, cfg) => ({
+      config: cfg, now: Date.now(), watermarkMs: state.watermarkMs || 0,
+      fetchCsv: fetchGoogleSheetCSV, leads: ALL_LEADS, initiatives: ALL_INITIATIVES, presence: AGENT_PRESENCE,
+      addLeads: docs => bulkAddLeads(docs), updateLead, classify: autoSyncClassify,
+    }),
+    onRun: result => {
+      renderLeadAutomationStatus();
+      const assigned = (result.assignedNew || 0) + (result.assignedBacklog || 0);
+      if(!result.error && (result.imported || result.assignedBacklog)) {
+        showToast(`⚡ Auto-sync: ${result.imported} new lead${result.imported === 1 ? '' : 's'} imported${assigned ? `, ${assigned} assigned` : ''}`, false, 5000);
+      }
+      sweepPendingDepartments();
+    },
+  });
+  leadRunner.start();
+  clearInterval(laTicker);
+  laTicker = setInterval(renderLeadAutomationStatus, 30000); // keeps "2 min ago" honest
+}
+function stopLeadAutomation() {
+  if(leadRunner) { leadRunner.stop(); leadRunner = null; }
+  clearInterval(laTicker); laTicker = null;
+}
+
+// An agent who was away and is back (or just arrived) should get waiting
+// leads immediately — that is the whole point: no cold leads.
+function onAgentPresenceChanged() {
+  const now = Date.now();
+  let cameOnline = false;
+  AGENT_PRESENCE.forEach(p => {
+    const fresh = now - (p.lastSeen || 0) <= PRESENCE_FRESH_MS;
+    const prev = laPrevPresence.get(p.uid);
+    if(fresh && (prev === undefined || (p.lastSeen - prev) > PRESENCE_FRESH_MS)) cameOnline = true;
+    laPrevPresence.set(p.uid, p.lastSeen || 0);
+  });
+  if(cameOnline && leadRunner && laKickedOnce) leadRunner.tick(true).catch(() => {});
+}
+
+// The agent-pages can't read team_members, so the names they assign by come
+// from a small directory stored with the settings. Kept current here.
+function laDesiredDirectory() {
+  return ALL_TEAM_MEMBERS.filter(m => m.hasLoginAccount && m.authUid && m.role === 'agent' && m.active !== false)
+    .map(m => ({ uid: m.authUid, name: m.name || m.email || 'Agent' })).sort((a, b) => a.name.localeCompare(b.name));
+}
+function syncAgentDirectory() {
+  if(!LEAD_AUTOMATION || !ALL_TEAM_MEMBERS.length) return;
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const want = laDesiredDirectory(), have = [...(LEAD_AUTOMATION.agentDirectory || [])].sort(byName);
+  if(JSON.stringify(want) !== JSON.stringify(have)) saveLeadAutomation({ agentDirectory: want }, 'auto').catch(() => {});
+}
+
+// ── Form ──────────────────────────────────────────────────────────────────
+window.markLeadAutomationDirty = function() {
+  laDirty = true;
+  const m = document.getElementById('la-msg');
+  if(m) m.textContent = 'Unsaved changes';
+}
+
+function renderLeadAutomationAgents() {
+  const el = document.getElementById('la-agents');
+  if(!el) return;
+  const cfg = LEAD_AUTOMATION || {};
+  const current = new Map([...el.querySelectorAll('input[data-uid]')].map(i => [i.dataset.uid, i.checked])); // keep unsaved ticks across live refreshes
+  const excluded = new Set(cfg.excludedAgentUids || []);
+  const now = Date.now();
+  const dir = laDesiredDirectory();
+  el.innerHTML = dir.length ? dir.map(a => {
+    const p = AGENT_PRESENCE.find(x => x.uid === a.uid);
+    const online = !!p && now - (p.lastSeen || 0) <= PRESENCE_FRESH_MS;
+    const checked = current.has(a.uid) ? current.get(a.uid) : !excluded.has(a.uid);
+    return `<label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" data-uid="${esc(a.uid)}" ${checked ? 'checked' : ''} style="width:15px;height:15px">
+      <span style="font-weight:600">${esc(a.name)}</span>
+      <span style="font-size:10px;color:${online ? 'var(--green)' : 'var(--text-3)'}">${online ? '● online now' : '○ offline'}</span></label>`;
+  }).join('') : '<div style="font-size:11px;color:var(--text-3)">No agents with a login yet — add one under Team Members (role: Agent).</div>';
+}
+
+function laFillSelects() {
+  const dept = document.getElementById('la-dept'), ent = document.getElementById('la-entity');
+  if(!dept || !ent) return;
+  const pd = dept.value, pe = ent.value;
+  dept.innerHTML = '<option value="">— choose —</option>' + DEPARTMENTS.map(d => `<option>${esc(d)}</option>`).join('');
+  ent.innerHTML = '<option value="">— none —</option>' + ALL_ENTITIES.map(e => `<option>${esc(e.name)}</option>`).join('');
+  dept.value = pd; ent.value = pe;
+}
+
+function loadLeadAutomationForm() {
+  if(!document.getElementById('la-enabled')) return;
+  laFillSelects();
+  renderLeadAutomationAgents();
+  if(laDirty) return; // never overwrite what's being typed
+  const c = LEAD_AUTOMATION || {};
+  document.getElementById('la-enabled').checked = c.enabled === true;
+  document.getElementById('la-sheet').value = c.sheetUrl || '';
+  document.getElementById(c.startFromMode === 'all' ? 'la-start-all' : 'la-start-new').checked = true;
+  document.getElementById('la-start-note').textContent = c.startFromMs ? `Importing leads that arrived after ${new Date(c.startFromMs).toLocaleString('en-GB')}.` : (c.startFromMode === 'all' ? '' : 'The start time is set the first time you save with sync on.');
+  document.getElementById('la-interval').value = String(c.intervalMinutes || 2);
+  document.getElementById('la-dept').value = c.defaultDepartment || '';
+  document.getElementById('la-entity').value = c.defaultEntity || '';
+  document.getElementById('la-ai').checked = c.classifyWithAI !== false;      // on unless switched off
+  document.getElementById('la-assign').checked = c.autoAssign !== false;      // on unless switched off
+  document.getElementById('la-cap').value = c.maxUntouchedPerAgent || '';
+  document.getElementById('la-msg').textContent = '';
+}
+
+window.saveLeadAutomationForm = async function() {
+  const $ = id => document.getElementById(id);
+  const enabled = $('la-enabled').checked;
+  const sheetUrl = $('la-sheet').value.trim();
+  const defaultDepartment = $('la-dept').value;
+  if(sheetUrl && !parseGoogleSheetId(sheetUrl)) { showToast("That doesn't look like a Google Sheet link", true); return; }
+  if(enabled && !sheetUrl) { showToast('Paste the Google Sheet link before turning sync on', true); return; }
+  if(enabled && !defaultDepartment) { showToast('Choose a default department first (used when a lead can\'t be classified)', true); return; }
+  const capRaw = $('la-cap').value.trim();
+  const cap = capRaw === '' ? null : parseInt(capRaw, 10);
+  if(cap !== null && !(cap >= 1 && cap <= 500)) { showToast('Max untouched per agent must be between 1 and 500, or blank', true); return; }
+
+  const prev = LEAD_AUTOMATION || {};
+  const mode = $('la-start-all').checked ? 'all' : 'new';
+  let startFromMs = prev.startFromMs ?? null;
+  if(mode === 'all') {
+    if(prev.startFromMode !== 'all' && !confirm('Import the rows already in the sheet too?\n\nLeads you already imported by hand are skipped, and it imports at most 300 per check — but check the sheet link is the right one first.')) return;
+    startFromMs = 0;
+  } else if(prev.startFromMode !== 'new' || startFromMs == null || prev.sheetUrl !== sheetUrl) {
+    startFromMs = Date.now(); // first enable, a mode switch, or a new sheet: start counting from now
+  }
+  const excludedAgentUids = [...document.querySelectorAll('#la-agents input[data-uid]')].filter(i => !i.checked).map(i => i.dataset.uid);
+
+  const btn = $('la-save-btn');
+  btn.disabled = true;
+  try {
+    await saveLeadAutomation({
+      enabled, sheetUrl, intervalMinutes: parseInt($('la-interval').value, 10) || 2,
+      defaultDepartment, defaultEntity: $('la-entity').value,
+      classifyWithAI: $('la-ai').checked, autoAssign: $('la-assign').checked,
+      maxUntouchedPerAgent: cap, excludedAgentUids,
+      startFromMode: mode, startFromMs, agentDirectory: laDesiredDirectory(),
+    }, myMemberName() || currentAdminEmail);
+    laDirty = false;
+    $('la-msg').textContent = enabled ? 'Saved ✓ — syncing' : 'Saved ✓ (sync is off)';
+    showToast(enabled ? '✓ Automatic sync saved and running' : '✓ Settings saved (sync is off)');
+    if(enabled && leadRunner) setTimeout(() => { if(leadRunner) leadRunner.tick(true).catch(() => {}); }, 800); // after the new settings arrive
+  } catch(e) { showToast('Save failed: ' + e.message, true); }
+  finally { btn.disabled = false; }
+}
+
+window.runLeadSyncNow = async function() {
+  if(!leadRunner) return;
+  if(!LEAD_AUTOMATION || !LEAD_AUTOMATION.enabled) { showToast('Turn automatic sync on and save first', true); return; }
+  showToast('Checking the sheet…');
+  const r = await leadRunner.tick(true);
+  if(r.ran) return; // onRun already reported the result
+  const why = { recent: 'It already checked less than 30 seconds ago.', busy: `${(LEAD_SYNC_STATE && LEAD_SYNC_STATE.holderName) || 'Another browser'} is syncing right now.`,
+                running: 'A check is already in progress here.', 'not-ready': 'Still loading your leads — try again in a moment.', disabled: 'Turn automatic sync on and save first.' }[r.skipped] || 'Nothing to do.';
+  showToast(why, r.skipped === 'disabled');
+}
+
+// ── Status (Settings panel + the chip on the Leads CRM page) ──────────────
+function laAgo(ms) {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if(s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if(m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`;
+}
+function renderLeadAutomationStatus() {
+  const box = document.getElementById('la-status'), chip = document.getElementById('la-chip');
+  const cfg = LEAD_AUTOMATION, st = LEAD_SYNC_STATE || {}, r = st.lastResult || null, now = Date.now();
+  const online = eligibleAgents(AGENT_PRESENCE, cfg || {}, now);
+  const syncing = st.leaseUntil && st.leaseUntil > now;
+  const sumSkipped = r && r.skipped ? Object.values(r.skipped).reduce((a, b) => a + b, 0) : 0;
+  const assigned = r ? (r.assignedNew || 0) + (r.assignedBacklog || 0) : 0;
+  if(box) {
+    const lines = [];
+    lines.push(!cfg ? '⚪ <strong>Not set up yet.</strong> Fill in the settings below and turn it on.'
+      : cfg.enabled ? '🟢 <strong>Automatic sync is ON</strong>' : '⚪ <strong>Automatic sync is OFF</strong>');
+    if(syncing) lines.push(`⟳ Syncing right now (${esc(st.holderName || 'a browser')})…`);
+    if(st.lastRunAt) {
+      lines.push(`Last check: <strong>${laAgo(st.lastRunAt)}</strong>${r && r.runBy ? ` · by ${esc(r.runBy)} (${esc(r.runPage || '')} page)` : ''}`);
+      if(r && r.error) lines.push(`<span style="color:var(--red)">⚠ ${esc(r.error)}</span>`);
+      else if(r) lines.push(`Result: <strong>${r.imported || 0}</strong> imported · <strong>${assigned}</strong> assigned${r.assignedBacklog ? ` (${r.assignedBacklog} were waiting)` : ''}` +
+        (r.classified ? ` · ${r.classified} classified by AI` : '') + (r.pendingDept ? ` · ${r.pendingDept} awaiting AI` : '') +
+        ` · ${sumSkipped} already known/older skipped` + (r.capped ? ' · <span style="color:var(--orange)">hit the 300-per-check limit — the rest follow next check</span>' : ''));
+    } else if(cfg && cfg.enabled) lines.push('Waiting for the first check…');
+    lines.push(`Agents online now: <strong>${online.length}</strong>${online.length ? ' — ' + online.map(a => esc(a.name)).join(', ') : ' <span style="color:var(--text-3)">(new leads wait unassigned until one appears)</span>'}`);
+    box.innerHTML = lines.join('<br>');
+  }
+  if(chip) {
+    if(!cfg) { chip.style.display = 'block'; chip.style.color = 'var(--text-3)'; chip.innerHTML = '⚡ Automatic lead sync isn\'t set up — click to configure'; }
+    else if(!cfg.enabled) { chip.style.display = 'block'; chip.style.color = 'var(--text-3)'; chip.innerHTML = '⚡ Automatic lead sync is off — click to open the settings'; }
+    else {
+      chip.style.display = 'block';
+      chip.style.color = r && r.error ? 'var(--red)' : 'var(--text-2)';
+      chip.innerHTML = `⚡ Auto-sync <strong>ON</strong> · ${st.lastRunAt ? `checked ${laAgo(st.lastRunAt)}` : 'waiting for first check'}` +
+        (r && r.error ? ` · ⚠ ${esc(r.error)}` : (r ? ` · +${r.imported || 0} imported, ${assigned} assigned` : '')) + ` · ${online.length} agent${online.length === 1 ? '' : 's'} online`;
+    }
+  }
+  renderLeadAutomationAgents(); // refreshes the online dots
+}
+
 // ── SETTINGS TAB — Entity Profiles ───────────────────────────────────────
 // One brief per entity, stored in config/entity_profiles keyed by entity name.
 // Shown one entity at a time (chips on top, one form below) so a live update
@@ -8593,6 +8937,7 @@ window.renderLeadsTable = function() {
         // that belongs to a campaign keeps the ℹ️ agent-script link right here.
         const deptCell = `${esc(l.department)||'—'}` +
           (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong. Edit the lead to correct it.">🤖</span>' : '') +
+          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting for the AI to classify it from the lead\'s notes">⏳</span>' : '') +
           (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="${esc(l.campaign || campaignTitleFor(l.campaignId) || 'Campaign')} — view agent script & post link">ℹ️</a>` : '');
         return `<tr style="${isChecked?'background:#F0F7FF':''}">
           <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
@@ -8979,171 +9324,8 @@ window.openFixLeadYearsPrompt = async function() {
 }
 
 // ── Excel upload ──────────────────────────────────────────────────────────
-// Robust Excel date parser — handles ISO strings, DD/MM/YYYY, MM/DD/YYYY,
-// JS Date objects, and raw Excel serial numbers (the common causes of a
-// date column silently failing to import).
-function parseExcelDate(raw) {
-  if (!raw) return '';
-  if (raw instanceof Date && !isNaN(raw)) {
-    // Use local date components, not toISOString() — toISOString() converts
-    // to UTC first, which silently shifts the date back a day for anyone in
-    // a timezone ahead of UTC (e.g. Asia/Riyadh, UTC+3).
-    return `${raw.getFullYear()}-${String(raw.getMonth()+1).padStart(2,'0')}-${String(raw.getDate()).padStart(2,'0')}`;
-  }
-  const s = String(raw).trim();
-  if (!s) return '';
-  // Already ISO: YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
-  // Raw Excel serial number (days since 1899-12-30) — this Date is
-  // constructed directly from a computed UTC timestamp, so UTC getters are
-  // correct here (no local-timezone shift risk, unlike the branches above/below).
-  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
-    const serial = parseFloat(s);
-    const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
-    if (!isNaN(date)) return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}`;
-  }
-  // DD/MM/YYYY or DD-MM-YYYY — 4-digit year only, deliberately.
-  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) {
-    const [, d, mo, y] = m;
-    if (parseInt(d) <= 31 && parseInt(mo) <= 12) {
-      return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
-    }
-  }
-  // A 2-digit-year date (e.g. "8/19/01") is genuinely ambiguous — never guess
-  // a century. Real incident: this silently fell through to the browser's
-  // native Date parser below, which read "01" as 2001 instead of 2026,
-  // corrupting 241 leads' dates by 25 years. Flag as unparsed instead so it's
-  // caught in the import preview ("not parsed", shown in red) before import.
-  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2}$/.test(s)) return '';
-  // No 4-digit year anywhere in the string at all (e.g. "19-Aug", a real
-  // incident caused by a source cell formatted with Excel's "d-mmm" style,
-  // which drops the year from the displayed text entirely). new Date() below
-  // would silently default a missing year to 2001 rather than erroring —
-  // reject instead of guessing, same reasoning as the 2-digit-year case above.
-  if (!/\d{4}/.test(s)) return '';
-  // Fallback: let the browser try, for any remaining genuinely date-like text
-  const parsed = new Date(s);
-  if (!isNaN(parsed)) return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
-  return '';
-}
-
-// Matches a raw department string from the sheet to our canonical
-// DEPARTMENTS spelling, case-insensitively. Returns null if no match.
-function matchDepartment(raw) {
-  if (!raw) return null;
-  const clean = String(raw).trim().toLowerCase();
-  const found = DEPARTMENTS.find(d => d.toLowerCase() === clean);
-  if (found) return found;
-  // Loose partial match as a second attempt (e.g. "ortho" → "Orthopedics")
-  const partial = DEPARTMENTS.find(d => d.toLowerCase().includes(clean) || clean.includes(d.toLowerCase()));
-  return partial || null;
-}
-
-// ── LEAD IMPORT COLUMN DETECTION — shared by Excel upload + Google Sheet ──
-// Both import paths accept raw exports from Meta Lead Ads (synced via
-// Zapier/Make into a Google Sheet, or downloaded as Excel), which name each
-// column after the literal question text configured inside the lead form —
-// often Arabic, and varying form-to-form — not a fixed English field name.
-// Keyword matching alone can't reliably find name/phone/email against that,
-// so content-sniffing (does the column's actual data look like an email or
-// a phone number?) is the real fallback. Internal Meta bookkeeping columns
-// are recognized by name so they're never mistaken for a real answer.
-const META_SYSTEM_COLUMNS = new Set([
-  'id','created_time','ad_id','ad_name','adset_id','adset_name',
-  'campaign_id','campaign_name','form_id','form_name','is_organic','lead_status'
-]);
-
-// Finds the first header containing any of `keywords` (case-insensitive
-// substring). Columns ending in "_id" are never matched — an ID column is
-// never the human-facing field we want for name/phone/email/source/etc.
-// `exclude` additionally rules out specific columns by exact name — needed
-// because Meta's own bookkeeping columns (ad_name, adset_name, form_name)
-// all contain the substring "name" and would otherwise win over the real
-// name column before an Arabic keyword ever gets a chance to match.
-function findColByKeywords(headers, keywords, exclude = new Set()) {
-  const candidates = headers.filter(h => !/_id$/i.test(h.trim()) && !exclude.has(h));
-  const lower = candidates.map(h => h.toLowerCase());
-  for (const kw of keywords) {
-    const idx = lower.findIndex(h => h.includes(kw));
-    if (idx !== -1) return candidates[idx];
-  }
-  return null;
-}
-
-// Guesses which column holds email/phone by sampling actual cell values,
-// for when keyword matching finds nothing (e.g. an Arabic-only header).
-// Requires >50% of a column's non-empty values to match to be confident.
-function sniffColumnByContent(headers, rows, exclude, test) {
-  let best = null, bestScore = 0;
-  for (const h of headers) {
-    if (exclude.has(h)) continue;
-    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
-    if (!vals.length) continue;
-    const score = vals.filter(test).length / vals.length;
-    if (score > 0.5 && score > bestScore) { best = h; bestScore = score; }
-  }
-  return best;
-}
-
-function detectLeadColumns(headers, rows) {
-  const used = new Set();
-  const claim = col => { if (col) used.add(col); return col; };
-  const sniffExclude = () => new Set([...used, ...headers.filter(h => META_SYSTEM_COLUMNS.has(h))]);
-
-  const nameCol      = claim(findColByKeywords(headers, ['name','اسم'], META_SYSTEM_COLUMNS));
-  const phoneCol      = claim(findColByKeywords(headers, ['phone','mobile','number','هاتف','جوال','موبايل'], META_SYSTEM_COLUMNS)
-                          || sniffColumnByContent(headers, rows, sniffExclude(), v => { const d = v.replace(/\D/g,''); return d.length >= 7 && d.length <= 15; }));
-  const emailCol      = claim(findColByKeywords(headers, ['email','ايميل','إيميل','بريد'], META_SYSTEM_COLUMNS)
-                          || sniffColumnByContent(headers, rows, sniffExclude(), v => v.includes('@')));
-  const platformCol   = claim(findColByKeywords(headers, ['platform'], META_SYSTEM_COLUMNS));
-  const sourceCol      = platformCol || claim(findColByKeywords(headers, ['source'], META_SYSTEM_COLUMNS));
-  const dateCol        = claim(findColByKeywords(headers, ['date'], META_SYSTEM_COLUMNS) || (headers.includes('created_time') ? 'created_time' : null));
-  const statusCol      = claim(findColByKeywords(headers, ['status'], META_SYSTEM_COLUMNS));
-  const deptCol        = claim(findColByKeywords(headers, ['department','dept'], META_SYSTEM_COLUMNS));
-  const entityCol      = claim(findColByKeywords(headers, ['entity','branch'], META_SYSTEM_COLUMNS));
-  const notesCol       = claim(findColByKeywords(headers, ['note','comment','notes'], META_SYSTEM_COLUMNS));
-  // Deliberately no META_SYSTEM_COLUMNS exclusion here — campaign_name is
-  // the one Meta bookkeeping field worth surfacing as a real value (the
-  // ad campaign's human-readable name), unlike ad_name/adset_name/form_name.
-  const campaignCol    = claim(findColByKeywords(headers, ['campaign']));
-
-  // Anything left — e.g. a lead form's custom questions — isn't a column we
-  // recognize but isn't Meta bookkeeping either. Carried into notes below
-  // rather than silently dropped.
-  const leftoverCols = headers.filter(h => !used.has(h) && !META_SYSTEM_COLUMNS.has(h));
-
-  return { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource: !!platformCol, dateCol, statusCol, deptCol, entityCol, notesCol, campaignCol, leftoverCols };
-}
-
-// ig/fb are Meta's own shorthand for where the lead form was shown — only
-// applied when the detected source column really was "platform" (Meta's
-// field), never to a genuinely free-typed Source column, where blank should
-// stay blank rather than being overwritten with a guess.
-function normalizeLeadSource(raw, isPlatformSource) {
-  const val = String(raw || '').trim();
-  if (!isPlatformSource) return val;
-  const lower = val.toLowerCase();
-  if (lower === 'ig') return 'Instagram';
-  if (lower === 'fb') return 'Facebook';
-  return val || 'Meta';
-}
-
-// Appends any unrecognized columns (a lead form's custom questions) onto
-// notes as "Question: Answer" pairs, so they're preserved instead of
-// silently dropped — necessary because custom questions vary form-to-form
-// and can't be mapped to a fixed field. Underscores are replaced with
-// spaces in both the question and the answer — Meta's export encodes
-// spaces as underscores in predefined multiple-choice answer text the same
-// way it does in column headers, not just the header.
-function buildLeadNotesWithLeftover(row, leftoverCols, existingNotes) {
-  const clean = s => String(s ?? '').trim().replace(/_/g, ' ');
-  const qa = leftoverCols
-    .map(col => { const val = clean(row[col]); return val ? `${clean(col)}: ${val}` : null; })
-    .filter(Boolean);
-  return [existingNotes, ...qa].map(s => (s||'').trim()).filter(Boolean).join('\n');
-}
-
+// (Parsing, date handling, column detection and department matching live in
+// lead-sync.js, shared with the Google Sheet import and the automatic sync.)
 window.handleExcelUpload = function(input) {
   const file = input.files[0];
   if(!file) return;
@@ -9224,17 +9406,6 @@ window.handleExcelUpload = function(input) {
   };
   reader.readAsBinaryString(file);
   input.value='';
-}
-
-function mapLeadStatus(raw) {
-  const r = String(raw).toLowerCase().trim();
-  if(r.includes('book'))                          return { contactStatus:'Reached',   outcome:'Booked' };
-  if(r.includes('open')||r.includes('file'))       return { contactStatus:'Reached',   outcome:'Open File' };
-  if(r.includes('close')||r.includes('unsuccess')) return { contactStatus:'Reached',   outcome:'Closed - Unsuccessful' };
-  if(r.includes('unreach')||r.includes('no answer'))return{ contactStatus:'Unreached', outcome:'Pending' };
-  if(r.includes('miss'))                           return { contactStatus:'Missed',    outcome:'Pending' };
-  if(r.includes('reach'))                          return { contactStatus:'Reached',   outcome:'Pending' };
-  return { contactStatus:'Untouched', outcome:'Pending' };
 }
 
 window.closeExcelPreview = function(){document.getElementById('excel-overlay').classList.remove('open');}
@@ -9328,30 +9499,6 @@ window.confirmImport = async function() {
   }
 }
 
-// ── SIMPLE CSV PARSER (quote-aware) — used for Google Sheet imports ───────
-function parseCSVText(text) {
-  const rows = [];
-  const lines = text.split('\n');
-  if(lines.length < 2) return rows;
-  const headers = lines[0].replace(/\r/g,'').split(',').map(h=>h.replace(/^"|"$/g,'').trim());
-  for(let i=1;i<lines.length;i++){
-    if(!lines[i].trim()) continue;
-    const vals = [];
-    let cur='', inQ=false;
-    for(let c=0;c<lines[i].length;c++){
-      const ch=lines[i][c];
-      if(ch==='"'){ inQ=!inQ; }
-      else if(ch===','&&!inQ){ vals.push(cur.trim()); cur=''; }
-      else cur+=ch;
-    }
-    vals.push(cur.trim());
-    const obj={};
-    headers.forEach((h,idx)=>{ obj[h]=(vals[idx]||'').replace(/\r$/,''); });
-    rows.push(obj);
-  }
-  return rows;
-}
-
 // ── GOOGLE SHEET LEADS IMPORT ───────────────────────────────────────────
 let pendingSheetImportRows = [];
 let sheetFetchRun = 0; // bumped on every Fetch so a slow, superseded run can't overwrite a newer one
@@ -9423,7 +9570,7 @@ Reply with ONLY a JSON array, one entry per input id: [{"i":0,"department":"<exa
     if(c && c.department) {
       r.department = c.department; r.departmentSource = 'ai'; r._aiConfidence = c.confidence;
       stats.aiClassified++; if(c.confidence === 'low') stats.lowConfidence++;
-    } else if(failedTexts.has(r._classifyText)) stats.failed++;
+    } else if(failedTexts.has(r._classifyText)) { stats.failed++; r._aiFailed = true; } // automatic sync leaves these "pending" for a later retry
     else stats.unclear++;
   });
   return stats;
@@ -9488,8 +9635,14 @@ window.fetchAndPreviewSheet = async function() {
     // the answers themselves say little — passed to the classifier, not stored.
     const hintCols = headers.filter(h => ['form_name', 'ad_name', 'adset_name', 'campaign_name'].includes(h.toLowerCase()));
 
+    // Meta's own row id: remembered on the lead so automatic sync never
+    // re-imports a row that was brought in by hand (and vice versa).
+    const idCol = headers.find(h => h.toLowerCase() === 'id') || null;
+    const knownRowIds = new Set(ALL_LEADS.map(l => l.sourceRowId).filter(Boolean).map(String));
+
     const allRows = rows.map(r=>{
       const rawDept = deptCol ? r[deptCol] : '';
+      const sourceRowId = idCol && r[idCol] ? String(r[idCol]) : '';
       const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
       const phone = normalizePhone(r[phoneCol]);
       const pairKey = `${phone}__${campaignId||''}`;
@@ -9505,8 +9658,9 @@ window.fetchAndPreviewSheet = async function() {
         department: matchDepartment(rawDept),
         campaignId: campaignId || null,
         campaign: campaignId ? campaignName : '',
-        _isDuplicate: existingPhoneCampaignPairs.has(pairKey),
+        _isDuplicate: (sourceRowId && knownRowIds.has(sourceRowId)) || existingPhoneCampaignPairs.has(pairKey), // older leads have no row id, so the phone+campaign rule still applies
       };
+      if(sourceRowId) row.sourceRowId = sourceRowId;
       row.department = matchDepartment(rawDept);
       row._classifyText = row.department ? '' : leadDeptText(row, hintCols.map(h => r[h] ? `${h.replace(/_/g, ' ')}: ${r[h]}` : '').filter(Boolean).join(' | '));
       return row;

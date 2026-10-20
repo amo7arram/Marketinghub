@@ -223,8 +223,12 @@ import {
   login, logout, watchAuth, getUserRole,
   watchLeads, updateLead, watchInitiatives,
   watchOffersCatalogMeta, getOffersCatalogBranch, normalizePhone,
-  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS,
+  fetchGoogleSheetCSV, bulkAddLeads,
+  watchLeadAutomation, watchLeadSyncState, acquireLeadSyncLock, finishLeadSyncRun,
+  setAgentPresence, watchAgentPresence
 } from './firebase-data.js';
+import { createLeadAutomationRunner } from './lead-sync.js';
 
 let ALL_LEADS = [];
 let ALL_CAMPAIGNS = [];
@@ -281,9 +285,16 @@ watchAuth(async user => {
       populateFilters();
       // Agents default to seeing only their own assigned leads; admins default to all.
       document.getElementById('f-scope').value = role === 'admin' ? 'all' : 'mine';
-      watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); renderTable(); });
-      watchLeads(data => { ALL_LEADS = data; renderStats(); renderTable(); });
+      CURRENT_USER_EMAIL = user.email || '';
+      startLeadAutomation();
+      watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); ALL_INITIATIVES = data; laMarkReady('initiatives'); renderTable(); });
+      watchLeads(data => { ALL_LEADS = data; laMarkReady('leads'); renderStats(); renderTable(); });
       watchOffersCatalogMeta(data => { OFFERS_META = data; renderOffersTab(); });
+      subsLeadAutomation = [
+        watchLeadAutomation(data => { LEAD_AUTOMATION = data; laMarkReady('cfg'); }),
+        watchLeadSyncState(data => { LEAD_SYNC_STATE = data; }),
+        watchAgentPresence(list => { AGENT_PRESENCE = list; laMarkReady('presence'); }),
+      ];
     } catch(e) {
       const errEl = document.getElementById('login-error');
       errEl.textContent = 'Could not verify access: ' + e.message;
@@ -295,8 +306,78 @@ watchAuth(async user => {
     if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
     document.getElementById('login-wrap').style.display = 'flex';
     document.getElementById('page-wrap').classList.remove('active');
+    stopLeadAutomation();
+    subsLeadAutomation.forEach(u => { try { u(); } catch(e) {} });
+    subsLeadAutomation = [];
+    LEAD_AUTOMATION = null; LEAD_SYNC_STATE = null; AGENT_PRESENCE = [];
+    CURRENT_USER_UID = null; CURRENT_USER_ROLE = null;
   }
 });
+
+// ── AUTOMATIC LEAD SYNC ───────────────────────────────────────────────────
+// The same engine as the admin page (lead-sync.js): whichever page is open
+// first checks the Google Sheet, imports new leads and hands them to agents
+// who are online. A lease in Firestore ensures only one browser does it at a
+// time. This page can't classify departments with AI (the API key is
+// admin-only), so such leads are flagged ⏳ and an admin page classifies them.
+let LEAD_AUTOMATION = null, LEAD_SYNC_STATE = null, AGENT_PRESENCE = [], ALL_INITIATIVES = [];
+let CURRENT_USER_EMAIL = '', subsLeadAutomation = [], leadRunner = null, presenceTimer = null, laKickedOnce = false;
+const laReady = { cfg: false, leads: false, initiatives: false, presence: false };
+
+function laMarkReady(k) {
+  laReady[k] = true;
+  if(!laKickedOnce && leadRunner && laReady.cfg && laReady.leads && laReady.initiatives && laReady.presence) {
+    laKickedOnce = true;
+    leadRunner.tick(true).catch(() => {});
+  }
+}
+function myDisplayName() {
+  const dir = (LEAD_AUTOMATION && LEAD_AUTOMATION.agentDirectory) || [];
+  const hit = dir.find(a => a.uid === CURRENT_USER_UID);
+  return (hit && hit.name) || (CURRENT_USER_EMAIL ? CURRENT_USER_EMAIL.split('@')[0] : 'Agent');
+}
+// Only agents count as "online to receive leads" — an admin looking at this page must not be handed any.
+let lastBeatAt = 0;
+function beat() {
+  if(CURRENT_USER_ROLE !== 'agent' || !CURRENT_USER_UID || document.visibilityState !== 'visible') return;
+  const cameBack = Date.now() - lastBeatAt > 180000; // first beat, or back after being away: hand out waiting leads right now
+  lastBeatAt = Date.now();
+  setAgentPresence(CURRENT_USER_UID, { name: myDisplayName(), page: 'call-center' })
+    .then(() => { if(cameBack && leadRunner && laKickedOnce) leadRunner.tick(true).catch(() => {}); })
+    .catch(e => console.error('presence heartbeat:', e.code || e.message));
+}
+function startLeadAutomation() {
+  stopLeadAutomation();
+  Object.keys(laReady).forEach(k => { laReady[k] = false; });
+  laKickedOnce = false;
+  leadRunner = createLeadAutomationRunner({
+    page: 'call-center',
+    isReady: () => laReady.cfg && laReady.leads && laReady.initiatives && laReady.presence,
+    getCfg: () => LEAD_AUTOMATION,
+    getState: () => LEAD_SYNC_STATE,
+    who: () => myDisplayName(),
+    acquireLock: acquireLeadSyncLock,
+    finishRun: finishLeadSyncRun,
+    buildDeps: (state, cfg) => ({
+      config: cfg, now: Date.now(), watermarkMs: state.watermarkMs || 0,
+      fetchCsv: fetchGoogleSheetCSV, leads: ALL_LEADS, initiatives: ALL_INITIATIVES, presence: AGENT_PRESENCE,
+      addLeads: docs => bulkAddLeads(docs), updateLead,
+    }),
+    onRun: result => {
+      const assigned = (result.assignedNew || 0) + (result.assignedBacklog || 0);
+      if(!result.error && (result.imported || result.assignedBacklog)) showToast(`⚡ ${result.imported} new lead${result.imported === 1 ? '' : 's'} arrived${assigned ? ` — ${assigned} assigned` : ''}`);
+    },
+  });
+  leadRunner.start();
+  beat();
+  presenceTimer = setInterval(beat, 60000);
+  document.addEventListener('visibilitychange', beat);
+}
+function stopLeadAutomation() {
+  if(leadRunner) { leadRunner.stop(); leadRunner = null; }
+  clearInterval(presenceTimer); presenceTimer = null; lastBeatAt = 0;
+  document.removeEventListener('visibilitychange', beat);
+}
 
 function populateFilters() {
   document.getElementById('f-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
@@ -387,6 +468,7 @@ function renderTable() {
         // to a campaign keeps the ℹ️ agent-script link beside its department.
         const deptCell = `${esc(l.department)||'—'}` +
           (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong">🤖</span>' : '') +
+          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting to be classified">⏳</span>' : '') +
           (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="${esc(l.campaign || campaignTitleFor(l.campaignId) || 'Campaign')} — view agent script & post link">ℹ️</a>` : '');
         return `<tr>
           <td style="font-weight:600">${esc(l.name)||'—'}</td>

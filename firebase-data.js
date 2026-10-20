@@ -6,7 +6,7 @@
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, setDoc,
-  getDocs, onSnapshot, query, where, Timestamp
+  getDocs, onSnapshot, query, where, Timestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
@@ -1295,6 +1295,62 @@ export function watchDepartmentRevenueEstimates(callback) {
     snap => callback(snap.exists() ? snap.data() : {}),
     err => { console.error('watchDepartmentRevenueEstimates:', err.code); callback({}); }
   );
+}
+
+// ── LEAD AUTOMATION (automatic Google-Sheet sync + assignment) ────────────
+// Three small documents, all readable by admins AND agents (the call-center
+// page can run the sync too), writable by admins only for the settings:
+//   config/lead_automation → the settings an admin controls (sheet link, interval,
+//                            default department, AI on/off, auto-assign, excluded agents…)
+//   config/lead_sync_state → who is syncing right now (a lease), when the last run
+//                            finished, its result, and the "newest row seen" watermark
+//   agent_presence/{uid}   → a heartbeat each agent's call-center page writes, so the
+//                            sync knows who is online to receive leads
+export function watchLeadAutomation(callback) {
+  return onSnapshot(doc(db, CONFIG, "lead_automation"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchLeadAutomation:', err.code); callback(null); });
+}
+export function saveLeadAutomation(patch, updatedBy) {
+  return setDoc(doc(db, CONFIG, "lead_automation"), { ...patch, updatedBy: updatedBy || '', updatedAt: Timestamp.now() }, { merge: true });
+}
+export function watchLeadSyncState(callback) {
+  return onSnapshot(doc(db, CONFIG, "lead_sync_state"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchLeadSyncState:', err.code); callback(null); });
+}
+
+// A lease, taken in a transaction so two browsers can never both think they
+// hold it. Refuses if someone else's lease is still live, or (unless the caller
+// is forcing) if a run finished less than minIntervalMs ago — checked HERE, not
+// just in the page, because ten open tabs would otherwise each sync every minute.
+export async function acquireLeadSyncLock({ runnerId, name, page, leaseMs, minIntervalMs }) {
+  const ref = doc(db, CONFIG, "lead_sync_state");
+  return runTransaction(db, async tx => {
+    const snap = await tx.get(ref);
+    const d = snap.exists() ? snap.data() : {};
+    const now = Date.now();
+    if(d.leaseUntil && d.leaseUntil > now && d.holderRunnerId !== runnerId) return { acquired: false, reason: 'busy', holder: d.holderName || '' };
+    if(minIntervalMs && d.lastRunAt && now - d.lastRunAt < minIntervalMs) return { acquired: false, reason: 'recent' };
+    tx.set(ref, { holderRunnerId: runnerId, holderName: name || '', holderPage: page || '', leaseUntil: now + leaseMs, runStartedAt: now }, { merge: true });
+    return { acquired: true, state: d };
+  });
+}
+// Releases the lease and records the outcome. The watermark only moves when
+// the run produced one (a failed run must not advance it).
+export function finishLeadSyncRun({ runnerId, result, watermarkMs, watermarkSheet }) {
+  const patch = { holderRunnerId: null, leaseUntil: 0, lastRunAt: Date.now(), lastResult: result };
+  if(Number.isFinite(watermarkMs)) { patch.watermarkMs = watermarkMs; patch.watermarkSheet = watermarkSheet || ''; }
+  return setDoc(doc(db, CONFIG, "lead_sync_state"), patch, { merge: true });
+}
+
+export function setAgentPresence(uid, data) {
+  return setDoc(doc(db, "agent_presence", uid), { name: data.name || '', page: data.page || '', lastSeen: Date.now() });
+}
+export function watchAgentPresence(callback) {
+  return onSnapshot(collection(db, "agent_presence"),
+    snap => callback(snap.docs.map(d => ({ uid: d.id, ...d.data() }))),
+    err => { console.error('watchAgentPresence:', err.code); callback([]); });
 }
 
 // ── ENTITY PROFILES (admin-only; the monthly planner's knowledge of each entity) ──

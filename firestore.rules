@@ -13,7 +13,9 @@ rules_version = '2';
 // key and Metricool token, and could have edited or deleted initiatives and
 // other people's requests straight from the browser console. Now:
 //   - admin       → everything
-//   - agent       → leads (read/update) only — what call-center.html uses
+//   - agent       → leads (read/update, plus creating *auto-imported* leads) and the
+//                   lead-automation config/state/presence documents — what
+//                   call-center.html uses
 //   - coordinator → create + read their OWN requests, withdraw/answer their
 //                   own, read their own roles doc. Nothing else.
 //   - nobody (public pages) → only the explicit public-read documents below
@@ -44,6 +46,23 @@ service cloud.firestore {
     function isAdmin()       { return hasRole('admin'); }
     function isAgent()       { return hasRole('agent'); }
     function isCoordinator() { return hasRole('coordinator'); }
+
+    // The one kind of lead an AGENT's browser may create: a new, untouched
+    // lead produced by the automatic sheet sync (call-center.html can run it).
+    // Fixed status, fixed field whitelist — an agent still can't create an
+    // arbitrary "Booked" lead or attach revenue. Mirror any change to the
+    // fields in lead-sync.js's buildLeadDoc().
+    function isAutoImportedLead() {
+      return request.resource.data.autoImported == true
+        && request.resource.data.contactStatus == 'Untouched'
+        && request.resource.data.outcome == 'Pending'
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 200
+        && request.resource.data.phone is string && request.resource.data.phone.size() > 0 && request.resource.data.phone.size() < 20
+        && request.resource.data.keys().hasOnly([
+             'name','phone','email','source','entity','dateCreated','contactStatus','outcome','notes',
+             'department','departmentSource','deptPending','sourceHint','campaign','campaignId',
+             'sourceRowId','autoImported','autoImportedAt','assignedAgentUid','assignedAgentName','createdAt']);
+    }
 
     // ── PUBLIC READ, ADMIN WRITE ─────────────────────────────────────────
     match /initiatives/{doc} {
@@ -186,7 +205,7 @@ service cloud.firestore {
       // not a hard boundary" tradeoff already accepted for the Public
       // Access Gate (see ARCHITECTURE.md §4.5). See ARCHITECTURE.md for the
       // full writeup of this exception.
-      allow create: if isAdmin() || (
+      allow create: if isAdmin() || (isAgent() && isAutoImportedLead()) || (
         request.resource.data.source == 'Landing Page' &&
         request.resource.data.contactStatus == 'Untouched' &&
         request.resource.data.outcome == 'Pending' &&
@@ -228,6 +247,26 @@ service cloud.firestore {
     match /config/sentiment_stats {
       // Same reasoning as social_comments above.
       allow read, write: if isAdmin();
+    }
+    match /config/lead_automation {
+      // The automatic-sync settings. Agents' pages read it (they can run the
+      // sync too); only admins change it. Holds no secrets — just the sheet
+      // link, intervals and who may receive leads.
+      allow read: if isAdmin() || isAgent();
+      allow write: if isAdmin();
+    }
+    match /config/lead_sync_state {
+      // The sync lease + last-run result + watermark. Admins' AND agents'
+      // pages write it (whichever page is open runs the sync).
+      allow read, write: if isAdmin() || isAgent();
+    }
+    match /agent_presence/{uid} {
+      // Heartbeat so the sync knows which agents are online. You may only
+      // write your own, in a fixed shape.
+      allow read: if isAdmin() || isAgent();
+      allow create, update: if (isAdmin() || isAgent()) && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name','page','lastSeen']);
+      allow delete: if (isAdmin() || isAgent()) && request.auth.uid == uid;
     }
     match /config/entity_profiles {
       // Internal strategy briefs per entity (competitors, constraints,
