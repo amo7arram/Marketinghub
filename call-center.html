@@ -157,9 +157,9 @@ tr:hover td{background:var(--bg)}
         <table style="min-width:1000px">
           <thead><tr>
             <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Campaign</th><th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
+            <th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="table-body"><tr class="empty-row"><td colspan="14">Loading leads...</td></tr></tbody>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="13">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
@@ -237,6 +237,12 @@ let currentPage = 1;
 const PER_PAGE = 50;
 let CURRENT_USER_UID = null;
 let CURRENT_USER_ROLE = null;
+
+// Lead names, notes and form answers originate from public lead forms, so they
+// are untrusted text — always escaped before going into innerHTML.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 window.doLogin = async function() {
@@ -377,16 +383,19 @@ function renderTable() {
         const oc = l.outcome || 'Pending';
         const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
         const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
-        const campaignLabel = l.campaign || campaignTitleFor(l.campaignId) || '—';
+        // Department replaces the old Campaign column for now; a lead that belongs
+        // to a campaign keeps the ℹ️ agent-script link beside its department.
+        const deptCell = `${esc(l.department)||'—'}` +
+          (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong">🤖</span>' : '') +
+          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="${esc(l.campaign || campaignTitleFor(l.campaignId) || 'Campaign')} — view agent script & post link">ℹ️</a>` : '');
         return `<tr>
-          <td style="font-weight:600">${l.name||'—'}</td>
-          <td>${l.phone||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.email||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.department||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.entity||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.source||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.campaignId?`<a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script & post link">${campaignLabel} ℹ️</a>`:campaignLabel}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.assignedAgentName||'— Unassigned —'}</td>
+          <td style="font-weight:600">${esc(l.name)||'—'}</td>
+          <td>${esc(l.phone)||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${esc(l.email)||'—'}</td>
+          <td style="color:var(--text-2);font-size:11px;font-weight:500">${deptCell}</td>
+          <td style="color:var(--text-3);font-size:11px">${esc(l.entity)||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${esc(l.source)||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${esc(l.assignedAgentName)||'— Unassigned —'}</td>
           <td style="color:var(--text-3);font-size:11px;white-space:nowrap">${l.dateCreated||'—'}</td>
           <td>${oc==='Booked'
             ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
@@ -409,14 +418,14 @@ function renderTable() {
               </select>`
             : `<span style="color:var(--text-3);font-size:11px">—</span>`}
           </td>
-          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${l.notes||''}">${l.notes||'—'}</td>
+          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${esc(l.notes)}">${esc(l.notes)||'—'}</td>
           <td>
-            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
+            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call">📞</a>`:''}
             <button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button>
           </td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="14">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="13">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
 
   renderPagination(data.length, totalPages, startIdx, pageData.length);
 }

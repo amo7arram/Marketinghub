@@ -179,6 +179,16 @@ The request was to add sentiment analysis on social comments. Metricool itself h
 - **Notifications are in-app only.** A red badge on Activities → Requests counts Pending requests (stateless, so it's correct the moment an admin logs in); the browser tab title carries the same count; and a toast fires while the panel is open when a new request arrives or a requester answers a question.
 - **Output escaping.** Coordinator-typed text (title, description, replies) is rendered into `admin.html`, which holds an admin session with access to the API keys — so it is always HTML-escaped (`esc()`), and nothing user-typed is interpolated into an inline `onclick` (handlers take only the document id). Accepting a request into a new activity additionally strips `<`/`>` from the title and carries over only entity names that really exist, because the resulting initiative is shown on the public portal and in tables that do not all escape.
 
+### 4.11 Lead department classification — AI on imported leads, with the PII stripped
+
+Sheet-imported leads (Meta lead forms) have no department, so `fetchAndPreviewSheet()` can classify each into one of the real departments via `classifyLeadDepartments()` (same `advisorClaudeCall()` helper, `claude-sonnet-4-6` like the sentiment feature).
+- **Only redacted text leaves the browser.** The input is the lead's notes/form answers plus the ad/form/campaign names; `advRedact()` removes the lead's own name, phone and email (and any email/long number it finds) first. A test asserts that none of a lead's identifiers appear in the actual request body.
+- **The output is validated, not trusted.** A department the model returns must match a real one (case-insensitively, mapped to the canonical spelling) or it is discarded — a made-up department is never stored. Ids the model skips are treated as failures, not guesses.
+- **Errors are accepted but never hidden.** The admin explicitly tolerates a percentage of misclassification, so the safeguards are about honesty: every AI-assigned lead is stored with `departmentSource:"ai"` and shown as 🤖, uncertain ones as 🤖? in the preview, anything unclear or failed falls back to the chosen default department (never a random one), and a human edit clears the mark.
+- **Cost is kept down by design:** duplicates are excluded before classifying; identical answers (very common with multiple-choice lead forms) are sent once; results are cached for the page session; 40 distinct answers per call. A sheet department column bypasses the AI entirely.
+- Uses the tolerant `parseModelJson()` (§4.10) so a slightly malformed reply doesn't discard a whole batch.
+- A side effect of working on the leads tables: lead names, notes, and form answers come from **public** lead forms (anyone can type anything into a Meta form), so they were being inserted unescaped into `admin.html` and `call-center.html` tables — a stored-XSS path into admin and agent sessions. Those cells (and the import preview) are now escaped, and the Delete button no longer embeds the lead's name in an inline handler.
+
 ### 4.10 Monthly Planner — AI planning with a human gate
 
 The planner (admin.html → Monthly Planner) calls Claude directly from the browser through the same `advisorClaudeCall()` helper the Advisor uses, with the same API-key exposure tradeoff (admin-only, §4.2). Design decisions:

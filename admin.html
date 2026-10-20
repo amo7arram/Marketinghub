@@ -578,9 +578,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
             <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Campaign</th><th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
+            <th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="14" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="13" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
@@ -1980,8 +1980,13 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <label class="field-label">Google Sheet Link</label>
         <input class="field-input" id="sheet-import-url" placeholder="https://docs.google.com/spreadsheets/d/...">
       </div>
+      <div class="field-group" style="display:flex;align-items:flex-start;gap:8px">
+        <input type="checkbox" id="sheet-import-classify" checked style="width:16px;height:16px;margin-top:2px;cursor:pointer">
+        <label for="sheet-import-classify" style="font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer">🤖 Auto-classify each lead's department from its notes and form/ad name
+          <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5;margin-top:2px">Uses AI, so it will sometimes be wrong — leads it classified are marked 🤖 so you can spot-check and correct them. Names, phone numbers and emails are removed before anything is sent. A department column in the sheet always wins over the AI.</span></label>
+      </div>
       <div class="field-group">
-        <label class="field-label">Default Department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used for rows with no department match)</span></label>
+        <label class="field-label">Default Department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used for leads that can't be classified)</span></label>
         <select class="field-select" id="sheet-import-dept"></select>
       </div>
       <button class="btn btn-primary" onclick="fetchAndPreviewSheet()">Fetch & Preview</button>
@@ -8583,16 +8588,20 @@ window.renderLeadsTable = function() {
         const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
         const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
         const isChecked = selectedLeadIds.has(l.id);
-        const campaignLabel = l.campaign || campaignTitleFor(l.campaignId) || '—';
+        // The Department column replaces the old Campaign column for now (campaign
+        // is still stored, filterable and in the Campaign Performance panel). A lead
+        // that belongs to a campaign keeps the ℹ️ agent-script link right here.
+        const deptCell = `${esc(l.department)||'—'}` +
+          (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong. Edit the lead to correct it.">🤖</span>' : '') +
+          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="${esc(l.campaign || campaignTitleFor(l.campaignId) || 'Campaign')} — view agent script & post link">ℹ️</a>` : '');
         return `<tr style="${isChecked?'background:#F0F7FF':''}">
           <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
-          <td style="font-weight:600">${l.name||'—'}</td>
-          <td style="font-size:12px">${l.phone||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.department||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.entity||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.source||'—'}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.campaignId?`<a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script & post link">${campaignLabel} ℹ️</a>`:campaignLabel}</td>
-          <td style="font-size:11px;color:var(--text-3)">${l.assignedAgentName||'— Unassigned —'}</td>
+          <td style="font-weight:600">${esc(l.name)||'—'}</td>
+          <td style="font-size:12px">${esc(l.phone)||'—'}</td>
+          <td style="font-size:11px;color:var(--text-2);font-weight:500">${deptCell}</td>
+          <td style="font-size:11px;color:var(--text-3)">${esc(l.entity)||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${esc(l.source)||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3)">${esc(l.assignedAgentName)||'— Unassigned —'}</td>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${l.dateCreated||'—'}</td>
           <td>
             <select style="font-size:10px;padding:3px 5px;border:1px solid ${csColor.bg};border-radius:4px;background:${csColor.bg};color:${csColor.t};font-weight:600;cursor:pointer;font-family:inherit"
@@ -8617,16 +8626,16 @@ window.renderLeadsTable = function() {
                 </select>`
               : `<span style="font-size:10px;color:var(--text-3)">—</span>`}
           </td>
-          <td style="font-size:11px;color:var(--text-3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${l.notes||''}">${l.notes||'—'}</td>
+          <td style="font-size:11px;color:var(--text-3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.notes)}">${esc(l.notes)||'—'}</td>
           <td class="row-actions">
-            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
+            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call">📞</a>`:''}
             <button class="btn btn-sm" onclick="openAssignLeadModal('${l.id}')">Assign</button>
             <button class="btn btn-sm" onclick="editLeadRow('${l.id}')">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="removeLeadRow('${l.id}','${(l.name||'').replace(/'/g,"\\'")}')">Delete</button>
+            <button class="btn btn-sm btn-danger" onclick="removeLeadRow('${l.id}')">Delete</button>
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="14" class="empty">${!ALL_LEADS.length ? 'No leads yet — upload an Excel, import from a Google Sheet, or add manually' : leadsShowAll ? 'No leads match filters' : `No leads match filters in ${document.getElementById('leads-month-label').textContent} — try another month or Show All Time`}</td></tr>`;
+    : `<tr><td colspan="13" class="empty">${!ALL_LEADS.length ? 'No leads yet — upload an Excel, import from a Google Sheet, or add manually' : leadsShowAll ? 'No leads match filters' : `No leads match filters in ${document.getElementById('leads-month-label').textContent} — try another month or Show All Time`}</td></tr>`;
 
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
@@ -8765,7 +8774,7 @@ window.confirmBulkEdit = async function() {
 
   const updateObj = {};
   if(dateVal)    updateObj.dateCreated   = dateVal;
-  if(deptVal)    updateObj.department    = deptVal;
+  if(deptVal)  { updateObj.department = deptVal; updateObj.departmentSource = null; } // a human decision replaces any AI guess
   if(entityVal)  updateObj.entity        = entityVal;
   if(sourceVal)  updateObj.source        = sourceVal;
   if(contactVal) updateObj.contactStatus = contactVal;
@@ -8898,6 +8907,8 @@ window.saveLead = async function() {
     if(original?.outcome==='Booked' && (data.contactStatus!==original.contactStatus || data.outcome!==original.outcome)) {
       if(!confirm('This lead is marked Booked — changing its status may affect reported revenue. Continue?')) return;
     }
+    // A human choosing a different department replaces the AI's guess, so the 🤖 mark goes.
+    if(original && original.department !== data.department) data.departmentSource = null;
   }
   try {
     if(editingLeadId){await updateLead(editingLeadId,data);showToast('Lead updated');}
@@ -8906,7 +8917,8 @@ window.saveLead = async function() {
   } catch(e){showToast('Save failed: '+e.message,true);}
 }
 window.editLeadRow = function(id){const l=ALL_LEADS.find(x=>x.id===id);if(l)openLeadForm(l);}
-window.removeLeadRow = async function(id,name){
+window.removeLeadRow = async function(id){
+  const name = ALL_LEADS.find(x=>x.id===id)?.name || 'this lead'; // looked up, never embedded in the inline handler
   if(!confirm(`Delete lead "${name}"?`))return;
   try{await deleteLead(id);showToast('Lead deleted');}catch(e){showToast('Delete failed: '+e.message,true);}
 }
@@ -9342,6 +9354,80 @@ function parseCSVText(text) {
 
 // ── GOOGLE SHEET LEADS IMPORT ───────────────────────────────────────────
 let pendingSheetImportRows = [];
+let sheetFetchRun = 0; // bumped on every Fetch so a slow, superseded run can't overwrite a newer one
+
+// ── AI department classification for imported leads ───────────────────────
+// Leads arriving from a Meta lead form carry no department, only the form's
+// answers and the ad/form name. Each lead's text is classified into ONE of the
+// real departments. Errors are accepted by design (the admin said a percentage
+// of mistakes is fine), so the safeguards are about being honest rather than
+// perfect: AI-classified leads are marked (departmentSource:'ai', shown as 🤖),
+// anything unclear falls back to the chosen default department, and a
+// department column in the sheet always beats the AI.
+// Privacy: only the redacted notes/answers and the ad/form name are sent —
+// the lead's name, phone and email are stripped (advRedact) first.
+const LEAD_DEPT_MODEL = 'claude-sonnet-4-6';
+const LEAD_DEPT_CHUNK = 40;           // distinct texts per API call
+const LEAD_DEPT_TEXT_MAX = 600;
+const leadDeptCache = new Map();      // redacted text -> { department|null, confidence } — this page session only
+
+function leadDeptText(row, hint) {
+  return advRedact([hint, row.notes].filter(Boolean).join('\n'), row).replace(/\s+/g, ' ').trim().slice(0, LEAD_DEPT_TEXT_MAX);
+}
+
+async function classifyLeadDepartments(rows, onProgress) {
+  const todo = rows.filter(r => !r.department && r._classifyText);
+  const stats = { eligible: todo.length, aiClassified: 0, unclear: 0, failed: 0, lowConfidence: 0, error: '' };
+  // Many leads share identical form answers, so classify each DISTINCT text once.
+  const unique = [...new Set(todo.map(r => r._classifyText))].filter(t => !leadDeptCache.has(t));
+  const failedTexts = new Set();
+  const system =
+`You classify inbound patient leads for a private hospital group in Saudi Arabia into exactly ONE medical department each.
+Each item is a lead's form answers or notes (often Arabic, sometimes English), usually with the name of the ad or form that brought them in.
+Choose the department from the supplied list that best matches the patient's stated need or the topic of the form. When the answers say little, use the form/ad name as the hint. Use "General / Brand" only for generic enquiries about the hospital itself. If it genuinely cannot be inferred (blank, 'other', unrelated), use null — do not guess wildly.
+Reply with ONLY a JSON array, one entry per input id: [{"i":0,"department":"<exact name from the list>" or null,"confidence":"high"|"medium"|"low"}]`;
+  const chunks = [];
+  for(let i = 0; i < unique.length; i += LEAD_DEPT_CHUNK) chunks.push(unique.slice(i, i + LEAD_DEPT_CHUNK));
+  let done = 0;
+  const runChunk = async chunk => {
+    try {
+      const items = chunk.map((text, i) => ({ i, text }));
+      const { text } = await advisorClaudeCall({
+        system, messages: [{ role: 'user', content: JSON.stringify({ departments: DEPARTMENTS, items }) }],
+        maxTokens: 4000, returnMeta: true, model: LEAD_DEPT_MODEL,
+      });
+      const arr = parseModelJson(text).value;
+      if(!Array.isArray(arr)) throw new Error('unexpected reply shape');
+      const answered = new Set();
+      arr.forEach(x => {
+        const i = Number(x && x.i);
+        if(!Number.isInteger(i) || !chunk[i]) return;
+        answered.add(i);
+        const dept = DEPARTMENTS.find(d => d.toLowerCase() === String((x && x.department) ?? '').trim().toLowerCase()) || null;
+        leadDeptCache.set(chunk[i], { department: dept, confidence: ['high', 'medium', 'low'].includes(x.confidence) ? x.confidence : 'medium' });
+      });
+      chunk.forEach((t, i) => { if(!answered.has(i)) failedTexts.add(t); }); // the model skipped it
+    } catch(e) {
+      chunk.forEach(t => failedTexts.add(t));
+      stats.error = stats.error || e.message;
+    }
+    done += chunk.length;
+    if(onProgress) onProgress(done, unique.length);
+  };
+  const queue = [...chunks];
+  const worker = async () => { while(queue.length) await runChunk(queue.shift()); };
+  await Promise.all([worker(), worker(), worker()]); // three calls at a time
+
+  todo.forEach(r => {
+    const c = leadDeptCache.get(r._classifyText);
+    if(c && c.department) {
+      r.department = c.department; r.departmentSource = 'ai'; r._aiConfidence = c.confidence;
+      stats.aiClassified++; if(c.confidence === 'low') stats.lowConfidence++;
+    } else if(failedTexts.has(r._classifyText)) stats.failed++;
+    else stats.unclear++;
+  });
+  return stats;
+}
 
 window.openSheetImportModal = function() {
   document.getElementById('sheet-import-url').value = '';
@@ -9368,12 +9454,16 @@ window.fetchAndPreviewSheet = async function() {
   const url = document.getElementById('sheet-import-url').value.trim();
   if(!url) { showToast('Paste a Google Sheet link first', true); return; }
   const statusEl = document.getElementById('sheet-import-status');
+  const runId = ++sheetFetchRun;
   statusEl.style.display = 'block';
   statusEl.textContent = 'Fetching sheet...';
   statusEl.style.color = 'var(--text-3)';
+  document.getElementById('confirm-sheet-import-btn').disabled = true; // stays off until classification finishes
+  document.getElementById('sheet-import-preview-wrap').style.display = 'none';
 
   try {
     const csvText = await fetchGoogleSheetCSV(url);
+    if(runId !== sheetFetchRun) return;
     const rows = parseCSVText(csvText);
     if(!rows.length) { statusEl.textContent = 'No rows found in that sheet'; statusEl.style.color = 'var(--red)'; return; }
 
@@ -9394,12 +9484,16 @@ window.fetchAndPreviewSheet = async function() {
     const campaignId = document.getElementById('sheet-import-campaign').value;
     const campaignName = campaignId ? campaignTitleFor(campaignId) : '';
 
+    // Meta's ad/form names are a strong department hint ("Sleep Clinic") when
+    // the answers themselves say little — passed to the classifier, not stored.
+    const hintCols = headers.filter(h => ['form_name', 'ad_name', 'adset_name', 'campaign_name'].includes(h.toLowerCase()));
+
     const allRows = rows.map(r=>{
       const rawDept = deptCol ? r[deptCol] : '';
       const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
       const phone = normalizePhone(r[phoneCol]);
       const pairKey = `${phone}__${campaignId||''}`;
-      return {
+      const row = {
         name: r[nameCol]||'', phone,
         email: emailCol ? r[emailCol]||'' : '',
         source: sourceCol ? normalizeLeadSource(r[sourceCol], isPlatformSource) : '',
@@ -9413,27 +9507,56 @@ window.fetchAndPreviewSheet = async function() {
         campaign: campaignId ? campaignName : '',
         _isDuplicate: existingPhoneCampaignPairs.has(pairKey),
       };
+      row.department = matchDepartment(rawDept);
+      row._classifyText = row.department ? '' : leadDeptText(row, hintCols.map(h => r[h] ? `${h.replace(/_/g, ' ')}: ${r[h]}` : '').filter(Boolean).join(' | '));
+      return row;
     }).filter(r=>r.name && r.phone);
 
     pendingSheetImportRows = allRows.filter(r=>!r._isDuplicate);
     const dupCount = allRows.length - pendingSheetImportRows.length;
 
+    // Classify only what will actually be imported (duplicates are skipped, so
+    // no point paying to classify them).
+    let classifyStatus = '';
+    const wantsAi = document.getElementById('sheet-import-classify').checked;
+    if(wantsAi && pendingSheetImportRows.some(r => !r.department && r._classifyText)) {
+      if(!ANTHROPIC_API_KEY) {
+        classifyStatus = ' — department auto-classification skipped (no API key set under Campaign Generator → AI Setup)';
+      } else {
+        statusEl.textContent = 'Classifying departments…';
+        const s = await classifyLeadDepartments(pendingSheetImportRows, (d, t) => {
+          if(runId === sheetFetchRun) statusEl.textContent = `Classifying departments… ${d} / ${t} distinct answers`;
+        });
+        if(runId !== sheetFetchRun) return;
+        const counts = {};
+        pendingSheetImportRows.filter(r => r.departmentSource === 'ai').forEach(r => { counts[r.department] = (counts[r.department] || 0) + 1; });
+        const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([d, n]) => `${esc(d)} ${n}`).join(', ');
+        const leftover = s.unclear + s.failed;
+        classifyStatus = `<br>🤖 ${s.aiClassified} of ${s.eligible} classified${top ? ` — ${top}` : ''}` +
+          (s.lowConfidence ? ` · ${s.lowConfidence} low-confidence (marked 🤖?)` : '') +
+          (leftover ? ` · ${leftover} unclear → will use the default department` : '') +
+          (s.failed ? `<br><span style="color:var(--orange)">${s.error ? `Some AI calls failed (${esc(s.error)})` : `The AI skipped ${s.failed} lead${s.failed === 1 ? '' : 's'}`} — ${s.failed === 1 ? 'that lead falls' : 'those leads fall'} back to the default department; fetch again to retry.</span>` : '');
+      }
+    }
+
     const previewRows = pendingSheetImportRows.slice(0,10);
     document.getElementById('sheet-preview-table').innerHTML =
       `<thead style="background:var(--navy);color:#fff"><tr>${['Name','Phone','Email','Department','Source','Date','Contact Status'].map(c=>`<th style="padding:6px 10px;text-align:left;font-size:11px">${c}</th>`).join('')}</tr></thead>
       <tbody>${previewRows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}</td>
-        <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
-        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.email||'—'}</td>
-        <td style="padding:5px 10px;font-size:11px">${r.department||`<span style="color:var(--orange)">uses default</span>`}</td>
-        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
-        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'—'}</td>
-        <td style="padding:5px 10px;font-size:11px">${r.contactStatus}</td>
+        <td style="padding:5px 10px;font-size:11px;font-weight:600">${esc(r.name)}</td>
+        <td style="padding:5px 10px;font-size:11px">${esc(r.phone)}</td>
+        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${esc(r.email)||'—'}</td>
+        <td style="padding:5px 10px;font-size:11px">${r.department
+          ? `${esc(r.department)}${r.departmentSource === 'ai' ? ` <span title="Auto-classified from the lead's notes${r._aiConfidence === 'low' ? ' (low confidence)' : ''}">🤖${r._aiConfidence === 'low' ? '?' : ''}</span>` : ''}`
+          : `<span style="color:var(--orange)">uses default</span>`}</td>
+        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${esc(r.source)}</td>
+        <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${esc(r.dateCreated)||'—'}</td>
+        <td style="padding:5px 10px;font-size:11px">${esc(r.contactStatus)}</td>
       </tr>`).join('')}</tbody>`;
 
     const emailStatus = emailCol ? '' : ' — no email column found';
     const leftoverStatus = leftoverCols.length ? ` — ${leftoverCols.length} extra column(s) appended to Notes` : '';
-    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}${emailStatus}${leftoverStatus}`;
+    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}${emailStatus}${leftoverStatus}${classifyStatus}`;
     statusEl.style.color = 'var(--green)';
     document.getElementById('sheet-import-preview-wrap').style.display = 'block';
     document.getElementById('confirm-sheet-import-btn').disabled = pendingSheetImportRows.length === 0;
@@ -9447,7 +9570,9 @@ window.confirmSheetImport = async function() {
   if(!pendingSheetImportRows.length) return;
   const fallbackDept = document.getElementById('sheet-import-dept').value;
   const leadsToImport = pendingSheetImportRows.map(r=>{
-    const { _isDuplicate, ...clean } = r;
+    // Underscore-prefixed fields (_isDuplicate, _classifyText, _aiConfidence) are
+    // working data for the preview, never stored. departmentSource ('ai') is.
+    const clean = Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('_')));
     return { ...clean, department: r.department || fallbackDept };
   });
   const btn = document.getElementById('confirm-sheet-import-btn');
