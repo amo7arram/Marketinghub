@@ -1558,6 +1558,16 @@ tr.row-overdue:hover td{background:#FFD6D6}
   </div>
 </div>
 
+<!-- ── REQUESTS-BY-USER SIDE PANEL (sits under the request detail panel so a request opened from it stacks on top) ── -->
+<div class="rd-overlay" id="ru-overlay" onclick="closeUserRequests()"></div>
+<div class="rd-panel" id="ru-panel">
+  <div class="rd-header">
+    <div><div class="rd-title" id="ru-title">User</div><div style="margin-top:6px;font-size:11px;color:var(--text-3)" id="ru-sub"></div></div>
+    <button class="rd-close" onclick="closeUserRequests()" title="Close (Esc)">✕</button>
+  </div>
+  <div class="rd-body" id="ru-body"></div>
+</div>
+
 <!-- ── REQUEST DETAIL SIDE PANEL ── -->
 <div class="rd-overlay" id="rd-overlay" onclick="closeRequestDetail()"></div>
 <div class="rd-panel" id="rd-panel">
@@ -2307,6 +2317,7 @@ watchAuth(async user => {
     if(unsubAgentPresence) unsubAgentPresence();
     LEAD_AUTOMATION = null; LEAD_SYNC_STATE = null; AGENT_PRESENCE = []; laDirty = false;
     knownRequestIds = null;
+    closeUserRequests(); closeRequestDetail(); // no one's request data may stay on screen behind the login
     PLAN = null; // an unreviewed plan must not survive a logout into the next person's session
     if(unsubExpenses) unsubExpenses();
     if(unsubOffersCatalogMeta) unsubOffersCatalogMeta();
@@ -2336,8 +2347,8 @@ function initData() {
   unsubTeamMembers  = watchTeamMembers(data  => { ALL_TEAM_MEMBERS = data; syncAgentDirectory(); renderLeadAutomationAgents(); renderTeamMembersTable(); populateAssignedToSelect(); populateAssignLeadSelect(); renderAgentPerformance(); refreshPlannerAccess(); });
   unsubDeptRevenue  = watchDepartmentRevenueEstimates(data => { DEPT_REVENUE_ESTIMATES = data; loadDeptRevenueForm(); computeAndPublishLeadStats(); renderCampaignPerformance(); });
   unsubResources    = watchResources(data    => { ALL_RESOURCES   = data; renderResourcesTable(); });
-  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); if(currentRequestDetailId) renderRequestDetail(); });
-  unsubRequestAccounts = watchRequestAccounts(data => { ALL_REQUEST_ACCOUNTS = data; renderRequestAccountsTable(); });
+  unsubRequests     = watchRequests(data     => { ALL_REQUESTS    = data; onRequestsChanged(); renderRequestsTable(); if(currentRequestDetailId) renderRequestDetail(); if(currentUserPanelKey) renderUserRequests(); });
+  unsubRequestAccounts = watchRequestAccounts(data => { ALL_REQUEST_ACCOUNTS = data; renderRequestAccountsTable(); if(currentUserPanelKey) renderUserRequests(); });
   unsubEntityProfiles = watchEntityProfiles(data => { ENTITY_PROFILES = data; onEntityProfilesChanged(); });
   unsubExpenses     = watchExpenses(data     => { ALL_EXPENSES    = data; renderBudgetTab(); });
   unsubOffersCatalogMeta = watchOffersCatalogMeta(data => { OFFERS_CATALOG_META = data; renderOffersCatalogStatus(); });
@@ -4884,7 +4895,7 @@ window.renderRequestsTable = function() {
           : `<span style="color:var(--text-3)">— nobody yet —</span>`;
         return `<tr>
           <td style="font-size:11px;color:var(--text-3);white-space:nowrap">${submitted}</td>
-          <td style="font-size:11px">${esc(r.requesterName)||'—'}${r.email?`<br><span style="color:var(--text-3)">${esc(r.email)}</span>`:''}</td>
+          <td style="font-size:11px">${esc(r.requesterName)||'—'}${r.email?`<br><span style="color:var(--text-3)">${esc(r.email)}</span>`:''}${userLinkHtml(r)}</td>
           <td style="font-weight:600">${esc(r.title)}</td>
           <td>${esc(r.department)}</td>
           <td style="font-size:11px">${esc((r.entity||[]).join(', '))||'—'}</td>
@@ -4929,7 +4940,133 @@ window.closeRequestDetail = function() {
   document.getElementById('rd-overlay').classList.remove('open');
   document.getElementById('rd-panel').classList.remove('open');
 }
-document.addEventListener('keydown', e => { if(e.key === 'Escape' && currentRequestDetailId) closeRequestDetail(); });
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  if(currentRequestDetailId) closeRequestDetail();          // topmost first
+  else if(currentUserPanelKey) closeUserRequests();
+});
+
+// ── Requests by user ──────────────────────────────────────────────────────
+// "User" = the login that submitted (submittedBy): one of the shared request
+// accounts, or an individual coordinator/admin. Click the username in the
+// table (or "Submitted via" in a request's detail) to see their stats and every
+// request they've filed with its status. Computed live from ALL_REQUESTS —
+// nothing extra is stored.
+let currentUserPanelKey = null, ruStatusFilter = '';
+const lcEmail = s => String(s || '').trim().toLowerCase();
+const shortUser = s => String(s || '').split('@')[0];
+
+// Inline handlers carry no raw data: the key sits in an escaped data attribute.
+function userLinkHtml(r) {
+  if(!r.submittedBy) return '';
+  return `<br><a class="rd-more" data-u="${esc(r.submittedBy)}" onclick="openUserRequests(this.dataset.u)" title="See all requests from this user" style="font-size:10px">👤 ${esc(shortUser(r.submittedBy))}</a>`;
+}
+window.openUserRequests = function(key) {
+  currentUserPanelKey = lcEmail(key);
+  ruStatusFilter = '';
+  renderUserRequests();
+  document.getElementById('ru-overlay').classList.add('open');
+  document.getElementById('ru-panel').classList.add('open');
+}
+window.closeUserRequests = function() {
+  currentUserPanelKey = null;
+  document.getElementById('ru-overlay').classList.remove('open');
+  document.getElementById('ru-panel').classList.remove('open');
+}
+window.setUserReqFilter = function(status) {
+  ruStatusFilter = ruStatusFilter === status ? '' : status; // click again to clear
+  renderUserRequests();
+}
+
+function fmtDuration(ms) {
+  const h = ms / 3600000;
+  if(h < 1) return `${Math.max(1, Math.round(ms / 60000))} min`;
+  if(h < 48) return `${h.toFixed(h < 10 ? 1 : 0)} h`;
+  return `${(h / 24).toFixed(1)} days`;
+}
+
+function renderUserRequests() {
+  const key = currentUserPanelKey;
+  if(!key) return;
+  const mine = ALL_REQUESTS.filter(r => lcEmail(r.submittedBy) === key);
+  const acct = ALL_REQUEST_ACCOUNTS.find(a => lcEmail(a.username) === key);
+  const ts = r => r.createdAt?.toMillis ? r.createdAt.toMillis() : 0;
+  const sorted = [...mine].sort((a, b) => ts(b) - ts(a));
+  const counts = Object.fromEntries(REQUEST_STATUSES.map(s => [s, 0]));
+  mine.forEach(r => { const s = requestStatusOf(r); counts[s] = (counts[s] || 0) + 1; });
+  const total = mine.length, open = counts['Pending'] + counts['Needs Info'];
+  const decided = counts['Accepted'] + counts['Rejected'];
+  const now = Date.now();
+  const last24 = mine.filter(r => now - ts(r) < 86400000).length;
+  const last30 = mine.filter(r => now - ts(r) < 30 * 86400000).length;
+  const turn = mine.filter(r => ['Accepted', 'Rejected'].includes(requestStatusOf(r)) && r.reviewedAt?.toMillis && ts(r))
+    .map(r => r.reviewedAt.toMillis() - ts(r)).filter(d => d >= 0);
+  const avgTurn = turn.length ? turn.reduce((a, b) => a + b, 0) / turn.length : null;
+
+  document.getElementById('ru-title').textContent = shortUser(key) || 'User';
+  document.getElementById('ru-sub').innerHTML = acct
+    ? `${esc(acct.label)} · shared request account`
+    : (ALL_REQUESTS.length ? 'Not one of the generated request accounts (individual login, or the account was deleted)' : '');
+
+  const tile = (label, value, sub, color) => `<div style="flex:1;min-width:110px;background:var(--bg);border-radius:var(--radius);padding:10px 12px">
+    <div style="font-size:10px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em">${label}</div>
+    <div style="font-size:20px;font-weight:800;color:${color || 'var(--text)'};margin-top:2px">${value}</div>
+    ${sub ? `<div style="font-size:10px;color:var(--text-3);margin-top:2px">${sub}</div>` : ''}</div>`;
+
+  const countBy = fn => { const m = {}; mine.forEach(r => { const v = fn(r); if(v) m[v] = (m[v] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const chips = pairs => pairs.length ? pairs.map(([k, n]) => `<span style="display:inline-block;background:var(--bg);border-radius:20px;padding:3px 10px;font-size:11px;margin:0 6px 6px 0">${esc(k)} <strong>${n}</strong></span>`).join('') : '<span style="color:var(--text-3);font-size:12px">—</span>';
+  const names = countBy(r => (r.requesterName || '').trim());
+  const depts = countBy(r => r.department);
+
+  const statusChips = REQUEST_STATUSES.filter(s => counts[s]).map(s => {
+    const on = ruStatusFilter === s;
+    return `<span class="badge ${REQUEST_STATUS_CLASS[s] || 'b-planned'}" onclick="setUserReqFilter('${s}')" style="cursor:pointer;margin:0 6px 6px 0;${on ? 'outline:2px solid var(--navy);outline-offset:1px' : ''}" title="Click to ${on ? 'show all' : 'show only these'}">${esc(s)} ${counts[s]}</span>`;
+  }).join('');
+
+  const shown = ruStatusFilter ? sorted.filter(r => requestStatusOf(r) === ruStatusFilter) : sorted;
+  const listHtml = shown.length ? shown.map(r => {
+    const s = requestStatusOf(r);
+    const d = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-GB') : '—';
+    const waiting = s === 'Needs Info' ? ' <span style="color:var(--orange);font-size:10px">⏳ waiting for their reply</span>' : '';
+    return `<div onclick="openRequestDetail('${r.id}')" style="cursor:pointer;border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div style="font-weight:600;font-size:12px;word-break:break-word">${esc(r.title) || 'Untitled'}</div>
+        <span class="badge ${REQUEST_STATUS_CLASS[s] || 'b-planned'}" style="flex-shrink:0">${esc(s)}</span></div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">${d} · ${esc(r.department) || '—'} · ${esc(r.type) || '—'}${r.requesterName ? ` · by ${esc(r.requesterName)}` : ''}${r.handledBy ? ` · handled by ${esc(r.handledBy)}` : ''}${waiting}</div>
+      ${s === 'Rejected' && r.rejectionReason ? `<div style="font-size:10px;color:var(--text-3);margin-top:3px">${esc(r.rejectionReason)}</div>` : ''}
+    </div>`;
+  }).join('') : '<div style="color:var(--text-3);font-size:12px">No requests.</div>';
+
+  document.getElementById('ru-body').innerHTML = !total
+    ? '<div class="rd-text">No requests found for this user.</div>'
+    : `<div class="rd-section">
+        <div class="rd-section-title">At a glance</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${tile('Submitted', total, `${last30} in last 30 days`)}
+          ${tile('Open now', open, counts['Needs Info'] ? `${counts['Needs Info']} awaiting their reply` : 'pending a decision', open ? 'var(--orange)' : '')}
+          ${tile('Accepted', decided ? Math.round(counts['Accepted'] / decided * 100) + '%' : '—', decided ? `${counts['Accepted']} of ${decided} decided` : 'nothing decided yet', decided && counts['Accepted'] / decided >= 0.5 ? 'var(--green)' : '')}
+          ${tile('Time to decide', avgTurn == null ? '—' : '≈ ' + fmtDuration(avgTurn), avgTurn == null ? '' : 'average, submit → decision')}
+        </div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:8px">Last request ${fmtReqTs(sorted[0].createdAt)}${last24 ? ` · <strong>${last24}</strong> in the last 24 h` : ''}</div>
+      </div>
+      <div class="rd-section">
+        <div class="rd-section-title">By status <span style="text-transform:none;letter-spacing:0;font-weight:400">— click to filter the list</span></div>
+        <div>${statusChips}</div>
+      </div>
+      <div class="rd-section">
+        <div class="rd-section-title">Who used this login</div>
+        <div>${chips(names)}</div>
+        <div style="font-size:10px;color:var(--text-3)">Names typed into the form's Requester field — useful on a shared account.</div>
+      </div>
+      <div class="rd-section">
+        <div class="rd-section-title">Departments requested for</div>
+        <div>${chips(depts)}</div>
+      </div>
+      <div class="rd-section">
+        <div class="rd-section-title">${ruStatusFilter ? esc(ruStatusFilter) + ' requests' : 'All requests'} (${shown.length}) <span style="text-transform:none;letter-spacing:0;font-weight:400">— newest first, click one to open it</span></div>
+        ${listHtml}
+      </div>`;
+}
 
 // Re-rendered on every live update while open, so a status change made
 // elsewhere (or by the requester) shows up without reopening it.
@@ -4956,7 +5093,7 @@ function renderRequestDetail() {
       <div class="rd-section-title">Request</div>
       ${row('Requester', esc(r.requesterName)||'—')}
       ${row('Email', esc(r.email)||'—')}
-      ${row('Submitted via', esc((r.submittedBy||'').split('@')[0])||'—')}
+      ${row('Submitted via', r.submittedBy ? `<a class="rd-more" data-u="${esc(r.submittedBy)}" onclick="closeRequestDetail();openUserRequests(this.dataset.u)" title="See everything this user has submitted">${esc(r.submittedBy.split('@')[0])} →</a>` : '—')}
       ${row('Submitted', fmtReqTs(r.createdAt))}
       ${row('Department', esc(r.department)||'—')}
       ${row('Entity', esc((r.entity||[]).join(', '))||'—')}
