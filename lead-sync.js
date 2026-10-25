@@ -15,6 +15,35 @@ export const SYNC_MAX_PER_RUN = 300;             // runaway guard: never import 
 export const PRESENCE_FRESH_MS = 3 * 60 * 1000;  // an agent counts as "online" if seen in the last 3 minutes
 export const SYNC_ASSIGN_BACKLOG_MAX = 100;      // unassigned auto-imported leads picked up per run
 export const SAME_SUBMISSION_DAYS = 2;           // a legacy lead (no source row id) this close in date to a row is treated as the same submission
+export const SYNC_MAX_SHEETS = 5;                // sheets the automatic sync will read per run
+
+// ── Sheets the sync reads ─────────────────────────────────────────────────
+// config/lead_automation.sheets = [{ id, label, url, department, entity, startFromMs }].
+// Configs saved before multi-sheet support only have `sheetUrl` (+ startFromMs);
+// those read as a single sheet, so nothing needs migrating by hand.
+//   department — if set, rows in that sheet that carry no department of their own
+//                get it directly (no AI call); '' = let the AI decide
+//   entity     — default entity for that sheet's rows (a sheet column still wins)
+//   startFromMs— rows created before this are never imported from that sheet
+export function getSheets(cfg) {
+  if(cfg && Array.isArray(cfg.sheets) && cfg.sheets.length) {
+    return cfg.sheets.filter(s => s && s.url).slice(0, SYNC_MAX_SHEETS).map((s, i) => ({
+      id: s.id || ('s' + (i + 1)), label: s.label || `Sheet ${i + 1}`, url: s.url,
+      department: s.department || '', entity: s.entity || '', startFromMs: Number(s.startFromMs) || 0,
+    }));
+  }
+  if(cfg && cfg.sheetUrl) return [{ id: 'main', label: 'Main sheet', url: cfg.sheetUrl, department: '', entity: '', startFromMs: Number(cfg.startFromMs) || 0 }];
+  return [];
+}
+// Identity of a sheet for its watermark: the spreadsheet id plus the tab (gid).
+// Editing a link to point at a different sheet or tab therefore starts a fresh
+// watermark, while re-pasting the same sheet keeps it. Safe to use as a Firestore map key.
+export function sheetKey(url) {
+  const u = String(url || '');
+  const id = (u.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
+  const gid = (u.match(/[#?&]gid=(\d+)/) || [])[1];
+  return (id ? `${id}_${gid || '0'}` : u.slice(0, 60)).replace(/[^A-Za-z0-9_-]/g, '_');
+}
 
 // ══ CSV ════════════════════════════════════════════════════════════════════
 // A real CSV reader: quoted fields may contain commas, doubled quotes ("")
@@ -397,24 +426,26 @@ export function buildLeadDoc(r, cfg, nowMs) {
 }
 
 // ── The sync itself ───────────────────────────────────────────────────────
-// d (all injected): { config, now, watermarkMs, fetchCsv(url), leads[], initiatives[],
+// d (all injected): { config, now, watermarks, fetchCsv(url), leads[], initiatives[],
 //   presence[], addLeads(docs), updateLead(id, data), classify?(rows) }
-// Returns { result, watermarkMs }. `classify` exists only where an API key is
+// Returns { result, watermarks, watermarkMs (first sheet's, legacy) }. `classify` exists only where an API key is
 // readable (the admin page); elsewhere leads that needed the AI are marked
 // deptPending and swept later by an admin session.
+// Several sheets: each is read in turn (a failing one is reported and skipped —
+// the others still sync), their new rows are pooled, capped together, classified,
+// assigned in ONE plan (so agents are balanced across sheets) and written.
+// Watermarks are per sheet: d.watermarks = { [sheetKey]: ms } in, same out.
 export async function runLeadSync(d) {
   const cfg = d.config || {};
   const now = d.now;
   const result = { startedAt: now, sheetRows: 0, imported: 0, assignedNew: 0, assignedBacklog: 0, classified: 0, pendingDept: 0,
-                   skipped: {}, capped: false, agentsOnline: 0, error: '' };
-  if(!cfg.sheetUrl) { result.error = 'No sheet link is set'; return { result, watermarkMs: d.watermarkMs }; }
+                   skipped: {}, capped: false, agentsOnline: 0, error: '', warning: '', sheets: [] };
+  const sheets = getSheets(cfg);
+  const wmIn = { ...(d.watermarks || {}) };
+  if(sheets.length && d.watermarkMs && !Object.keys(wmIn).length) wmIn[sheetKey(sheets[0].url)] = d.watermarkMs; // single-sheet callers
+  const wmOut = {};
+  if(!sheets.length) { result.error = 'No sheet link is set'; return { result, watermarks: wmOut, watermarkMs: undefined }; }
 
-  const csv = await d.fetchCsv(cfg.sheetUrl);
-  const parsed = buildCandidates(csv);
-  if(parsed.error) { result.error = parsed.error; return { result, watermarkMs: d.watermarkMs }; }
-  result.sheetRows = parsed.candidates.length;
-
-  const cutoffMs = Math.max(cfg.startFromMs || 0, d.watermarkMs ? d.watermarkMs - SYNC_OVERLAP_MS : 0);
   const campaigns = (d.initiatives || []).filter(i => i.type === 'Campaign');
   const campaignIdFor = r => {
     const t = String(r.campaignName || '').trim().toLowerCase();
@@ -422,13 +453,41 @@ export async function runLeadSync(d) {
     const hit = campaigns.find(c => String(c.title || '').trim().toLowerCase() === t);
     return hit ? hit.id : null;
   };
-  const sel = selectEligible(parsed.candidates, d.leads, { cutoffMs, campaignIdFor });
-  result.skipped = sel.skipped;
 
-  let eligible = sel.eligible.slice().sort((a, b) => (a.rowTimeMs ?? 0) - (b.rowTimeMs ?? 0));
+  // 1. read every sheet, collect what is new in each
+  const known = (d.leads || []).slice(); // grows as sheets are read, so one lead appearing in two sheets is taken once
+  const pool = [], perSheet = [];
+  const sumSkipped = {};
+  for(const sheet of sheets) {
+    const key = sheetKey(sheet.url), prevWm = wmIn[key] || 0;
+    const info = { label: sheet.label, key, rows: 0, imported: 0, error: '' };
+    result.sheets.push(info);
+    let parsed;
+    try { parsed = buildCandidates(await d.fetchCsv(sheet.url)); }
+    catch(e) { info.error = e.message || String(e); continue; }
+    if(parsed.error) { info.error = parsed.error; continue; }
+    info.rows = parsed.candidates.length; result.sheetRows += info.rows;
+    parsed.candidates.forEach(r => { if(!r.department && sheet.department) r.department = sheet.department; }); // a sheet dedicated to one department
+    const cutoffMs = Math.max(sheet.startFromMs || 0, prevWm ? prevWm - SYNC_OVERLAP_MS : 0);
+    const sel = selectEligible(parsed.candidates, known, { cutoffMs, campaignIdFor });
+    Object.entries(sel.skipped).forEach(([k, n]) => { sumSkipped[k] = (sumSkipped[k] || 0) + n; });
+    sel.eligible.forEach(r => {
+      r._sheet = sheet;
+      known.push({ sourceRowId: r.rowId ? String(r.rowId) : '', phone: r.phone, campaignId: r._campaignId || '', dateCreated: r.rowTimeMs != null ? riyadhDate(r.rowTimeMs) : (r.sheetDate || '') });
+    });
+    pool.push(...sel.eligible);
+    perSheet.push({ key, prevWm, info, candidates: parsed.candidates, eligible: sel.eligible });
+  }
+  result.skipped = sumSkipped;
+  const failed = result.sheets.filter(s => s.error);
+  if(failed.length === sheets.length) { result.error = failed.map(s => sheets.length > 1 ? `${s.label}: ${s.error}` : s.error).join(' · '); return { result, watermarks: wmOut, watermarkMs: undefined }; }
+  if(failed.length) result.warning = failed.map(s => `${s.label}: ${s.error}`).join(' · ');
+
+  // 2. pool, oldest first, one cap for the whole run
+  let eligible = pool.slice().sort((a, b) => (a.rowTimeMs ?? 0) - (b.rowTimeMs ?? 0));
   if(eligible.length > SYNC_MAX_PER_RUN) { eligible = eligible.slice(0, SYNC_MAX_PER_RUN); result.capped = true; }
 
-  // Department: a sheet column always wins; otherwise the AI where this page can run it.
+  // Department: a sheet column (or a dedicated sheet) always wins; otherwise the AI where this page can run it.
   const needDept = eligible.filter(r => !r.department);
   if(needDept.length && cfg.classifyWithAI) {
     if(d.classify) { await d.classify(needDept); }
@@ -436,7 +495,7 @@ export async function runLeadSync(d) {
     needDept.forEach(r => { if(r.department) result.classified++; else if(r._aiFailed) { r._pending = true; result.pendingDept++; } });
   }
 
-  const docs = eligible.map(r => buildLeadDoc(r, cfg, now));
+  const docs = eligible.map(r => buildLeadDoc(r, { ...cfg, defaultEntity: (r._sheet && r._sheet.entity) || cfg.defaultEntity }, now));
 
   // Assignment: fresh leads first, then any earlier auto-imported leads still waiting for someone.
   let assignedBacklog = [];
@@ -457,11 +516,19 @@ export async function runLeadSync(d) {
   for(const { l, a } of assignedBacklog) { await d.updateLead(l.id, { assignedAgentUid: a.uid, assignedAgentName: a.name }); result.assignedBacklog++; }
   result.imported = docs.length;
 
-  // Watermark: newest row time seen. If we hit the per-run cap, only advance as
-  // far as what we actually imported, so the rest is picked up next time.
-  const times = (result.capped ? eligible : parsed.candidates).map(r => r.rowTimeMs).filter(t => t != null);
-  const wm = times.length ? Math.max(...times, d.watermarkMs || 0) : (d.watermarkMs || 0);
-  return { result, watermarkMs: wm || d.watermarkMs };
+  // Watermarks, per sheet: the newest row time seen. A sheet that still has new
+  // rows waiting (we hit the per-run cap) only advances as far as what was
+  // actually imported from it, so the rest is picked up next time.
+  const importedSet = new Set(eligible);
+  perSheet.forEach(s => {
+    const mine = s.eligible.filter(r => importedSet.has(r));
+    mine.forEach(() => { s.info.imported++; });
+    const leftover = s.eligible.length - mine.length;
+    const times = (leftover ? mine : s.candidates).map(r => r.rowTimeMs).filter(t => t != null);
+    const wm = times.length ? Math.max(...times, s.prevWm) : s.prevWm;
+    if(wm) wmOut[s.key] = wm;
+  });
+  return { result, watermarks: wmOut, watermarkMs: wmOut[sheetKey(sheets[0].url)] };
 }
 
 // ── Scheduler ─────────────────────────────────────────────────────────────
@@ -478,7 +545,7 @@ export function createLeadAutomationRunner(o) {
 
   async function tick(force = false) {
     const cfg = o.getCfg();
-    if(!cfg || !cfg.enabled || !cfg.sheetUrl) return { skipped: 'disabled' };
+    if(!cfg || !cfg.enabled || !getSheets(cfg).length) return { skipped: 'disabled' };
     if(running) return { skipped: 'running' };
     // SAFETY: never run before the page has finished loading the existing leads
     // and campaigns. With an empty "existing leads" list every row in the sheet
@@ -496,12 +563,20 @@ export function createLeadAutomationRunner(o) {
       try {
         // A watermark belongs to the sheet it was measured on — a different sheet starts fresh.
         const st = lock.state || {};
-        out = await runLeadSync(o.buildDeps({ ...st, watermarkMs: st.watermarkSheet === cfg.sheetUrl ? (st.watermarkMs || 0) : 0 }, cfg));
+        const sheets = getSheets(cfg);
+        const wms = { ...(st.watermarks || {}) };
+        // State written before multi-sheet support holds ONE watermark + the link it belonged to.
+        if(st.watermarkMs && st.watermarkSheet) sheets.forEach(s => { if(s.url === st.watermarkSheet && wms[sheetKey(s.url)] == null) wms[sheetKey(s.url)] = st.watermarkMs; });
+        // watermarkMs is zeroed on purpose: `wms` above already holds every valid watermark, and the
+        // legacy single value must not be applied to a sheet it wasn't measured on.
+        out = await runLeadSync({ ...o.buildDeps({ ...st, watermarks: wms }, cfg), watermarks: wms, watermarkMs: 0 });
       } catch(e) {
-        out = { result: { startedAt: nowFn(), error: e.message || String(e), imported: 0, assignedNew: 0, assignedBacklog: 0, skipped: {} }, watermarkMs: undefined };
+        out = { result: { startedAt: nowFn(), error: e.message || String(e), imported: 0, assignedNew: 0, assignedBacklog: 0, skipped: {}, sheets: [] }, watermarks: {}, watermarkMs: undefined };
       }
       out.result.runBy = o.who(); out.result.runPage = o.page;
-      await o.finishRun({ runnerId, result: out.result, watermarkMs: out.watermarkMs, watermarkSheet: cfg.sheetUrl });
+      const first = getSheets(cfg)[0];
+      // watermarkMs/watermarkSheet are still written for the FIRST sheet so a page that hasn't been refreshed yet keeps working.
+      await o.finishRun({ runnerId, result: out.result, watermarks: out.watermarks, watermarkMs: out.watermarkMs, watermarkSheet: first ? first.url : '' });
       if(o.onRun) o.onRun(out.result);
       return { ran: true, result: out.result };
     } finally { running = false; }

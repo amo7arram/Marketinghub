@@ -1131,14 +1131,16 @@ tr.row-overdue:hover td{background:#FFD6D6}
               <input type="checkbox" id="la-enabled" style="width:16px;height:16px;cursor:pointer">
               <label for="la-enabled" style="font-size:13px;font-weight:700;color:var(--text);cursor:pointer">Automatic sync is ON</label>
             </div>
-            <div class="field-group"><label class="field-label">Google Sheet link <span style="color:var(--text-3);font-weight:400;font-size:11px">— link-sharing must be "Anyone with the link can view"</span></label>
-              <input class="field-input" id="la-sheet" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
-            <div class="field-group"><label class="field-label">Which leads to import first</label>
+            <div class="field-group"><label class="field-label">Google Sheets to check <span style="color:var(--text-3);font-weight:400;font-size:11px">— each link must be shared as "Anyone with the link can view". A link ending in <code>#gid=…</code> reads that tab.</span></label>
+              <div id="la-sheets" style="display:flex;flex-direction:column;gap:10px"></div>
+              <button type="button" class="btn btn-sm" id="la-add-sheet" style="margin-top:8px" onclick="addLeadSheetRow()">＋ Add another sheet</button>
+            </div>
+            <div class="field-group"><label class="field-label">When a sheet is added, which leads to import first</label>
               <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-2)">
                 <label style="cursor:pointer"><input type="radio" name="la-start" id="la-start-new" value="new"> Only leads that arrive <strong>from now on</strong> <span style="color:var(--text-3)">(recommended — your existing leads are left alone)</span></label>
                 <label style="cursor:pointer"><input type="radio" name="la-start" id="la-start-all" value="all"> Also import rows already in the sheet <span style="color:var(--text-3)">(ones you already imported by hand are skipped, up to 300 per check)</span></label>
               </div>
-              <div id="la-start-note" style="font-size:10px;color:var(--text-3);margin-top:4px"></div>
+              <div id="la-start-note" style="font-size:10px;color:var(--text-3);margin-top:4px">Applies only to sheets you add or change in this save; sheets already syncing keep their start time.</div>
             </div>
             <div class="field-row">
               <div class="field-group"><label class="field-label">Check every</label>
@@ -2166,7 +2168,8 @@ import {
 import {
   parseCSVText, parseExcelDate, matchDepartment, mapLeadStatus,
   detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover,
-  createLeadAutomationRunner, eligibleAgents, PRESENCE_FRESH_MS
+  createLeadAutomationRunner, eligibleAgents, PRESENCE_FRESH_MS,
+  getSheets, sheetKey, SYNC_MAX_SHEETS
 } from './lead-sync.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
@@ -2357,7 +2360,7 @@ function initData() {
   unsubLoyalty      = watchLoyaltyCards(data => { ALL_LOYALTY     = data; renderLoyaltyTable(); });
   unsubBdTargets    = watchBdTargets(data    => { BD_TARGETS      = data; loadBdTargetsForm(); });
   unsubBrandVoice   = watchBrandVoice(data   => { BRAND_VOICE     = data; loadBrandVoiceForm(); });
-  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); renderEntitiesSettingsList(); renderEntityProfileChips(); refreshPlannerSetupIfOpen(); });
+  unsubEntities     = watchEntities(data     => { ALL_ENTITIES    = data; populateEntitySelects(); laFillSelects(); renderEntitiesSettingsList(); renderEntityProfileChips(); refreshPlannerSetupIfOpen(); });
   unsubAnthropicKey = watchAnthropicKey(key  => { ANTHROPIC_API_KEY = key; loadApiKeyForm(); });
   unsubMetricoolSettings = watchMetricoolSettings(data => { METRICOOL_SETTINGS = data; loadMetricoolSettingsForm(); });
   unsubAnalyticsSettings = watchAnalyticsSettings(data => { ANALYTICS_SETTINGS = data; loadAnalyticsSettingsForm(); });
@@ -7812,13 +7815,77 @@ function renderLeadAutomationAgents() {
   }).join('') : '<div style="font-size:11px;color:var(--text-3)">No agents with a login yet — add one under Team Members (role: Agent).</div>';
 }
 
+const laDeptOptions = first => `<option value="">${first}</option>` + DEPARTMENTS.map(d => `<option>${esc(d)}</option>`).join('');
+const laEntityOptions = first => `<option value="">${first}</option>` + ALL_ENTITIES.map(e => `<option>${esc(e.name)}</option>`).join('');
+
 function laFillSelects() {
   const dept = document.getElementById('la-dept'), ent = document.getElementById('la-entity');
   if(!dept || !ent) return;
   const pd = dept.value, pe = ent.value;
-  dept.innerHTML = '<option value="">— choose —</option>' + DEPARTMENTS.map(d => `<option>${esc(d)}</option>`).join('');
-  ent.innerHTML = '<option value="">— none —</option>' + ALL_ENTITIES.map(e => `<option>${esc(e.name)}</option>`).join('');
+  dept.innerHTML = laDeptOptions('— choose —');
+  ent.innerHTML = laEntityOptions('— none —');
   dept.value = pd; ent.value = pe;
+  // the per-sheet pickers use the same lists; keep whatever each row has chosen
+  document.querySelectorAll('#la-sheets .la-sheet-row').forEach(row => {
+    const d = row.querySelector('[data-f=department]'), e = row.querySelector('[data-f=entity]');
+    const dv = d.value, ev = e.value;
+    d.innerHTML = laDeptOptions('Let the AI decide'); e.innerHTML = laEntityOptions('Same as default');
+    d.value = dv; e.value = ev;
+  });
+}
+
+// ── The list of sheets ────────────────────────────────────────────────────
+// One row per sheet. A row remembers which sheet (data-key) and start time
+// (data-start) it was loaded with, so saving can tell an untouched, already-
+// syncing sheet (keeps its start time) from a new or re-pointed one (gets a
+// fresh start per the "when a sheet is added" choice).
+function laSheetRowHtml(s) {
+  const key = s && s.url ? sheetKey(s.url) : '';
+  const note = !s || !s.url ? 'New sheet — its start time is set when you save.'
+    : (s.startFromMs ? `Importing rows created after ${new Date(s.startFromMs).toLocaleString('en-GB')}.` : 'Importing every row (including ones already in the sheet).');
+  return `<div class="la-sheet-row" data-id="${esc(s ? s.id : '')}" data-key="${esc(key)}" data-start="${s && s.url ? String(s.startFromMs || 0) : ''}" style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--bg)">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="field-input" data-f="label" placeholder="Name (e.g. Dental form)" value="${esc(s ? s.label : '')}" style="flex:0 0 190px" maxlength="40">
+      <input class="field-input" data-f="url" placeholder="https://docs.google.com/spreadsheets/d/…" value="${esc(s ? s.url : '')}" style="flex:1;min-width:230px">
+      <button type="button" class="btn btn-sm btn-danger" onclick="removeLeadSheetRow(this)" title="Stop checking this sheet (leads already imported stay)">✕</button>
+    </div>
+    <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-3)">
+      <label>Department <select class="field-select" data-f="department" style="width:auto;display:inline-block;margin-left:4px">${laDeptOptions('Let the AI decide')}</select></label>
+      <label>Entity <select class="field-select" data-f="entity" style="width:auto;display:inline-block;margin-left:4px">${laEntityOptions('Same as default')}</select></label>
+    </div>
+    <div style="font-size:10px;color:var(--text-3);margin-top:6px">${esc(note)}</div>
+  </div>`;
+}
+function laSetSheetRows(list) {
+  const el = document.getElementById('la-sheets');
+  if(!el) return;
+  el.innerHTML = (list.length ? list : [null]).map(laSheetRowHtml).join('');
+  [...el.querySelectorAll('.la-sheet-row')].forEach((row, i) => {
+    const s = list[i];
+    row.querySelector('[data-f=department]').value = (s && s.department) || '';
+    row.querySelector('[data-f=entity]').value = (s && s.entity) || '';
+  });
+  laUpdateAddButton();
+}
+function laUpdateAddButton() {
+  const n = document.querySelectorAll('#la-sheets .la-sheet-row').length, b = document.getElementById('la-add-sheet');
+  if(b) { b.disabled = n >= SYNC_MAX_SHEETS; b.title = n >= SYNC_MAX_SHEETS ? `Up to ${SYNC_MAX_SHEETS} sheets` : ''; }
+}
+window.addLeadSheetRow = function() {
+  const el = document.getElementById('la-sheets');
+  if(el.querySelectorAll('.la-sheet-row').length >= SYNC_MAX_SHEETS) { showToast(`Up to ${SYNC_MAX_SHEETS} sheets`, true); return; }
+  el.insertAdjacentHTML('beforeend', laSheetRowHtml(null));
+  laUpdateAddButton();
+  markLeadAutomationDirty();
+  const last = el.lastElementChild.querySelector('[data-f=label]'); if(last) last.focus();
+}
+window.removeLeadSheetRow = function(btn) {
+  const row = btn.closest('.la-sheet-row');
+  if(!row) return;
+  if(row.dataset.key && !confirm('Stop checking this sheet?\n\nLeads already imported from it stay in the CRM. If you add the same link again later it starts counting from that moment.')) return;
+  row.remove();
+  laUpdateAddButton();
+  markLeadAutomationDirty();
 }
 
 function loadLeadAutomationForm() {
@@ -7828,9 +7895,8 @@ function loadLeadAutomationForm() {
   if(laDirty) return; // never overwrite what's being typed
   const c = LEAD_AUTOMATION || {};
   document.getElementById('la-enabled').checked = c.enabled === true;
-  document.getElementById('la-sheet').value = c.sheetUrl || '';
+  laSetSheetRows(getSheets(c));
   document.getElementById(c.startFromMode === 'all' ? 'la-start-all' : 'la-start-new').checked = true;
-  document.getElementById('la-start-note').textContent = c.startFromMs ? `Importing leads that arrived after ${new Date(c.startFromMs).toLocaleString('en-GB')}.` : (c.startFromMode === 'all' ? '' : 'The start time is set the first time you save with sync on.');
   document.getElementById('la-interval').value = String(c.intervalMinutes || 2);
   document.getElementById('la-dept').value = c.defaultDepartment || '';
   document.getElementById('la-entity').value = c.defaultEntity || '';
@@ -7843,35 +7909,52 @@ function loadLeadAutomationForm() {
 window.saveLeadAutomationForm = async function() {
   const $ = id => document.getElementById(id);
   const enabled = $('la-enabled').checked;
-  const sheetUrl = $('la-sheet').value.trim();
   const defaultDepartment = $('la-dept').value;
-  if(sheetUrl && !parseGoogleSheetId(sheetUrl)) { showToast("That doesn't look like a Google Sheet link", true); return; }
-  if(enabled && !sheetUrl) { showToast('Paste the Google Sheet link before turning sync on', true); return; }
+
+  // Read the sheet rows (completely empty rows are ignored)
+  const rows = [...document.querySelectorAll('#la-sheets .la-sheet-row')].map((row, i) => ({
+    row, id: row.dataset.id, key: row.dataset.key, start: row.dataset.start,
+    label: row.querySelector('[data-f=label]').value.trim(), url: row.querySelector('[data-f=url]').value.trim(),
+    department: row.querySelector('[data-f=department]').value, entity: row.querySelector('[data-f=entity]').value, n: i + 1,
+  })).filter(r => r.url || r.label);
+  for(const r of rows) {
+    if(!r.url) { showToast(`Sheet ${r.n} has a name but no link`, true); return; }
+    if(!parseGoogleSheetId(r.url)) { showToast(`Sheet ${r.n}: that doesn't look like a Google Sheet link`, true); return; }
+  }
+  const keys = rows.map(r => sheetKey(r.url));
+  if(new Set(keys).size !== keys.length) { showToast('The same sheet is listed twice — remove one', true); return; }
+  if(enabled && !rows.length) { showToast('Paste a Google Sheet link before turning sync on', true); return; }
   if(enabled && !defaultDepartment) { showToast('Choose a default department first (used when a lead can\'t be classified)', true); return; }
   const capRaw = $('la-cap').value.trim();
   const cap = capRaw === '' ? null : parseInt(capRaw, 10);
   if(cap !== null && !(cap >= 1 && cap <= 500)) { showToast('Max untouched per agent must be between 1 and 500, or blank', true); return; }
 
-  const prev = LEAD_AUTOMATION || {};
+  // A sheet that was already syncing (same sheet and tab as when loaded) keeps its start
+  // time. A new or re-pointed one starts per the choice: from now, or including what's there.
   const mode = $('la-start-all').checked ? 'all' : 'new';
-  let startFromMs = prev.startFromMs ?? null;
-  if(mode === 'all') {
-    if(prev.startFromMode !== 'all' && !confirm('Import the rows already in the sheet too?\n\nLeads you already imported by hand are skipped, and it imports at most 300 per check — but check the sheet link is the right one first.')) return;
-    startFromMs = 0;
-  } else if(prev.startFromMode !== 'new' || startFromMs == null || prev.sheetUrl !== sheetUrl) {
-    startFromMs = Date.now(); // first enable, a mode switch, or a new sheet: start counting from now
-  }
+  const isNew = r => !(r.start !== '' && r.key && r.key === sheetKey(r.url));
+  const added = rows.filter(isNew);
+  if(mode === 'all' && added.length && !confirm(`Import the rows already in ${added.length === 1 ? 'this sheet' : 'these sheets'} too?\n\n${added.map(r => '• ' + (r.label || r.url.slice(0, 50))).join('\n')}\n\nLeads you already imported by hand are skipped, and it imports at most 300 per check — but check the link${added.length === 1 ? ' is' : 's are'} the right one first.`)) return;
+  const nowMs = Date.now();
+  const sheets = rows.map((r, i) => ({
+    id: (!isNew(r) && r.id) || ('s' + nowMs.toString(36) + i),
+    label: r.label || `Sheet ${r.n}`, url: r.url, department: r.department, entity: r.entity,
+    startFromMs: isNew(r) ? (mode === 'all' ? 0 : nowMs) : (Number(r.start) || 0),
+  }));
   const excludedAgentUids = [...document.querySelectorAll('#la-agents input[data-uid]')].filter(i => !i.checked).map(i => i.dataset.uid);
 
   const btn = $('la-save-btn');
   btn.disabled = true;
   try {
     await saveLeadAutomation({
-      enabled, sheetUrl, intervalMinutes: parseInt($('la-interval').value, 10) || 2,
+      enabled, sheets,
+      // sheetUrl/startFromMs mirror the FIRST sheet — read by any page that hasn't been refreshed since multi-sheet support
+      sheetUrl: sheets.length ? sheets[0].url : '', startFromMs: sheets.length ? sheets[0].startFromMs : null,
+      intervalMinutes: parseInt($('la-interval').value, 10) || 2,
       defaultDepartment, defaultEntity: $('la-entity').value,
       classifyWithAI: $('la-ai').checked, autoAssign: $('la-assign').checked,
       maxUntouchedPerAgent: cap, excludedAgentUids,
-      startFromMode: mode, startFromMs, agentDirectory: laDesiredDirectory(),
+      startFromMode: mode, agentDirectory: laDesiredDirectory(),
     }, myMemberName() || currentAdminEmail);
     laDirty = false;
     $('la-msg').textContent = enabled ? 'Saved ✓ — syncing' : 'Saved ✓ (sync is off)';
@@ -7919,6 +8002,10 @@ function renderLeadAutomationStatus() {
       else if(r) lines.push(`Result: <strong>${r.imported || 0}</strong> imported · <strong>${assigned}</strong> assigned${r.assignedBacklog ? ` (${r.assignedBacklog} were waiting)` : ''}` +
         (r.classified ? ` · ${r.classified} classified by AI` : '') + (r.pendingDept ? ` · ${r.pendingDept} awaiting AI` : '') +
         ` · ${sumSkipped} already known/older skipped` + (r.capped ? ' · <span style="color:var(--orange)">hit the 300-per-check limit — the rest follow next check</span>' : ''));
+      if(r && !r.error && r.warning) lines.push(`<span style="color:var(--orange)">⚠ A sheet couldn't be read (the others synced): ${esc(r.warning)}</span>`);
+      // one line per sheet when there is more than one, so you can see which is delivering
+      if(r && Array.isArray(r.sheets) && r.sheets.length > 1) lines.push(r.sheets.map(s =>
+        `<span style="font-size:11px;color:${s.error ? 'var(--red)' : 'var(--text-2)'}">• ${esc(s.label)}: ${s.error ? '⚠ ' + esc(s.error) : `${s.rows || 0} rows, <strong>${s.imported || 0}</strong> imported`}</span>`).join('<br>'));
     } else if(cfg && cfg.enabled) lines.push('Waiting for the first check…');
     lines.push(`Agents online now: <strong>${online.length}</strong>${online.length ? ' — ' + online.map(a => esc(a.name)).join(', ') : ' <span style="color:var(--text-3)">(new leads wait unassigned until one appears)</span>'}`);
     box.innerHTML = lines.join('<br>');
@@ -7930,7 +8017,7 @@ function renderLeadAutomationStatus() {
       chip.style.display = 'block';
       chip.style.color = r && r.error ? 'var(--red)' : 'var(--text-2)';
       chip.innerHTML = `⚡ Auto-sync <strong>ON</strong> · ${st.lastRunAt ? `checked ${laAgo(st.lastRunAt)}` : 'waiting for first check'}` +
-        (r && r.error ? ` · ⚠ ${esc(r.error)}` : (r ? ` · +${r.imported || 0} imported, ${assigned} assigned` : '')) + ` · ${online.length} agent${online.length === 1 ? '' : 's'} online`;
+        (r && r.error ? ` · ⚠ ${esc(r.error)}` : (r ? ` · +${r.imported || 0} imported, ${assigned} assigned${r.warning ? ' · <span style="color:var(--orange)">⚠ a sheet failed</span>' : ''}` : '')) + ` · ${online.length} agent${online.length === 1 ? '' : 's'} online`;
     }
   }
   renderLeadAutomationAgents(); // refreshes the online dots

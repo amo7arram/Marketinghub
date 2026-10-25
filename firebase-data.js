@@ -1215,7 +1215,11 @@ export function parseGoogleSheetId(url) {
 export async function fetchGoogleSheetCSV(sheetUrlOrId) {
   const sheetId = sheetUrlOrId.includes('/') ? parseGoogleSheetId(sheetUrlOrId) : sheetUrlOrId;
   if (!sheetId) throw new Error('Could not find a valid Google Sheet ID in that link');
-  const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+  // A link copied from the browser ends in #gid=<tab id>: read THAT tab (without
+  // it Google returns the first tab, which silently re-read the wrong data for a
+  // link to a second tab). No gid in the link = first tab, as before.
+  const gid = (String(sheetUrlOrId).match(/[#?&]gid=(\d+)/) || [])[1];
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gid ? `&gid=${gid}` : ''}`;
   const res = await fetch(exportUrl);
   if (!res.ok) throw new Error('Could not fetch the sheet — check that link-sharing is set to "Anyone with the link can view"');
   return res.text();
@@ -1338,9 +1342,13 @@ export async function acquireLeadSyncLock({ runnerId, name, page, leaseMs, minIn
 }
 // Releases the lease and records the outcome. The watermark only moves when
 // the run produced one (a failed run must not advance it).
-export function finishLeadSyncRun({ runnerId, result, watermarkMs, watermarkSheet }) {
+// `watermarks` = { [sheetKey]: ms }, one per sheet; it is deep-merged, so a sheet that
+// failed this time keeps its old value. watermarkMs/watermarkSheet are the legacy
+// single-sheet pair (the FIRST sheet), still written so a not-yet-refreshed page keeps working.
+export function finishLeadSyncRun({ runnerId, result, watermarkMs, watermarkSheet, watermarks }) {
   const patch = { holderRunnerId: null, leaseUntil: 0, lastRunAt: Date.now(), lastResult: result };
   if(Number.isFinite(watermarkMs)) { patch.watermarkMs = watermarkMs; patch.watermarkSheet = watermarkSheet || ''; }
+  if(watermarks && Object.keys(watermarks).length) patch.watermarks = watermarks;
   return setDoc(doc(db, CONFIG, "lead_sync_state"), patch, { merge: true });
 }
 
