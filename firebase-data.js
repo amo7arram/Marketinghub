@@ -924,7 +924,7 @@ export const DEPARTMENTS = [
   "Fertility & IVF","Radiology & Imaging","Emergency Medicine (ER)"
 ];
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
-export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
+export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Snapchat","Print","Multi-channel"];
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
 export const TYPES = ["Campaign","Event","SM Content","Print","Website Update","Physician Video"];
 export const WEBSITE_UPDATE_TYPES = ["News Article","Department Page Update","Doctor Profile Added","Doctor Profile Removed","Other"];

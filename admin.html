@@ -343,7 +343,10 @@ tr.row-overdue:hover td{background:#FFD6D6}
           </label>
           <input class="filter-input" type="text" placeholder="Search..." id="f-search" oninput="renderTable()">
         </div>
-        <button class="btn btn-primary" onclick="openForm()">+ New Activity</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" onclick="openCalendarImport()" title="Create social media activities from your content calendar (Excel or Google Sheet)">📅 Import content calendar</button>
+          <button class="btn btn-primary" onclick="openForm()">+ New Activity</button>
+        </div>
       </div>
       <table>
         <thead><tr><th>Type</th><th>Title</th><th>Department</th><th>Entity</th><th class="sortable-th" onclick="toggleSort()" style="cursor:pointer;user-select:none">Dates <span id="sort-arrow">↕</span></th><th>Status</th><th>Assigned To</th><th>Actions</th></tr></thead>
@@ -2033,6 +2036,54 @@ tr.row-overdue:hover td{background:#FFD6D6}
 </div>
 
 <!-- ── GOOGLE SHEET IMPORT MODAL ── -->
+<!-- ── CONTENT CALENDAR IMPORT ── -->
+<div class="modal-overlay" id="cal-overlay">
+  <div class="modal" style="width:1180px">
+    <div class="modal-header">
+      <div class="modal-title">📅 Import content calendar</div>
+      <button class="modal-close" onclick="closeCalendarImport()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:74vh">
+      <div id="cal-source">
+        <div style="font-size:11px;color:var(--text-3);background:var(--bg);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;line-height:1.7">
+          Reads a monthly social media calendar — an Excel file or a Google Sheet, Arabic or English — and creates one <strong>SM Content</strong> activity per post.
+          It takes the <strong>date, title, department, content type, platforms, caption (+ hashtags), status and content pillar</strong> (as the objective), and an optional <strong>campaign</strong> column. Nothing else is copied: design/script briefs, compliance notes, paid-promotion plans and post times stay in your sheet, because activity text is shown on the public portal.
+          You review everything before anything is created, and the whole import can be undone.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px">
+          <div class="field-group" style="margin:0"><label class="field-label">Excel file <span style="color:var(--text-3);font-weight:400;font-size:11px">(.xlsx / .xls / .csv)</span></label>
+            <input type="file" id="cal-file" accept=".xlsx,.xls,.csv" onchange="handleCalendarFile(this)" style="font-size:12px"></div>
+          <div class="field-group" style="margin:0"><label class="field-label">…or a Google Sheet link <span style="color:var(--text-3);font-weight:400;font-size:11px">(shared as "Anyone with the link can view"; add #gid=… for a specific tab)</span></label>
+            <div style="display:flex;gap:6px"><input class="field-input" id="cal-url" placeholder="https://docs.google.com/spreadsheets/d/…" style="flex:1"><button class="btn btn-primary" onclick="fetchCalendarSheet()">Fetch</button></div></div>
+        </div>
+        <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-2)">
+          <label>Entity <select class="field-select" id="cal-entity" onchange="calOptionChanged()" style="width:auto;display:inline-block;margin-left:4px"></select></label>
+          <label style="cursor:pointer"><input type="checkbox" id="cal-inc-caption" checked onchange="calOptionChanged()"> Import captions</label>
+          <label style="cursor:pointer"><input type="checkbox" id="cal-inc-tags" checked onchange="calOptionChanged()"> Add hashtags to the caption</label>
+        </div>
+        <div style="font-size:10px;color:var(--text-3);margin-top:6px">Captions appear in the public portal's activity detail once imported, including for posts still waiting for review — untick "Import captions" to keep them out.</div>
+        <div id="cal-prev" style="margin-top:14px"></div>
+      </div>
+      <div id="cal-status" style="font-size:12px;color:var(--text-3);margin-top:12px;display:none"></div>
+      <div id="cal-review" style="display:none;margin-top:14px">
+        <div id="cal-summary" style="font-size:12px;margin-bottom:12px;line-height:1.7"></div>
+        <details id="cal-map-wrap" style="margin-bottom:14px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text-2)">Columns we matched <span id="cal-map-count" style="font-weight:400;color:var(--text-3)"></span></summary>
+          <div id="cal-map" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px 14px;margin-top:10px"></div></details>
+        <div id="cal-dept-wrap" style="margin-bottom:14px"></div>
+        <div id="cal-camp-wrap" style="margin-bottom:14px"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Posts to create</div>
+        <div style="overflow:auto;max-height:420px;border:1px solid var(--border);border-radius:var(--radius)" id="cal-items-scroll"><table id="cal-items" style="width:100%;border-collapse:collapse;font-size:11px"></table></div>
+      </div>
+      <div id="cal-done" style="display:none"></div>
+    </div>
+    <div class="modal-footer" style="align-items:center">
+      <span id="cal-progress" style="margin-right:auto;font-size:12px;color:var(--navy);font-weight:600"></span>
+      <button class="btn" onclick="closeCalendarImport()">Close</button>
+      <button class="btn btn-primary" id="cal-create-btn" onclick="createCalendarActivities()" disabled>Create activities</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="sheet-import-overlay">
   <div class="modal" style="width:640px">
     <div class="modal-header">
@@ -2169,8 +2220,12 @@ import {
   parseCSVText, parseExcelDate, matchDepartment, mapLeadStatus,
   detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover,
   createLeadAutomationRunner, eligibleAgents, PRESENCE_FRESH_MS,
-  getSheets, sheetKey, SYNC_MAX_SHEETS
+  getSheets, sheetKey, SYNC_MAX_SHEETS, parseCSVRecords
 } from './lead-sync.js';
+import {
+  FIELDS as CAL_FIELDS, detectHeaderRow, detectColumns, buildCalendarRows, buildActivityDoc, buildCampaignDoc,
+  undoTargets as calUndoTargets, newImportId, WEEKDAY_NAMES_EN
+} from './calendar-import.js';
 
 // ── STATE ──────────────────────────────────────────────────────────────
 let ALL_INITIATIVES = [];
@@ -2321,6 +2376,7 @@ watchAuth(async user => {
     LEAD_AUTOMATION = null; LEAD_SYNC_STATE = null; AGENT_PRESENCE = []; laDirty = false;
     knownRequestIds = null;
     closeUserRequests(); closeRequestDetail(); // no one's request data may stay on screen behind the login
+    document.getElementById('cal-overlay').classList.remove('open'); CAL = null; // an unfinished calendar import must not survive into the next session
     PLAN = null; // an unreviewed plan must not survive a logout into the next person's session
     if(unsubExpenses) unsubExpenses();
     if(unsubOffersCatalogMeta) unsubOffersCatalogMeta();
@@ -6508,6 +6564,347 @@ window.undoPlan = async function(planId) {
     for(const id of t.deleteIds) await deleteInitiative(id);
     showToast(`✓ Removed ${t.deleteIds.length} item${t.deleteIds.length === 1 ? '' : 's'}`);
     if(!PLAN) { plShow('pl-setup'); renderPlannerSetup(); }
+  } catch(e) { showToast('Undo stopped: ' + e.message, true); }
+}
+
+// ── CONTENT CALENDAR IMPORT ───────────────────────────────────────────────
+// Upload an Excel file or paste a Google Sheet link → review → create SM Content
+// activities (and campaigns the sheet introduces). Parsing/mapping lives in
+// calendar-import.js; this is the screen and the writes. Nothing is written until
+// the admin clicks Create, and everything created carries an importId so the whole
+// import can be undone while the items are still Planned.
+let CAL = null, calFetchRun = 0, calBusy = false;
+const CAL_PREF_KEY = 'imc_cal_import_v1';
+function calPrefs() { try { return JSON.parse(localStorage.getItem(CAL_PREF_KEY) || '{}') || {}; } catch(e) { return {}; } }
+function calSavePrefs(p) { try { localStorage.setItem(CAL_PREF_KEY, JSON.stringify({ ...calPrefs(), ...p })); } catch(e) {} } // a convenience only — never required
+const calCol = i => { let s = '', n = i; do { s = String.fromCharCode(65 + n % 26) + s; n = Math.floor(n / 26) - 1; } while(n >= 0); return s; };
+function calWeekdayAr(iso) {
+  try { return new Date(iso + 'T00:00:00Z').toLocaleDateString('ar', { weekday: 'long', timeZone: 'UTC' }); } catch(e) { return ''; }
+}
+
+window.openCalendarImport = function() {
+  CAL = { sheets: [], idx: 0, rows: [], hr: -1, headers: [], map: {}, items: [], deptValues: [], campValues: [], skipped: {},
+          deptChoice: {}, deptConfirmed: {}, campChoice: {}, label: '', done: null };
+  const p = calPrefs();
+  const sel = document.getElementById('cal-entity');
+  const names = ALL_ENTITIES.map(e => e.name);
+  sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join('');
+  sel.value = names.includes(p.entity) ? p.entity : (names.includes('IMC') ? 'IMC' : (names[0] || ''));
+  document.getElementById('cal-inc-caption').checked = p.includeCaption !== false;
+  document.getElementById('cal-inc-tags').checked = p.includeHashtags !== false;
+  document.getElementById('cal-file').value = '';
+  document.getElementById('cal-url').value = '';
+  ['cal-status', 'cal-review', 'cal-done'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  document.getElementById('cal-source').style.display = 'block';
+  document.getElementById('cal-progress').textContent = '';
+  document.getElementById('cal-create-btn').disabled = true;
+  document.getElementById('cal-create-btn').style.display = '';
+  calRenderPrevious();
+  document.getElementById('cal-overlay').classList.add('open');
+}
+window.closeCalendarImport = function() {
+  if(calBusy && !confirm('An import is still running. Close anyway? (What was already created stays — you can undo it from this screen.)')) return;
+  document.getElementById('cal-overlay').classList.remove('open');
+}
+
+// Earlier imports, for Undo after the screen was closed.
+function calImportsFrom(initiatives) {
+  const map = {};
+  initiatives.filter(i => i.importId).forEach(i => {
+    const p = map[i.importId] = map[i.importId] || { id: i.importId, total: 0, planned: 0, created: 0, months: new Set() };
+    p.total++; if(i.status === 'Planned') p.planned++;
+    p.created = Math.max(p.created, i.createdAt?.toMillis?.() || 0);
+    if(i.type !== 'Campaign' && i.startDate) p.months.add(i.startDate.slice(0, 7));
+  });
+  return Object.values(map).sort((a, b) => b.created - a.created);
+}
+function calRenderPrevious() {
+  const el = document.getElementById('cal-prev');
+  const list = calImportsFrom(ALL_INITIATIVES).slice(0, 5);
+  el.innerHTML = list.length ? `<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Earlier imports</div>` + list.map(p =>
+    `<div style="display:flex;gap:10px;align-items:center;font-size:12px;margin-bottom:4px"><span>${esc([...p.months].sort().join(', ') || '—')} · ${p.total} item${p.total === 1 ? '' : 's'} (${p.planned} still Planned)${p.created ? ' · ' + esc(new Date(p.created).toLocaleDateString('en-GB')) : ''}</span>
+      <button class="btn btn-sm btn-danger" data-imp="${esc(p.id)}" onclick="undoCalendarImport(this.dataset.imp)" ${p.planned ? '' : 'disabled'}>Undo</button></div>`).join('') : '';
+}
+
+// ── Reading the file / sheet ──
+function calStatus(msg, color) {
+  const el = document.getElementById('cal-status');
+  el.style.display = msg ? 'block' : 'none'; el.style.color = color || 'var(--text-3)'; el.innerHTML = msg || '';
+}
+window.handleCalendarFile = function(input) {
+  const file = input.files[0];
+  if(!file) return;
+  calStatus('Reading the file…');
+  const reader = new FileReader();
+  reader.onerror = () => calStatus('Could not read that file', 'var(--red)');
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      // raw:true keeps dates as Excel serial numbers. Never read dates as formatted text:
+      // a year-less cell format would silently drop the year.
+      const sheets = wb.SheetNames.map(name => ({ name, rows: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '' }) }));
+      calLoadSheets(sheets, file.name);
+    } catch(err) { calStatus('Could not open that file — is it an Excel or CSV file? (' + esc(err.message) + ')', 'var(--red)'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+window.fetchCalendarSheet = async function() {
+  const url = document.getElementById('cal-url').value.trim();
+  if(!url) { showToast('Paste a Google Sheet link first', true); return; }
+  if(!parseGoogleSheetId(url)) { showToast("That doesn't look like a Google Sheet link", true); return; }
+  const run = ++calFetchRun;
+  calStatus('Fetching the sheet…');
+  try {
+    const text = await fetchGoogleSheetCSV(url);
+    if(run !== calFetchRun) return;
+    calLoadSheets([{ name: 'Google Sheet', rows: parseCSVRecords(text) }], 'Google Sheet');
+  } catch(e) { if(run === calFetchRun) calStatus(esc(e.message), 'var(--red)'); }
+}
+
+// Pick the sheet (tab) that really holds a calendar, find its header row, match columns.
+function calLoadSheets(sheets, label) {
+  const scored = sheets.map((s, i) => {
+    const hr = detectHeaderRow(s.rows);
+    const map = hr >= 0 ? detectColumns(s.rows[hr], s.rows.slice(hr + 1)) : {};
+    return { i, hr, score: Object.keys(map).length };
+  }).filter(x => x.hr >= 0).sort((a, b) => b.score - a.score || a.i - b.i);
+  if(!scored.length) {
+    calStatus("Couldn't find a header row. The sheet needs a row with columns like date, title, department and platforms (Arabic or English).", 'var(--red)');
+    return;
+  }
+  CAL.sheets = sheets; CAL.label = label;
+  calUseSheet(scored[0].i);
+}
+window.calUseSheet = calUseSheet;
+function calUseSheet(idx) {
+  const s = CAL.sheets[idx];
+  CAL.idx = idx; CAL.rows = s.rows;
+  CAL.hr = detectHeaderRow(s.rows);
+  CAL.headers = (s.rows[CAL.hr] || []).map(h => String(h ?? '').trim());
+  CAL.map = detectColumns(s.rows[CAL.hr], s.rows.slice(CAL.hr + 1));
+  calStatus('');
+  calRebuild();
+}
+
+// ── Building / rendering the review ──
+function calOptions() {
+  return { entityDefault: document.getElementById('cal-entity').value, entityNames: ALL_ENTITIES.map(e => e.name),
+           includeCaption: document.getElementById('cal-inc-caption').checked, includeHashtags: document.getElementById('cal-inc-tags').checked,
+           existing: ALL_INITIATIVES, campaigns: ALL_INITIATIVES.filter(i => i.type === 'Campaign') };
+}
+window.calOptionChanged = function() { if(CAL && CAL.rows.length) calRebuild(); }
+function calRebuild() {
+  const res = buildCalendarRows(CAL.rows, { headerRow: CAL.hr, map: CAL.map }, calOptions());
+  CAL.items = res.items; CAL.deptValues = res.deptValues; CAL.campValues = res.campValues; CAL.skipped = res.skipped;
+  const saved = calPrefs().deptMap || {};
+  CAL.deptValues.forEach(d => {
+    if(d.key in CAL.deptChoice) return;                                   // keep choices across a rebuild
+    if(saved[d.key] && DEPARTMENTS.includes(saved[d.key])) { CAL.deptChoice[d.key] = saved[d.key]; CAL.deptConfirmed[d.key] = true; }
+    else if(d.suggestion) { CAL.deptChoice[d.key] = d.suggestion.dept; CAL.deptConfirmed[d.key] = d.suggestion.sure; }
+    else { CAL.deptChoice[d.key] = ''; CAL.deptConfirmed[d.key] = false; }
+  });
+  CAL.campValues.forEach(c => {
+    if(c.key in CAL.campChoice) return;
+    CAL.campChoice[c.key] = c.match.kind === 'exact' ? c.match.id : c.match.kind === 'near' ? '' : 'new'; // a near-miss is never decided for you
+  });
+  document.getElementById('cal-review').style.display = 'block';
+  calRender();
+}
+function calItemDept(it) { return CAL.deptChoice[it.deptKey] || ''; }
+// Blocking problems, from the CURRENT values (so editing a cell clears its problem).
+function calProblems() {
+  const inc = CAL.items.filter(i => i.include);
+  const p = [];
+  const n = (cnt, text) => { if(cnt) p.push(`${cnt} ${text}`); };
+  n(inc.filter(i => !i.date).length, 'post(s) with no date');
+  n(inc.filter(i => !i.title.trim()).length, 'post(s) with no title');
+  n(inc.filter(i => !calItemDept(i)).length, 'post(s) with no department');
+  n(new Set(inc.filter(i => i.deptKey && CAL.deptChoice[i.deptKey] && !CAL.deptConfirmed[i.deptKey]).map(i => i.deptKey)).size, 'department(s) to confirm');
+  n(new Set(inc.filter(i => i.campKey && CAL.campChoice[i.campKey] === '').map(i => i.campKey)).size, 'campaign(s) to decide');
+  return p;
+}
+function calRender() {
+  calRenderMap(); calRenderDepts(); calRenderCamps(); calRenderItems(); calRenderSummary();
+}
+function calRenderSummary() {
+  const inc = CAL.items.filter(i => i.include), probs = calProblems();
+  const newCamps = CAL.campValues.filter(c => CAL.campChoice[c.key] === 'new' && inc.some(i => i.campKey === c.key)).length;
+  const dups = CAL.items.filter(i => i.flags.some(f => f.dup)).length;
+  document.getElementById('cal-summary').innerHTML =
+    `<strong>${esc(CAL.label)}</strong>${CAL.sheets.length > 1 ? ` · tab <select class="field-select" style="width:auto;display:inline-block;padding:2px 6px" onchange="calUseSheet(+this.value)">${CAL.sheets.map((s, i) => `<option value="${i}" ${i === CAL.idx ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>` : ''} · header found on row ${CAL.hr + 1} · <strong>${CAL.items.length}</strong> post${CAL.items.length === 1 ? '' : 's'} read` +
+    (CAL.skipped.nonPost ? ` · ${CAL.skipped.nonPost} non-post line${CAL.skipped.nonPost === 1 ? '' : 's'} ignored` : '') +
+    (dups ? ` · <span style="color:var(--orange)">${dups} already in your activities / listed twice (unticked)</span>` : '') +
+    `<br>Will create <strong>${inc.length}</strong> SM Content activit${inc.length === 1 ? 'y' : 'ies'}${newCamps ? ` and <strong>${newCamps}</strong> new campaign${newCamps === 1 ? '' : 's'}` : ''}` +
+    (probs.length ? ` · <span style="color:var(--red);font-weight:600">Fix first: ${probs.map(esc).join(' · ')}</span>` : '');
+  const btn = document.getElementById('cal-create-btn');
+  btn.disabled = calBusy || !inc.length || probs.length > 0;
+  btn.textContent = inc.length ? `Create ${inc.length} activit${inc.length === 1 ? 'y' : 'ies'}` : 'Create activities';
+}
+function calRenderMap() {
+  const missing = ['title', 'date', 'department'].filter(k => CAL.map[k] == null);
+  const opts = sel => '<option value="">— none —</option>' + CAL.headers.map((h, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${calCol(i)}${h ? ': ' + esc(h.slice(0, 40)) : ''}</option>`).join('');
+  document.getElementById('cal-map').innerHTML = CAL_FIELDS.map(f => {
+    const req = ['title', 'date', 'department'].includes(f.key);
+    return `<label style="font-size:11px;color:var(--text-2)">${esc(f.label)}${req ? ' <span style="color:var(--red)">*</span>' : ''}
+      <select class="field-select" data-f="${f.key}" onchange="calSetMap(this.dataset.f, this.value)" style="margin-top:3px;${req && CAL.map[f.key] == null ? 'border-color:var(--red)' : ''}">${opts(CAL.map[f.key])}</select></label>`;
+  }).join('');
+  document.getElementById('cal-map-count').textContent = `— ${Object.keys(CAL.map).length} of ${CAL_FIELDS.length} found`;
+  const det = document.getElementById('cal-map-wrap');
+  if(missing.length) det.open = true;
+}
+window.calSetMap = function(field, v) {
+  if(v === '') delete CAL.map[field]; else CAL.map[field] = Number(v);
+  calRebuild();
+}
+
+function calRenderDepts() {
+  const wrap = document.getElementById('cal-dept-wrap');
+  if(!CAL.deptValues.length) { wrap.innerHTML = ''; return; }
+  const need = d => !CAL.deptChoice[d.key] || !CAL.deptConfirmed[d.key];
+  const rows = [...CAL.deptValues].sort((a, b) => (need(b) - need(a)) || b.count - a.count);
+  const pending = rows.filter(d => CAL.deptChoice[d.key] && !CAL.deptConfirmed[d.key]).length;
+  wrap.innerHTML = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px"><div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em">Departments <span style="text-transform:none;letter-spacing:0;font-weight:400">— the sheet's names matched to yours; confirmed choices are remembered in this browser</span></div>
+    ${pending ? `<button class="btn btn-sm" onclick="calAcceptAllDepts()">✓ Accept all ${pending} suggestion${pending === 1 ? '' : 's'}</button>` : ''}</div>
+    <div style="overflow:auto;max-height:230px;border:1px solid var(--border);border-radius:var(--radius)"><table style="width:100%;border-collapse:collapse;font-size:11px">
+    <thead style="background:var(--bg)"><tr><th style="text-align:left;padding:5px 10px">In the sheet</th><th style="padding:5px 10px">Posts</th><th style="text-align:left;padding:5px 10px">Department here</th><th></th></tr></thead><tbody>` +
+    rows.map(d => {
+      const ch = CAL.deptChoice[d.key], ok = CAL.deptConfirmed[d.key];
+      const color = !ch ? 'var(--red)' : ok ? 'var(--border)' : 'var(--orange)';
+      return `<tr style="border-top:1px solid var(--border)"><td style="padding:5px 10px;font-weight:600" dir="auto">${esc(d.raw)}</td><td style="padding:5px 10px;text-align:center">${d.count}</td>
+        <td style="padding:5px 10px"><select class="field-select" data-k="${esc(d.key)}" onchange="calSetDept(this.dataset.k, this.value)" style="border-color:${color};max-width:260px"><option value="">— choose —</option>${DEPARTMENTS.map(x => `<option ${x === ch ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></td>
+        <td style="padding:5px 10px;white-space:nowrap">${!ch ? '<span style="color:var(--red)">choose one</span>' : ok ? '<span style="color:var(--green)">✓</span>' : `<button class="btn btn-sm" data-k="${esc(d.key)}" onclick="calConfirmDept(this.dataset.k)">✓ Looks right</button> <span style="color:var(--orange);font-size:10px">please check</span>`}</td></tr>`;
+    }).join('') + '</tbody></table></div>';
+}
+window.calSetDept = function(key, v) { CAL.deptChoice[key] = v; CAL.deptConfirmed[key] = !!v; calRender(); }
+window.calConfirmDept = function(key) { CAL.deptConfirmed[key] = true; calRender(); }
+window.calAcceptAllDepts = function() { CAL.deptValues.forEach(d => { if(CAL.deptChoice[d.key]) CAL.deptConfirmed[d.key] = true; }); calRender(); }
+
+function calRenderCamps() {
+  const wrap = document.getElementById('cal-camp-wrap');
+  if(!CAL.campValues.length) { wrap.innerHTML = ''; return; }
+  const existing = ALL_INITIATIVES.filter(i => i.type === 'Campaign');
+  wrap.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Campaigns <span style="text-transform:none;letter-spacing:0;font-weight:400">— posts are grouped under these; a post with no campaign stays on its own</span></div>
+    <div style="border:1px solid var(--border);border-radius:var(--radius)"><table style="width:100%;border-collapse:collapse;font-size:11px"><tbody>` +
+    CAL.campValues.map(c => {
+      const ch = CAL.campChoice[c.key];
+      const note = c.match.kind === 'exact' ? '<span style="color:var(--green)">found</span>'
+        : c.match.kind === 'near' ? `<span style="color:var(--orange)">looks like “${esc(c.match.title)}” — choose</span>` : '<span style="color:var(--text-3)">not found</span>';
+      const sorted = [...existing].sort((a, b) => (b.id === c.match.id) - (a.id === c.match.id) || (a.title || '').localeCompare(b.title || ''));
+      return `<tr style="border-top:1px solid var(--border)"><td style="padding:6px 10px;font-weight:600" dir="auto">${esc(c.raw)}</td><td style="padding:6px 10px;text-align:center">${c.count} post${c.count === 1 ? '' : 's'}</td><td style="padding:6px 10px">${note}</td>
+        <td style="padding:6px 10px"><select class="field-select" data-k="${esc(c.key)}" onchange="calSetCamp(this.dataset.k, this.value)" style="max-width:300px;${ch === '' ? 'border-color:var(--red)' : ''}">
+          ${ch === '' ? '<option value="">— choose —</option>' : ''}
+          <option value="new" ${ch === 'new' ? 'selected' : ''}>Create new campaign “${esc(c.raw.slice(0, 40))}”</option>
+          <option value="none" ${ch === 'none' ? 'selected' : ''}>No campaign (each post on its own)</option>
+          ${sorted.map(x => `<option value="${esc(x.id)}" ${ch === x.id ? 'selected' : ''}>Use existing: ${esc((x.title || 'Untitled').slice(0, 50))}</option>`).join('')}</select></td></tr>`;
+    }).join('') + '</tbody></table></div>';
+}
+window.calSetCamp = function(key, v) { CAL.campChoice[key] = v; calRender(); }
+
+function calDisplayFlags(it) {
+  const f = it.flags.filter(x => x.level !== 'bad')
+    .filter(x => !(it.edited && it.edited.date && /Day\/month|check the date/.test(x.text)));
+  if(!it.date) f.push({ text: 'No date — pick one', level: 'bad' });
+  if(!it.title.trim()) f.push({ text: 'No title', level: 'bad' });
+  if(!calItemDept(it)) f.push({ text: it.deptRaw ? 'Department not chosen yet' : 'No department in the sheet', level: 'bad' });
+  return f;
+}
+function calRenderItems() {
+  const sc = document.getElementById('cal-items-scroll'), top = sc.scrollTop;
+  const th = 'position:sticky;top:0;background:var(--navy);color:#fff;padding:6px 8px;text-align:left;font-size:10px;z-index:1';
+  document.getElementById('cal-items').innerHTML = `<thead><tr><th style="${th}"><input type="checkbox" id="cal-all" onchange="calToggleAll(this.checked)" ${CAL.items.length && CAL.items.every(i => i.include) ? 'checked' : ''}></th><th style="${th}">Row</th><th style="${th}">Date</th><th style="${th}">Title</th><th style="${th}">Department</th><th style="${th}">Type</th><th style="${th}">Channels</th><th style="${th}">Status</th><th style="${th}">Campaign</th><th style="${th}">Notes</th></tr></thead><tbody>` +
+    CAL.items.map((it, i) => {
+      const flags = calDisplayFlags(it), bad = flags.some(f => f.level === 'bad');
+      const camp = it.campKey ? (CAL.campChoice[it.campKey] === 'none' ? '—' : CAL.campChoice[it.campKey] === 'new' ? `new: ${esc(it.campRaw.slice(0, 24))}` : CAL.campChoice[it.campKey] === '' ? '<span style="color:var(--red)">?</span>' : esc(((ALL_INITIATIVES.find(x => x.id === CAL.campChoice[it.campKey]) || {}).title || '').slice(0, 24))) : '—';
+      return `<tr style="border-top:1px solid var(--border);${!it.include ? 'opacity:0.5;' : ''}${bad && it.include ? 'background:#FFF1F1;' : ''}">
+        <td style="padding:4px 8px"><input type="checkbox" ${it.include ? 'checked' : ''} onchange="calSetItem(${i},'include',this.checked)"></td>
+        <td style="padding:4px 8px;color:var(--text-3)">${it.rowNo}</td>
+        <td style="padding:4px 8px;white-space:nowrap"><input type="date" value="${esc(it.date)}" onchange="calSetItem(${i},'date',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid ${it.date ? 'var(--border)' : 'var(--red)'};border-radius:4px"> <span style="color:var(--text-3)">${it.date ? esc(calWeekdayAr(it.date)) : ''}</span></td>
+        <td style="padding:4px 8px;min-width:240px"><input type="text" dir="auto" value="${esc(it.title)}" onchange="calSetItem(${i},'title',this.value)" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid ${it.title.trim() ? 'var(--border)' : 'var(--red)'};border-radius:4px"></td>
+        <td style="padding:4px 8px">${calItemDept(it) ? esc(calItemDept(it)) : '<span style="color:var(--red)">—</span>'}</td>
+        <td style="padding:4px 8px">${esc(it.contentType)}</td>
+        <td style="padding:4px 8px;min-width:130px">${esc(it.channels.join(', ')) || '<span style="color:var(--orange)">none</span>'}</td>
+        <td style="padding:4px 8px">${esc(it.status)}</td>
+        <td style="padding:4px 8px">${camp}</td>
+        <td style="padding:4px 8px;font-size:10px;min-width:210px;max-width:300px">${flags.map(f => `<div style="color:${f.level === 'bad' ? 'var(--red)' : 'var(--orange)'}">${f.level === 'bad' ? '✕' : '⚠'} ${esc(f.text)}</div>`).join('')}</td></tr>`;
+    }).join('') + '</tbody>';
+  sc.scrollTop = top;
+}
+window.calSetItem = function(i, field, v) {
+  const it = CAL.items[i];
+  if(!it) return;
+  if(field === 'include') it.include = !!v;
+  else if(field === 'date') { it.date = v; it.edited = { ...(it.edited || {}), date: true }; }
+  else if(field === 'title') it.title = String(v).replace(/[<>]/g, '').trim().slice(0, 160);
+  calRender();
+}
+window.calToggleAll = function(on) { CAL.items.forEach(i => { i.include = on; }); calRender(); }
+
+// ── Creating ──
+window.createCalendarActivities = async function() {
+  if(calBusy || !CAL) return;
+  const inc = CAL.items.filter(i => i.include);
+  if(!inc.length || calProblems().length) return;
+  const toMake = CAL.campValues.filter(c => CAL.campChoice[c.key] === 'new' && inc.some(i => i.campKey === c.key));
+  const byStatus = {}; inc.forEach(i => { byStatus[i.status] = (byStatus[i.status] || 0) + 1; });
+  if(!confirm(`Create ${inc.length} SM Content activit${inc.length === 1 ? 'y' : 'ies'}` + (toMake.length ? ` and ${toMake.length} new campaign${toMake.length === 1 ? '' : 's'}` : '') + `?\n\nStatus: ${Object.entries(byStatus).map(([s, n]) => `${n} ${s}`).join(', ')}.\n\nYou can undo this import afterwards (anything still Planned).`)) return;
+  calBusy = true;
+  const importId = newImportId();
+  const ctx = { importId, createdByUid: currentAdminUid, createdByName: myMemberName() || currentAdminEmail || 'Unknown' };
+  const prog = document.getElementById('cal-progress');
+  document.getElementById('cal-create-btn').disabled = true;
+  const total = toMake.length + inc.length;
+  let done = 0, campIds = {};
+  try {
+    for(const c of toMake) {
+      const kids = inc.filter(i => i.campKey === c.key);
+      const ref = await addInitiative(buildCampaignDoc(c.raw, kids, calItemDept, ctx));
+      campIds[c.key] = ref.id;
+      prog.textContent = `Creating… ${++done} / ${total}`;
+    }
+    for(let i = 0; i < inc.length; i += 5) {
+      await Promise.all(inc.slice(i, i + 5).map(async it => {
+        const choice = it.campKey ? CAL.campChoice[it.campKey] : 'none';
+        const parent = choice === 'new' ? campIds[it.campKey] : (choice && choice !== 'none' ? choice : null);
+        await addInitiative(buildActivityDoc(it, calItemDept(it), { ...ctx, parentCampaignId: parent }));
+        prog.textContent = `Creating… ${++done} / ${total}`;
+      }));
+    }
+    // Remember what was confirmed, for next month's sheet.
+    const prev = calPrefs().deptMap || {}, dm = { ...prev };
+    CAL.deptValues.forEach(d => { if(CAL.deptChoice[d.key] && CAL.deptConfirmed[d.key]) dm[d.key] = CAL.deptChoice[d.key]; });
+    calSavePrefs({ deptMap: dm, entity: document.getElementById('cal-entity').value,
+                   includeCaption: document.getElementById('cal-inc-caption').checked, includeHashtags: document.getElementById('cal-inc-tags').checked });
+    CAL.done = { importId, n: inc.length, camps: toMake.length };
+    ['cal-source', 'cal-review', 'cal-status'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('cal-create-btn').style.display = 'none';
+    prog.textContent = '';
+    const done$ = document.getElementById('cal-done');
+    done$.style.display = 'block';
+    done$.innerHTML = `<div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--green);margin-bottom:6px">✓ ${inc.length} activit${inc.length === 1 ? 'y' : 'ies'} created${toMake.length ? ` · ${toMake.length} new campaign${toMake.length === 1 ? '' : 's'}` : ''}</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:14px">They are now in Activities. Assign owners from there.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" onclick="closeCalendarImport();switchTab('initiatives', document.querySelector('#group-initiatives .tab-dropdown-item'), 'group-initiatives')">View in Activities</button>
+      <button class="btn" onclick="openCalendarImport()">Import another</button>
+      <button class="btn btn-danger" data-imp="${esc(importId)}" onclick="undoCalendarImport(this.dataset.imp)">Undo this import</button></div>`;
+    showToast(`✓ ${inc.length} activities created`);
+  } catch(e) {
+    prog.textContent = '';
+    calStatus(`Stopped after ${done} of ${total}: ${esc(e.message)}. What was created can be removed with “Undo” (under Earlier imports, or in the Activities list by title).`, 'var(--red)');
+    showToast('Creation stopped part-way — see the message', true);
+    calRenderPrevious();
+  } finally { calBusy = false; if(CAL && !CAL.done) calRenderSummary(); }
+}
+
+window.undoCalendarImport = async function(importId) {
+  const t = calUndoTargets(ALL_INITIATIVES, importId);
+  if(!t.total) { showToast('Nothing found for that import', true); return; }
+  if(!t.deleteIds.length) { showToast('Everything from this import has already moved past Planned — nothing to undo', true); return; }
+  if(!confirm(`Delete ${t.deleteIds.length} of this import's ${t.total} items (those still in Planned)?` +
+      (t.keptCount ? `\n\n${t.keptCount} will be kept because they've moved past Planned or have work under them.` : ''))) return;
+  try {
+    for(const id of t.deleteIds) await deleteInitiative(id);
+    showToast(`✓ Removed ${t.deleteIds.length} item${t.deleteIds.length === 1 ? '' : 's'}`);
+    if(CAL && CAL.done && CAL.done.importId === importId) document.getElementById('cal-done').innerHTML = '<div style="font-size:13px;color:var(--text-2)">Import undone. <button class="btn btn-sm" onclick="openCalendarImport()">Start over</button></div>';
+    else if(document.getElementById('cal-overlay').classList.contains('open')) setTimeout(calRenderPrevious, 600);
   } catch(e) { showToast('Undo stopped: ' + e.message, true); }
 }
 
