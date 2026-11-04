@@ -3966,13 +3966,40 @@ async function initMetricsTab() {
   renderSentimentStats();
 }
 
+// Today as YYYY-MM-DD in Riyadh — NOT toISOString(), which is the UTC date and is
+// still "yesterday" for the first three hours of every Riyadh day.
+const riyadhTodayIso = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Riyadh' });
+
+// Newest date among the DAILY series that Metricool actually delivered. Follower
+// counts are skipped (the sync stamps them with today's date, so they'd always look
+// current) and so are manual overrides (dated by month, not by day).
+function metricoolNewestDailyDate() {
+  let max = '';
+  Object.entries(METRICOOL_STATS?.series || {}).forEach(([key, arr]) => {
+    if(/followers$/.test(key)) return;
+    (arr || []).forEach(p => { if(p.source !== 'manual' && p.date > max) max = p.date; });
+  });
+  return max;
+}
+
 function renderMetricoolSyncStatus() {
   const el = document.getElementById('metricool-sync-status');
   if(!el) return;
   if(METRICOOL_STATS?.updatedAt) {
     const d = METRICOOL_STATS.updatedAt.toDate ? METRICOOL_STATS.updatedAt.toDate() : new Date(METRICOOL_STATS.updatedAt);
-    el.textContent = `Last synced: ${d.toLocaleString()}`;
-    el.style.color = 'var(--text-3)';
+    let text = `Last synced: ${d.toLocaleString()}`, color = 'var(--text-3)';
+    const newest = metricoolNewestDailyDate();
+    if(newest) {
+      const behind = Math.round((new Date(riyadhTodayIso() + 'T00:00:00Z') - new Date(newest + 'T00:00:00Z')) / 86400000);
+      text += ` · newest daily data: ${new Date(newest + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
+      if(behind > 3) { text += ` (${behind} days behind — Metricool may not have newer data yet)`; color = 'var(--orange)'; }
+    }
+    if(METRICOOL_STATS.lastSyncFailures) {
+      text += ` · ⚠ ${METRICOOL_STATS.lastSyncFailures} of ${METRICOOL_STATS.lastSyncAttempted || '?'} requests failed on that sync`;
+      color = 'var(--orange)';
+    }
+    el.textContent = text;
+    el.style.color = color;
   } else {
     el.textContent = 'Never synced yet';
     el.style.color = 'var(--red)';
@@ -3990,8 +4017,9 @@ window.syncMetricool = async function() {
   try {
     const { apiToken, userId, blogId } = METRICOOL_SETTINGS;
     const authHeaders = { 'X-Mc-Auth': apiToken, 'Content-Type': 'application/json' };
+    const today = riyadhTodayIso();
     const from = encodeURIComponent(`${METRICOOL_BACKFILL_START}T00:00:00+03:00`);
-    const to   = encodeURIComponent(`${new Date().toISOString().slice(0,10)}T23:59:59+03:00`);
+    const to   = encodeURIComponent(`${today}T23:59:59+03:00`);
     const timelineDefs = [
       ['instagram_reach',           'instagram', 'reach',           'posts'],
       ['instagram_engagement_rate', 'instagram', 'engagement',      'posts'],
@@ -4005,6 +4033,7 @@ window.syncMetricool = async function() {
     ];
     const series = { ...(METRICOOL_STATS?.series || {}) };
     let failures = 0;
+    const dataRequests = timelineDefs.length + 1; // the 9 timelines + the follower snapshot
     for(const [key, network, metric, subject] of timelineDefs) {
       const url = `${METRICOOL_API_BASE}/v2/analytics/timelines?userId=${userId}&blogId=${blogId}&network=${network}&metric=${metric}&subject=${subject}&from=${from}&to=${to}&timezone=Asia%2FRiyadh`;
       try {
@@ -4023,11 +4052,16 @@ window.syncMetricool = async function() {
       if(fRes.ok) {
         const f = await fRes.json();
         if(typeof f.instagramFollowers === 'number') {
-          const today = new Date().toISOString().slice(0,10);
           series.instagram_followers = mergeMetricoolSeries(series.instagram_followers, [{date: today, value: f.instagramFollowers, source: 'metricool'}]);
         }
       } else { failures++; }
     } catch(e) { failures++; console.error('Metricool follower snapshot failed:', e); }
+    const dataFailures = failures; // failures among the data requests; the post-image step below is not data
+
+    // If NOTHING came back (expired token, Metricool down, wrong blog), say so and leave the
+    // stored data and "Last synced" alone — recording a fresh sync date for a sync that
+    // fetched nothing is exactly the kind of false reassurance this status line must not give.
+    if(dataFailures >= dataRequests) throw new Error('Metricool returned nothing — check the connection and token under Settings → Metricool, then try again (details in the browser console)');
 
     // Match published initiatives' postLink to Metricool's own scheduled
     // posts, pulling the real published media for use on the public
@@ -4044,7 +4078,7 @@ window.syncMetricool = async function() {
     // no dataGaps entry, this is expected steady-state behavior.
     try {
       const schedStart = encodeURIComponent(`${METRICOOL_BACKFILL_START}T00:00:00`);
-      const schedEnd   = encodeURIComponent(`${new Date().toISOString().slice(0,10)}T23:59:59`);
+      const schedEnd   = encodeURIComponent(`${today}T23:59:59`);
       const postsRes = await fetch(`${METRICOOL_API_BASE}/v2/scheduler/posts?userId=${userId}&blogId=${blogId}&start=${schedStart}&end=${schedEnd}&timezone=Asia%2FRiyadh`, { headers: authHeaders });
       if(postsRes.ok) {
         const postsBody = await postsRes.json();
@@ -4064,8 +4098,14 @@ window.syncMetricool = async function() {
       } else { failures++; console.error('Metricool post-image sync failed: HTTP', postsRes.status); }
     } catch(e) { failures++; console.error('Metricool post-image sync failed:', e); }
 
-    METRICOOL_STATS = { ...(METRICOOL_STATS||{}), series };
-    await setMetricoolStats(METRICOOL_STATS);
+    const toWrite = { ...(METRICOOL_STATS||{}), series, lastSyncFailures: failures, lastSyncAttempted: dataRequests + 1 };
+    await setMetricoolStats(toWrite);
+    // setMetricoolStats stamps updatedAt on the way to Firestore, but only on its own copy. Keeping the
+    // old local object made the status line keep showing the PREVIOUS sync's date right under a
+    // "sync complete" message. Re-read what was stored so the screen shows what's really there.
+    let fresh = null;
+    try { fresh = await getMetricoolStats(); } catch(e) { console.error('Could not re-read the stats after saving:', e); }
+    METRICOOL_STATS = fresh || { ...toWrite, updatedAt: new Date() };
     renderMetricoolSyncStatus();
     renderMetricsYearGrid();
     await loadMetricsForPeriod();

@@ -333,7 +333,9 @@ See the `config` table below for where this fits among other single-document con
 
 ```
 config/metricool_stats = {
-  updatedAt: Timestamp,
+  updatedAt: Timestamp,          // when the last sync that actually fetched data finished (never bumped by a sync that fetched nothing)
+  lastSyncFailures: number,      // requests that failed on that sync (0 = clean) — shown as a warning beside "Last synced"
+  lastSyncAttempted: number,     // requests made on that sync (11: 9 timelines + follower snapshot + scheduled-posts lookup)
   series: {
     <seriesKey>: [ { date: "YYYY-MM-DD", value: number, source: "metricool" | "manual" }, ... ],
     ...
