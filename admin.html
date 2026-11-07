@@ -1319,6 +1319,14 @@ tr.row-overdue:hover td{background:#FFD6D6}
 
           <button class="btn btn-primary" onclick="saveMetricoolSettings()">Save Metricool Settings</button>
           <span id="mc-save-status" style="font-size:11px;color:var(--green);display:none;margin-left:10px">✓ Saved</span>
+
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+            <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">🔍 Ads &amp; messages probe <span style="font-weight:400;font-size:11px;color:var(--text-3)">— diagnostic, read-only</span></div>
+            <div style="font-size:11px;color:var(--text-3);margin-bottom:10px;line-height:1.6">Checks what Metricool actually returns for your Meta Ads, TikTok Ads and Inbox (last 30 days), so the public dashboard can be designed on real data. The report contains campaign names, numbers and conversation <strong>counts</strong> — no message text, no customer names, and no token. Save the token and brand above first.</div>
+            <button class="btn btn-sm" id="mc-probe-btn" onclick="runMetricoolAdsProbe()">Run probe (about 20 seconds)</button>
+            <button class="btn btn-sm" onclick="copyMetricoolProbe()">Copy report</button>
+            <div id="mc-probe-wrap" style="display:none;margin-top:10px"><textarea id="mc-probe-out" readonly style="width:100%;height:340px;font-family:monospace;font-size:11px;padding:8px;border:1px solid var(--border);border-radius:var(--radius)"></textarea></div>
+          </div>
         </div>
 
         <!-- Google Analytics Setup -->
@@ -8889,6 +8897,127 @@ window.saveMetricoolSettings = async function() {
     loadMetricoolSettingsForm();
     showToast('Metricool settings saved');
   } catch(e) { showToast('Save failed: '+e.message, true); }
+}
+
+// ── METRICOOL ADS & MESSAGES PROBE ───────────────────────────────────────
+// A read-only diagnostic. The Metricool endpoints for Meta Ads, TikTok Ads and Inbox
+// conversations are documented only thinly (free-form `metrics`/`actions` objects, no
+// stated date formats), so before the public dashboard is built on them this prints
+// what THIS account really returns. Privacy: it reports field names, numbers, campaign
+// names and COUNTS only — never conversation participants or message text, and never
+// the token — so the report can be pasted somewhere to be read.
+window.copyMetricoolProbe = async function() {
+  const ta = document.getElementById('mc-probe-out');
+  if(!ta || !ta.value) { showToast('Run the probe first', true); return; }
+  try { await navigator.clipboard.writeText(ta.value); showToast('✓ Report copied'); }
+  catch(e) { ta.select(); showToast('Could not copy automatically — the text is selected, press Ctrl+C', true); }
+}
+
+window.runMetricoolAdsProbe = async function() {
+  const s = METRICOOL_SETTINGS || {};
+  if(!s.apiToken || !s.blogId) { showToast('Save the Metricool token and brand first', true); return; }
+  const btn = document.getElementById('mc-probe-btn'), wrap = document.getElementById('mc-probe-wrap'), ta = document.getElementById('mc-probe-out');
+  btn.disabled = true; wrap.style.display = 'block';
+  const L = [];
+  const say = (...a) => { L.push(a.join(' ')); ta.value = L.join('\n'); ta.scrollTop = ta.scrollHeight; };
+  const headers = { 'X-Mc-Auth': s.apiToken, 'Content-Type': 'application/json' };
+  const qs = o => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  const get = async (path, params = {}) => {
+    try {
+      const r = await fetch(`${METRICOOL_API_BASE}${path}?${qs({ userId: s.userId, blogId: s.blogId, ...params })}`, { headers });
+      const text = await r.text();
+      let json = null; try { json = JSON.parse(text); } catch(e) {}
+      return { ok: r.ok, status: r.status, text, json };
+    } catch(e) { return { ok: false, status: 0, text: String(e.message || e), json: null }; }
+  };
+  const short = (v, n = 260) => { const t = typeof v === 'string' ? v : JSON.stringify(v); return t == null ? '' : (t.length > n ? t.slice(0, n) + '…' : t); };
+  const err = r => `HTTP ${r.status}${r.text ? ' — ' + short(r.text.replace(/\s+/g, ' '), 160) : ''}`;
+  const tally = arr => { const m = {}; arr.forEach(x => { const k = x == null || x === '' ? '(blank)' : String(x); m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n}`).join(' · ') || '—'; };
+  const end = riyadhTodayIso();
+  const start = new Date(new Date(end + 'T00:00:00Z').getTime() - 30 * 86400000).toISOString().slice(0, 10);
+  const iso = { from: `${start}T00:00:00+03:00`, to: `${end}T23:59:59+03:00`, timezone: 'Asia/Riyadh' };
+  try {
+    say(`METRICOOL ADS & MESSAGES PROBE — ${end}, window ${start} → ${end}`);
+
+    // A. which networks are connected to this brand
+    say('\n[A] Connected networks for this brand');
+    const pr = await get('/admin/simpleProfiles');
+    if(pr.ok && Array.isArray(pr.json)) {
+      const p = pr.json.find(x => String(x.id) === String(s.blogId));
+      if(p) {
+        say('  ' + ['facebookAds', 'tiktokads', 'adwords', 'instagram', 'facebook', 'tiktok', 'gmb', 'linkedinCompany', 'twitter'].map(k => `${k}=${p[k] ? 'YES' : 'no'}`).join('  '));
+        say('  Meta ad account:', p.facebookAdsName || '(none)', ' | TikTok ads account:', p.tiktokadsDisplayName || '(none)');
+      } else say('  brand not found in the profile list');
+    } else say('  could not read profiles:', err(pr));
+
+    // B. TikTok Ads — documented timelines metrics
+    say('\n[B] TikTok Ads — /v2/analytics/timelines network=tiktokads (daily)');
+    for(const m of ['impressions', 'cost', 'clicks', 'conversions']) {
+      const r = await get('/v2/analytics/timelines', { network: 'tiktokads', metric: m, ...iso });
+      if(!r.ok) { say(`  ${m}: ${err(r)}`); continue; }
+      const vals = (r.json && r.json.data && r.json.data[0] && r.json.data[0].values) || [];
+      const nums = vals.map(v => Number(v.value)).filter(Number.isFinite);
+      say(`  ${m}: ${vals.length} daily points, total ${nums.reduce((a, b) => a + b, 0).toFixed(2)}${vals.length ? `, ${String(vals[0].dateTime).slice(0, 10)} → ${String(vals[vals.length - 1].dateTime).slice(0, 10)}` : ''}${vals.length ? '' : ' | raw: ' + short(r.text, 140)}`);
+    }
+
+    // C. Meta Ads — campaigns CSV (the documented replacement for /stats/facebookads/campaigns)
+    say('\n[C] Meta Ads — /v2/analytics/campaigns/facebookads (CSV of campaigns)');
+    const c = await get('/v2/analytics/campaigns/facebookads', { from: `${start}T00:00:00`, to: `${end}T23:59:59`, timezone: 'Asia/Riyadh' });
+    if(!c.ok) say('  ' + err(c));
+    else {
+      const rows = parseCSVRecords(c.text).filter(r => r.some(x => String(x).trim()));
+      say(`  ${Math.max(0, rows.length - 1)} campaign row(s). Columns: ${rows[0] ? rows[0].join(' | ') : '(empty response: ' + short(c.text, 100) + ')'}`);
+      rows.slice(1, 4).forEach((r, i) => say(`  row ${i + 1}: ${short(r.join(' | '), 400)}`));
+    }
+
+    // D. Campaign list (all ad networks)
+    say('\n[D] /v2/advertising/campaigns');
+    const d = await get('/v2/advertising/campaigns', iso);
+    if(!d.ok) say('  ' + err(d));
+    else {
+      const list = (d.json && (d.json.data || d.json)) || [];
+      const arr = Array.isArray(list) ? list : [];
+      say(`  ${arr.length} campaign(s). By network: ${tally(arr.map(x => x.network))}. By status: ${tally(arr.map(x => x.status))}. Objectives: ${tally(arr.map(x => x.objective))}`);
+      arr.slice(0, 6).forEach((x, i) => say(`  #${i + 1} ${x.network || '?'} | ${x.status || '?'} | ${x.objective || '?'} | ${short(x.name, 60)} | currency ${x.currency || '?'} | metrics: ${short(x.metrics, 300)}`));
+    }
+
+    // E/F. Ad-level data (carries results, actions and boostId). The date format isn't documented — try three.
+    const fmts = [['YYYY-MM-DD', x => x], ['YYYYMMDD', x => x.replace(/-/g, '')], ['ISO datetime', (x, e) => `${x}T${e ? '23:59:59' : '00:00:00'}`]];
+    for(const [label, path] of [['Meta Ads', '/datastudio/fbads/ads'], ['TikTok Ads', '/datastudio/tiktokads/ads']]) {
+      say(`\n[${label === 'Meta Ads' ? 'E' : 'F'}] ${label} ad level — ${path}`);
+      let got = null;
+      for(const [fl, f] of fmts) {
+        const r = await get(path, { start: f(start), end: f(end, true) });
+        say(`  date format ${fl}: ${r.ok ? 'OK' : err(r)}`);
+        if(r.ok && Array.isArray(r.json)) { got = r.json; break; }
+      }
+      if(!got) { say('  no usable response'); continue; }
+      say(`  ${got.length} ad row(s). Boosted posts (have boostId): ${got.filter(a => a.boostId).length} · other ads (dark / Ads Manager): ${got.filter(a => !a.boostId).length}`);
+      say(`  objectives: ${tally(got.map(a => a.objective))}`);
+      say(`  resultsLabel: ${tally(got.map(a => a.resultsLabel))}`);
+      const actionKeys = {}; got.forEach(a => Object.keys(a.actions || {}).forEach(k => { actionKeys[k] = (actionKeys[k] || 0) + (Number(a.actions[k]) || 0); }));
+      say(`  action types across all ads (name: total): ${Object.entries(actionKeys).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—'}`);
+      const mKeys = {}; got.forEach(a => Object.keys(a.metrics || {}).forEach(k => { mKeys[k] = (mKeys[k] || 0) + (Number(a.metrics[k]) || 0); }));
+      say(`  metric names across all ads (name: total): ${Object.entries(mKeys).slice(0, 30).map(([k, v]) => `${k}: ${Math.round(v * 100) / 100}`).join(' · ') || '—'}`);
+      say(`  results total: ${got.reduce((t, a) => t + (Number(a.results) || 0), 0)} · conversions total: ${got.reduce((t, a) => t + (Number(a.conversions) || 0), 0)} · currency: ${tally(got.map(a => a.currency))}`);
+      got.slice(0, 4).forEach((a, i) => say(`  ad #${i + 1}: ${short(a.campaignName, 50)} | ${a.objective || '?'} | results ${a.results ?? '?'} (${a.resultsLabel || '?'}) | actions ${short(a.actions, 200)} | boostId ${a.boostId ? 'yes' : 'no'}`));
+    }
+
+    // G. Inbox conversations — COUNTS ONLY. Participants and message text are never printed.
+    say('\n[G] Inbox conversations (organic DMs) — counts only, no names or text');
+    for(const provider of ['INSTAGRAM', 'FACEBOOK', 'TIKTOKBUSINESS']) {
+      const r = await get('/v2/inbox/conversations', { provider });
+      if(!r.ok) { say(`  ${provider}: ${err(r)}`); continue; }
+      const arr = (r.json && (r.json.data || r.json)) || [];
+      const list = Array.isArray(arr) ? arr : [];
+      const months = {}; list.forEach(x => { const m = String(x.creationDate || '').slice(0, 7) || '(none)'; months[m] = (months[m] || 0) + 1; });
+      const msgCounts = list.map(x => Array.isArray(x.messages) ? x.messages.length : 0);
+      say(`  ${provider}: ${list.length} conversation(s) on the first page; more pages: ${r.json && r.json.page && r.json.page.next ? 'YES' : 'no'}; fields: ${list[0] ? Object.keys(list[0]).join(', ') : '—'}`);
+      say(`     started per month: ${Object.entries(months).sort().map(([m, n]) => `${m}: ${n}`).join(' · ') || '—'}; status: ${tally(list.map(x => x.status))}; messages per conversation: ${msgCounts.length ? `min ${Math.min(...msgCounts)} / max ${Math.max(...msgCounts)}` : '—'}`);
+    }
+    say('\n--- end of report ---');
+  } catch(e) { say('\nPROBE STOPPED: ' + e.message); }
+  finally { btn.disabled = false; }
 }
 
 // ── GOOGLE ANALYTICS SETTINGS ──────────────────────────────────────────

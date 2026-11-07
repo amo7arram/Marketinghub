@@ -280,6 +280,181 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 .featured-card-body{padding:0 16px 10px;font-size:11px;color:var(--text-3);line-height:1.55}
 .featured-card-footer{padding:10px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text-3)}
 
+/* ═══ DASHBOARD: NEW VIEW (default). Everything is prefixed nv- so nothing here can touch the classic view or other pages. ═══ */
+#page-dashboard[data-view="classic"] #dash-new{display:none}
+#page-dashboard[data-view="new"] #dash-classic{display:none}
+#dash-new{max-width:1240px}
+#dash-new [hidden]{display:none!important}
+.nv-classic-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--gold-light);border:1px solid var(--border);border-radius:var(--radius-lg);padding:8px 14px;margin-bottom:16px;font-size:12px;color:var(--text-2)}
+.nv-ghost{border:1px solid var(--border-strong);background:var(--surface);border-radius:8px;padding:7px 13px;font-size:12px;font-family:inherit;cursor:pointer;color:var(--text-2);font-weight:500}
+.nv-ghost:hover{border-color:var(--navy);color:var(--navy)}
+.nv-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.nv-spacer{flex:1}
+.nv-asof{font-size:11.5px;color:var(--text-3)}
+.nv-asof i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px}
+.nv-asof.stale i{background:var(--orange)}
+.nv-snav{position:sticky;top:-28px;z-index:20;background:rgba(240,242,247,0.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);margin:12px -28px 0;padding:0 28px}
+.nv-snav-in{display:flex;gap:4px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
+.nv-snav a{white-space:nowrap;text-decoration:none;color:var(--text-2);font-size:12.5px;padding:5px 12px;border-radius:999px}
+.nv-snav a:hover{background:var(--surface);color:var(--navy)}
+.nv-eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);margin-bottom:10px;font-weight:600}
+.nv-hero{padding:30px 0 24px}
+.nv-hero h1{font-family:'Syne',sans-serif;font-size:clamp(24px,3.4vw,40px);font-weight:700;line-height:1.14;max-width:22em;letter-spacing:-.015em;margin:0}
+.nv-hero h1 em{font-style:normal;color:var(--navy)}
+.nv-hero h1 strong{font-weight:700;color:#8A6A1F}
+.nv-hero p{margin:14px 0 0;color:var(--text-2);max-width:46em}
+.nv-board{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));overflow:hidden}
+.nv-cell{all:unset;box-sizing:border-box;cursor:pointer;padding:18px 18px 14px;border-left:1px solid var(--border);display:flex;flex-direction:column;gap:6px;min-width:0;font-family:'IBM Plex Sans',sans-serif}
+.nv-cell:first-child{border-left:0}
+.nv-cell:hover{background:var(--surface-2)}
+.nv-cell:focus-visible,.nv-tile:focus-visible,.nv-ev:focus-visible{outline:2px solid var(--navy);outline-offset:-2px}
+.nv-cell .lab{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);font-weight:600}
+.nv-cell .val{font-family:'Syne',sans-serif;font-weight:700;font-size:30px;letter-spacing:-.02em;line-height:1.05;color:var(--text)}
+.nv-cell .sub{font-size:11px;color:var(--text-3);min-height:16px}
+.nv-cell svg.sp{width:100%;height:34px;margin-top:2px}
+.nv-delta{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;width:max-content}
+.nv-good{background:#DDF3E8;color:#0F7A4D}.nv-bad{background:#FBE4E0;color:#C0392B}.nv-flat{background:var(--surface-2);color:var(--text-3)}
+@media (max-width:1080px){.nv-board{grid-template-columns:repeat(3,minmax(0,1fr))}.nv-cell:nth-child(4){border-left:0}.nv-cell:nth-child(n+4){border-top:1px solid var(--border)}}
+@media (max-width:620px){.nv-board{grid-template-columns:repeat(2,minmax(0,1fr))}.nv-cell:nth-child(odd){border-left:0}.nv-cell:nth-child(n+3){border-top:1px solid var(--border)}.nv-cell:nth-child(4){border-left:1px solid var(--border)}}
+.nv-sec{margin-top:40px;scroll-margin-top:60px}
+.nv-sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.nv-sec-head h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin:0;letter-spacing:-.01em}
+.nv-sec-head p{margin:4px 0 0;color:var(--text-3);font-size:12.5px;max-width:52em}
+.nv-h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin:0 0 10px}
+.nv-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow);min-width:0}
+.nv-cols{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.nv-cols{grid-template-columns:1fr}}
+.nv-foot{font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.6}
+.nv-seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.nv-seg button{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-size:12.5px;font-family:inherit;color:var(--text-2);cursor:pointer}
+.nv-seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.nv-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.nv-tile{all:unset;box-sizing:border-box;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;position:relative;overflow:hidden;font-family:'IBM Plex Sans',sans-serif}
+.nv-tile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,var(--navy))}
+.nv-tile:hover{border-color:var(--border-strong);box-shadow:var(--shadow)}
+.nv-tile[aria-pressed="true"]{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy) inset;background:#EAF2FA}
+.nv-tile .n{font-size:13px;font-weight:500;padding-left:4px;line-height:1.3;color:var(--text)}
+.nv-tile .c{display:flex;align-items:baseline;gap:6px;padding-left:4px}
+.nv-tile .c b{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+.nv-tile .c span{font-size:11px;color:var(--text-3)}
+.nv-tile .bar{height:4px;border-radius:2px;background:var(--border);margin-left:4px;overflow:hidden}
+.nv-tile .bar i{display:block;height:100%;background:var(--c,var(--navy))}
+.nv-select{font-size:12px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit}
+.nv-how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.nv-how div{font-size:13px;color:var(--text-2)}.nv-how b{display:block;color:var(--text);font-family:'Syne',sans-serif;font-size:15px;margin-bottom:4px}
+@media (max-width:760px){.nv-how{grid-template-columns:1fr}}
+.nv-xhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.nv-xhead h3{font-family:'Syne',sans-serif;font-size:22px;margin:0}
+.nv-xhead .sp{flex:1}
+.nv-stats4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px}
+.nv-stats4>div{padding:12px 14px;border-left:1px solid var(--border)}.nv-stats4>div:first-child{border-left:0}
+.nv-stats4 b{display:block;font-family:'Syne',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.02em}
+.nv-stats4 span{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+@media (max-width:620px){.nv-stats4{grid-template-columns:repeat(2,minmax(0,1fr))}.nv-stats4>div:nth-child(3){border-left:0}.nv-stats4>div:nth-child(n+3){border-top:1px solid var(--border)}}
+.nv-xsub{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:22px 0 10px;flex-wrap:wrap}
+.nv-xsub h4{margin:0;font-family:'Syne',sans-serif;font-size:15px}.nv-xsub span{font-size:12px;color:var(--text-3)}
+.nv-pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.nv-pc{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);display:flex;flex-direction:column;min-width:0}
+.nv-pc .th{height:104px;position:relative;display:flex;align-items:flex-end;padding:9px;color:#fff;background:var(--c,var(--navy)) center/cover no-repeat}
+.nv-pc .th img,.nv-pc .th video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.nv-pc .th span{position:relative;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.45);padding:2px 8px;border-radius:999px}
+.nv-pc .bd{padding:12px 14px 6px;flex:1}
+.nv-pc h5{font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;line-height:1.4;margin:0 0 6px;word-break:break-word}
+.nv-pc .mt{font-size:11.5px;color:var(--text-3);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nv-pc .ac{display:flex;gap:6px;padding:10px 12px 12px;flex-wrap:wrap}
+.nv-btn{border:1px solid var(--border-strong);background:var(--surface);border-radius:8px;padding:6px 11px;font-size:12px;cursor:pointer;color:var(--text-2);font-family:inherit;text-decoration:none;display:inline-block}
+.nv-btn:hover{border-color:var(--navy);color:var(--navy)}
+.nv-btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}.nv-btn.pri:hover{background:#003f7a;color:#fff}
+.nv-upl{display:grid}
+.nv-ur{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+.nv-ur:first-child{border-top:0}
+.nv-ur .d{font-size:11px;color:var(--text-3);line-height:1.3}.nv-ur .d b{display:block;font-family:'Syne',sans-serif;font-size:18px;color:var(--text)}
+.nv-ur .t{font-size:13px;line-height:1.4;min-width:0;word-break:break-word}.nv-ur .t small{display:block;color:var(--text-3);font-size:11px}
+.nv-msg{width:100%;min-height:150px;resize:vertical;font:inherit;font-size:12.5px;line-height:1.6;padding:12px 14px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface-2);color:var(--text)}
+.nv-dept{display:inline-block;font-size:11px;font-weight:500;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.nv-dot{width:17px;height:17px;border-radius:50%;display:inline-grid;place-items:center;font-size:8.5px;font-weight:700;color:#fff}
+#nv-bars{width:100%;height:auto;display:block}
+.nv-plat{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:9px 0;border-top:1px solid var(--border);align-items:center}
+.nv-plat:first-of-type{border-top:0}
+.nv-plat .n{font-weight:500;font-size:13px}.nv-plat .v{font-size:13px;font-weight:600;text-align:right}
+.nv-plat .bar{grid-column:1/-1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}.nv-plat .bar i{display:block;height:100%;border-radius:3px;background:var(--blue)}
+.nv-plat .meta{grid-column:1/-1;font-size:11px;color:var(--text-3)}
+.nv-funnel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.nv-step{padding:18px 18px 16px;position:relative;border-left:1px solid var(--border);min-width:0}.nv-step:first-child{border-left:0}
+.nv-step .k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3)}
+.nv-step .v{font-family:'Syne',sans-serif;font-weight:700;font-size:30px;margin:6px 0 2px;letter-spacing:-.02em}
+.nv-step .d{font-size:12px;color:var(--text-2);min-height:36px}
+.nv-step .bar{height:8px;border-radius:4px;margin-top:12px;background:linear-gradient(90deg,var(--navy),var(--blue))}
+.nv-step .conv{position:absolute;right:14px;top:16px;background:#EAF2FA;border-radius:999px;font-size:11px;font-weight:600;padding:3px 9px;color:var(--navy);white-space:nowrap}
+.nv-step .conv::before{content:'→ '}.nv-step:last-child .conv{display:none}
+@media (max-width:760px){.nv-funnel{grid-template-columns:1fr 1fr}.nv-step:nth-child(3){border-left:0;border-top:1px solid var(--border)}.nv-step:nth-child(4){border-top:1px solid var(--border)}.nv-step .conv{display:none}}
+table.nv-camp{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
+.nv-camp th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);text-align:left;font-weight:600;padding:0 8px 10px 0}
+.nv-camp td{padding:11px 8px 11px 0;border-top:1px solid var(--border);vertical-align:middle}
+.nv-camp td.r,.nv-camp th.r{text-align:right}
+.nv-fchip{display:inline-flex;gap:8px;align-items:center;background:#EAF2FA;color:var(--navy);border-radius:999px;padding:3px 6px 3px 12px;font-size:12px;font-weight:500;margin-bottom:10px}
+.nv-fchip button{border:0;background:transparent;cursor:pointer;color:inherit;font-size:13px;padding:0 6px}
+.nv-rp{display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--border);text-decoration:none;color:inherit}
+.nv-rp:first-child{border-top:0;padding-top:0}
+.nv-rp .im{height:84px;border-radius:10px;overflow:hidden;background:var(--bg)}.nv-rp .im img,.nv-rp .im video{width:100%;height:100%;object-fit:cover;display:block}
+.nv-rp h5{font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:600;line-height:1.35;margin:0 0 6px;word-break:break-word}
+.nv-rp small{color:var(--text-3);font-size:11px}
+.nv-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.nv-chip{border:1px solid var(--border-strong);background:var(--surface);border-radius:999px;padding:5px 13px;font-size:12px;color:var(--text-2);cursor:pointer;font-family:inherit}
+.nv-chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.nv-adhere{display:flex;align-items:center;gap:14px;margin:0 0 14px;flex-wrap:wrap}
+.nv-adhere:empty{display:none}
+.nv-adhere .meter{flex:1;min-width:220px;height:10px;border-radius:5px;background:var(--border);display:flex;overflow:hidden}.nv-adhere .meter i{display:block;height:100%}
+.nv-adhere .txt{font-size:12.5px;color:var(--text-2)}.nv-adhere .txt b{color:var(--text)}
+.nv-rail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(176px,1fr);gap:10px;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity}
+.nv-day{scroll-snap-align:start;min-width:0}
+.nv-day .dh{display:flex;align-items:baseline;gap:8px;padding:0 2px 8px}
+.nv-day .dh b{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;line-height:1}
+.nv-day .dh span{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3)}
+.nv-day.today .dh b,.nv-day.today .dh span{color:var(--navy)}.nv-day.today .dh span{font-weight:700}
+.nv-day .stack{display:flex;flex-direction:column;gap:8px}
+.nv-ev{all:unset;box-sizing:border-box;cursor:pointer;display:block;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 11px;border-left:3px solid var(--c,var(--navy));font-family:'IBM Plex Sans',sans-serif}
+.nv-ev:hover{border-color:var(--border-strong);box-shadow:var(--shadow)}
+.nv-ev .t{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:5px}
+.nv-ev .ttl{font-size:12.5px;line-height:1.4;font-weight:500;color:var(--text);word-break:break-word}
+.nv-ev .m{display:flex;gap:4px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.nv-ev.health{background:#EAF2FA;border-left-color:var(--navy)}.nv-ev.event{background:var(--gold-light);border-left-color:var(--gold)}.nv-ev.campaign{background:var(--surface-2);border-left-color:var(--text-2)}
+.nv-sdot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.nv-empty{font-size:11.5px;color:var(--text-3);padding:10px 4px}
+.nv-dens{display:grid;grid-template-columns:repeat(31,minmax(0,1fr));gap:3px;margin-top:6px}
+.nv-dens i{display:block;aspect-ratio:1/1;border-radius:3px;background:var(--border)}
+.nv-dens i.t1{background:#B8D3EA}.nv-dens i.t2{background:#6FA3CF}.nv-dens i.t3{background:var(--navy)}.nv-dens i.now{outline:2px solid var(--gold);outline-offset:1px}.nv-dens i.x{visibility:hidden}
+.nv-denslab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-3);margin-top:6px}
+.nv-spot{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:980px){.nv-spot{grid-template-columns:1fr}}
+.nv-hc{background:var(--navy);color:#fff;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+.nv-hc .nv-eyebrow{color:rgba(255,255,255,.7);margin:0}
+.nv-hc h3{font-family:'Syne',sans-serif;font-size:26px;line-height:1.2;font-weight:700;margin:0;word-break:break-word}
+.nv-hc .range{font-size:12px;color:rgba(255,255,255,.75)}
+.nv-prog{height:8px;border-radius:4px;background:rgba(255,255,255,.22);overflow:hidden}.nv-prog i{display:block;height:100%;background:#E8D3A2;border-radius:4px}
+.nv-hstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.nv-hstats b{display:block;font-family:'Syne',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.02em}
+.nv-hstats span{font-size:11px;color:rgba(255,255,255,.72);letter-spacing:.05em;text-transform:uppercase}
+@media (max-width:560px){.nv-hstats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.nv-mini{display:flex;flex-direction:column;gap:10px}.nv-mini .nv-eyebrow{margin:0}
+.nv-mini h3{font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;line-height:1.4;margin:0;word-break:break-word}
+.nv-mini .big{font-family:'Syne',sans-serif;font-size:34px;font-weight:700;letter-spacing:-.02em;color:var(--navy)}
+.nv-sources{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;font-size:12px;color:var(--text-2)}
+.nv-sources b{display:block;color:var(--text);font-weight:600;margin-bottom:3px}
+@media (max-width:860px){.nv-sources{grid-template-columns:1fr 1fr}}@media (max-width:520px){.nv-sources{grid-template-columns:1fr}}
+.nv-drow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:8px 0;border-top:1px solid var(--border);font-size:13px}
+.nv-drow.go{cursor:pointer}.nv-drow.go:hover{background:var(--surface-2)}
+.nv-drow .bar{grid-column:1/-1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}.nv-drow .bar i{display:block;height:100%}
+.nv-dh4{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);margin:22px 0 8px;font-weight:600}
+.nv-dbig{font-family:'Syne',sans-serif;font-size:38px;font-weight:700;letter-spacing:-.02em}
+.nv-dsrc{font-size:11.5px;color:var(--text-3);line-height:1.6;background:var(--surface-2);border-radius:8px;padding:10px 12px;margin-top:6px}
+.nv-toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:var(--text);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:all .25s;z-index:200;max-width:calc(100vw - 32px);text-align:center}
+.nv-toast.on{opacity:1;transform:translate(-50%,0)}
+body.present .sidebar,body.present .topbar,body.present .nv-snav,body.present #nv-classic{display:none}
+body.present .content-area{padding:24px 32px}
+body.present .nv-cell .val,body.present .nv-step .v{font-size:38px}
+@media (prefers-reduced-motion:reduce){.nv-toast{transition:none}}
+
 /* LOYALTY CARDS */
 .loyalty-card{border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow-lg);transition:all var(--transition);position:relative}
 .loyalty-card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.18)}
@@ -426,7 +601,11 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
     <div class="content-area">
 
       <!-- DASHBOARD -->
-      <div class="page active" id="page-dashboard">
+      <div class="page active" id="page-dashboard" data-view="new">
+
+      <!-- ═══ CLASSIC VIEW — the dashboard exactly as it was, kept intact behind the "Classic view" button ═══ -->
+      <div id="dash-classic">
+        <div class="nv-classic-bar"><span>You are viewing the classic dashboard.</span><button class="nv-ghost" type="button" data-nv-act="newview">Try the new view</button></div>
 
         <!-- Period Navigator -->
         <div class="period-nav-bar">
@@ -523,6 +702,62 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
         <!-- Featured Initiatives -->
         <div class="dash-section-title">Featured Initiatives</div>
         <div class="dept-camp-grid" id="featured-grid"><div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">⭐</div>No featured initiatives yet — tick the star checkbox on any initiative in the admin panel</div></div>
+      </div><!-- /#dash-classic -->
+
+      <!-- ═══ NEW VIEW (default) ═══ -->
+      <div id="dash-new">
+        <div class="nv-top">
+          <div class="period-nav-bar" style="margin:0">
+            <button class="period-nav-btn" id="nv-prev" type="button" data-nv-act="prev" aria-label="Earlier month">←</button>
+            <div class="period-nav-label" id="nv-period">Loading...</div>
+            <button class="period-nav-btn" id="nv-next" type="button" data-nv-act="next" aria-label="Later month">→</button>
+          </div>
+          <div class="nv-spacer"></div>
+          <button class="nv-ghost" id="nv-present" type="button" data-nv-act="present">Present</button>
+          <button class="nv-ghost" id="nv-classic" type="button" data-nv-act="classic">Classic view</button>
+        </div>
+        <div class="nv-asof" id="nv-asof"></div>
+
+        <nav class="nv-snav" aria-label="Sections"><div class="nv-snav-in">
+          <a href="#nv-sec-top">Overview</a><a href="#nv-sec-output">What we produced</a><a href="#nv-sec-dept">Your department</a><a href="#nv-sec-social">Social media</a><a href="#nv-sec-funnel">Reach to bookings</a><a href="#nv-sec-worked">What worked</a><a href="#nv-sec-coming">Coming up</a><a href="#nv-sec-spot">Spotlight</a>
+        </div></nav>
+
+        <div class="nv-hero" id="nv-sec-top"><div class="nv-eyebrow" id="nv-h-eyebrow"></div><h1 id="nv-h-title"></h1><p id="nv-h-sub"></p></div>
+        <div class="nv-board" id="nv-board"></div>
+
+        <section class="nv-sec" id="nv-sec-output"><div class="nv-sec-head"><div><h2>What we produced</h2><p id="nv-output-p"></p></div></div><div class="nv-board" id="nv-outboard"></div></section>
+
+        <section class="nv-sec" id="nv-sec-dept"><div class="nv-sec-head"><div><h2>Find your department</h2><p>Every post, video and event, sorted by department. Open yours to see what is live, share it, and see what is coming.</p></div>
+          <div class="nv-seg" id="nv-groupby" role="group" aria-label="Group by"><button type="button" data-nv-by="department" aria-pressed="true">Department</button><button type="button" data-nv-by="entity" aria-pressed="false">Entity</button></div></div>
+          <div class="nv-tiles" id="nv-tiles"></div>
+          <div id="nv-more" style="margin-top:10px"></div>
+          <div class="nv-panel" id="nv-explorer" style="margin-top:16px" aria-live="polite"></div></section>
+
+        <section class="nv-sec" id="nv-sec-social"><div class="nv-sec-head"><div><h2>Social media</h2><p>Organic performance from our Instagram, TikTok, LinkedIn and X accounts, synced from Metricool. Reach is measured per account, so it is not split by department.</p></div></div>
+          <div class="nv-cols"><div class="nv-panel"><h3 class="nv-h3" id="nv-bars-title">Video views by month</h3><svg id="nv-bars" viewBox="0 0 660 230" role="img" aria-label="Video views by month"></svg><div class="nv-foot">Instagram reel views plus TikTok video views.</div></div>
+          <div class="nv-panel"><h3 class="nv-h3" id="nv-plat-title"></h3><div id="nv-plat"></div></div></div></section>
+
+        <section class="nv-sec" id="nv-sec-funnel" hidden><div class="nv-sec-head"><div><h2>From reach to bookings</h2><p>Each step shows how many moved on to the next. Bars are not to scale. Leads come from every source, not only social media.</p></div></div>
+          <div class="nv-panel" style="padding:0"><div class="nv-funnel" id="nv-funnel"></div></div></section>
+
+        <section class="nv-sec" id="nv-sec-worked"><div class="nv-sec-head"><div><h2>What worked</h2><p id="nv-worked-p"></p></div></div>
+          <div class="nv-cols"><div class="nv-panel"><div id="nv-campf"></div><div style="overflow-x:auto"><table class="nv-camp" id="nv-camp"></table></div><div class="nv-foot">Cost per lead is the campaign's cost divided by the leads attributed to it. Return is shown as on the Leads and Attribution page.</div></div>
+          <div class="nv-panel"><h3 class="nv-h3">Recent posts</h3><div id="nv-posts"></div></div></div></section>
+
+        <section class="nv-sec" id="nv-sec-coming"><div class="nv-sec-head"><div><h2>Coming up</h2><p>The next 14 days of content, events and health days. Titles only; captions stay in the admin panel until a post is live.</p></div><div class="nv-chips" id="nv-chips" role="group" aria-label="Filter"></div></div>
+          <div class="nv-panel"><div class="nv-adhere" id="nv-adhere"></div><div class="nv-rail" id="nv-rail"></div><div style="margin-top:14px"><div class="nv-eyebrow" id="nv-dens-title" style="margin:0"></div><div class="nv-dens" id="nv-dens"></div><div class="nv-denslab"><span id="nv-dens-a"></span><span>Darker means more posts that day</span><span id="nv-dens-b"></span></div></div></div></section>
+
+        <section class="nv-sec" id="nv-sec-spot"><div class="nv-sec-head"><div><h2>Spotlight</h2><p>The campaign leading right now with its live results, the latest published post, and a milestone.</p></div></div>
+          <div class="nv-spot" id="nv-spot"></div><div id="nv-featured" style="margin-top:14px"></div></section>
+
+        <section class="nv-sec"><div class="nv-sec-head"><div><h2 style="font-size:16px">Where each number comes from</h2></div></div>
+          <div class="nv-sources nv-panel">
+            <div><b>Social media</b>Instagram, TikTok, LinkedIn and X insights through Metricool. Synced from the admin panel.</div>
+            <div><b>What we produced and departments</b>Live from the Activities list. Cancelled items and campaign containers are not counted, so nothing is counted twice.</div>
+            <div><b>Leads, bookings and campaigns</b>Live from the Leads CRM, grouped by the month each lead arrived.</div>
+            <div><b>Coming up</b>Live from the Activities list and the Health Days calendar.</div>
+          </div></section>
+      </div><!-- /#dash-new -->
 
       </div>
 
@@ -1074,16 +1309,407 @@ function renderFeatured() {
 }
 
 // ── MAIN DASHBOARD RENDER ────────────────────────────────────────────────
-window.renderDashboard = function() {
-  renderDashboardKPIs();
-  renderWebChart();
-  renderRecentPosts();
-  renderMarketingOutput();
-  renderLeadsCharts();
-  renderDeptActivityBar();
-  renderCampMonthList();
-  renderFeatured();
+// The dashboard has two views. The NEW view is the default; the CLASSIC view is the
+// previous dashboard, untouched, one click away ("Classic view"). The choice is
+// remembered in this browser only; ?view=classic or ?view=new overrides it for a link.
+const DASH_VIEW_KEY = 'imc_dash_view';
+let dashView = (function(){
+  try { const q = new URLSearchParams(location.search).get('view'); if(q==='classic'||q==='new') return q; } catch(e) {}
+  try { return localStorage.getItem(DASH_VIEW_KEY)==='classic' ? 'classic' : 'new'; } catch(e) { return 'new'; }
+})();
+function applyDashView() { const p = document.getElementById('page-dashboard'); if(p) p.setAttribute('data-view', dashView); }
+function setDashView(v) {
+  dashView = v==='classic' ? 'classic' : 'new';
+  try { localStorage.setItem(DASH_VIEW_KEY, dashView); } catch(e) {}
+  applyDashView();
+  window.renderDashboard();
 }
+applyDashView();
+
+window.renderDashboard = function() {
+  if(dashView === 'classic') {
+    renderDashboardKPIs();
+    renderWebChart();
+    renderRecentPosts();
+    renderMarketingOutput();
+    renderLeadsCharts();
+    renderDeptActivityBar();
+    renderCampMonthList();
+    renderFeatured();
+  } else {
+    renderNewDashboard();
+  }
+}
+
+// ══ NEW DASHBOARD VIEW ═══════════════════════════════════════════════════
+// Built only from data this page already reads (activities, health days, lead
+// stats, Metricool stats, the offers count), all of it public-readable. Anything
+// typed by an admin is escaped before it goes into the page, and links are only
+// followed if they are http(s). Paid-ads and message numbers are not here yet:
+// they need the Metricool ads sync (see docs/ROADMAP / FEATURES).
+const NV = { by:'department', cur:null, pending:null, filt:'all', all:false };
+const nvEsc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nvSlug = s => String(s||'').toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const nvSafeUrl = u => /^https?:\/\//i.test(String(u||'').trim()) ? String(u).trim() : '';
+const nvPad = n => String(n).padStart(2,'0');
+const nvIso = d => d.getFullYear()+'-'+nvPad(d.getMonth()+1)+'-'+nvPad(d.getDate());
+const nvToday = () => nvIso(new Date());
+const nvAdd = (iso,n) => { const [y,m,d] = iso.split('-').map(Number); return nvIso(new Date(y,m-1,d+n)); };
+const nvWd = iso => { const [y,m,d] = iso.split('-').map(Number); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(y,m-1,d).getDay()]; };
+const nvPrev = p => { const [y,m] = p.split('-').map(Number); const d = new Date(y,m-2,1); return d.getFullYear()+'-'+nvPad(d.getMonth()+1); };
+const nvMonthsBack = (p,n) => { const out=[p]; for(let i=1;i<n;i++) out.unshift(nvPrev(out[0])); return out; };
+const nvMonthShort = p => { const [y,m] = p.split('-').map(Number); return new Date(y,m-1,1).toLocaleString('en',{month:'short'}); };
+const nvMonthName = p => { const [y,m] = p.split('-').map(Number); return new Date(y,m-1,1).toLocaleString('en',{month:'long'}); };
+const nvPeriod = () => { const ps = getAvailablePeriods(); return ps[dashPeriodIdx] || ps[0]; };
+const nvIsCurrent = p => p === getAvailablePeriods()[0];
+const nvFrac = () => { const d = new Date(), dim = new Date(d.getFullYear(),d.getMonth()+1,0).getDate(); return Math.min(1, Math.max(d.getDate()-1,1)/dim); };
+const nvDaysIn = p => { const [y,m] = p.split('-').map(Number); return new Date(y,m,0).getDate(); };
+const nvIsPost = i => i.type==='SM Content' || i.type==='Physician Video';
+const nvByDateDesc = (a,b) => (b.startDate||'').localeCompare(a.startDate||'');
+const nvCh = { Instagram:['IG','#C13584'], TikTok:['TT','#111111'], Facebook:['FB','#1877F2'], X:['X','#333333'], LinkedIn:['LI','#0A66C2'], Snapchat:['SC','#E6B800'] };
+const nvDots = arr => (arr||[]).filter(c=>nvCh[c]).map(c=>`<span class="nv-dot" style="background:${nvCh[c][1]}" title="${c}">${nvCh[c][0]}</span>`).join('');
+const nvLastKnown = (key,p) => { const pts = ((METRICOOL_STATS?.series?.[key])||[]).filter(x => x.source!=='manual' && x.date.slice(0,7) <= p); return pts.length ? pts.sort((a,b)=>a.date.localeCompare(b.date))[pts.length-1].value : null; };
+const nvSum = (...v) => { const x = v.filter(n=>n!=null); return x.length ? x.reduce((a,b)=>a+b,0) : null; };
+const nvMv = (k,p) => metricoolMonthlyValue(METRICOOL_STATS,k,p);
+const nvLead = (p,f) => (LEAD_STATS && LEAD_STATS.total!=null) ? ((LEAD_STATS.byMonth && LEAD_STATS.byMonth[p] && LEAD_STATS.byMonth[p][f]) || 0) : null;
+const NV_SRC_SOCIAL = 'Synced from Metricool by the marketing team. Counts are for the whole month.';
+const NV_DEFS = {
+  reach:    { label:'Instagram reach', kind:'sum',    get:p=>nvMv('instagram_reach',p),   def:'People reached by our Instagram posts during the month. Reach counts each person once.', src:NV_SRC_SOCIAL },
+  video:    { label:'Video views',     kind:'sum',    get:p=>nvSum(nvMv('instagram_reel_views',p),nvMv('tiktok_video_views',p)), def:'Instagram reel views plus TikTok video views.', src:NV_SRC_SOCIAL },
+  engage:   { label:'Engagements',     kind:'sum',    get:p=>nvSum(nvMv('instagram_likes',p),nvMv('instagram_comments',p)), def:'Likes and comments on our Instagram posts.', src:NV_SRC_SOCIAL },
+  followers:{ label:'Followers',       kind:'last',   get:p=>nvSum(nvLastKnown('instagram_followers',p),nvLastKnown('linkedin_followers',p),nvLastKnown('twitter_followers',p)), def:'Instagram, LinkedIn and X followers combined, as of the end of the month.', src:NV_SRC_SOCIAL },
+  leads:    { label:'Leads',           kind:'cohort', get:p=>nvLead(p,'total'),  def:'People who left their details through a landing page, a lead form or the call center, grouped by the month they arrived.', src:'Live from the Leads CRM.' },
+  booked:   { label:'Bookings',        kind:'cohort', get:p=>nvLead(p,'booked'), def:'Of the leads that arrived this month, how many have been booked so far.', src:'Live from the Leads CRM.' },
+};
+function nvPct(def,p) {
+  const cur = def.get(p), prev = def.get(nvPrev(p));
+  if(cur==null || prev==null) return null;
+  let base = prev, note = 'vs last month';
+  if(nvIsCurrent(p) && def.kind!=='last') { base = prev*nvFrac(); note = 'vs the same share of last month'; }
+  if(!(base>0)) return cur>0 ? { c:null, note } : { c:0, note };
+  return { c:Math.round((cur/base-1)*100), note };
+}
+function nvDeltaHtml(r) {
+  if(!r) return '<span class="nv-delta nv-flat">no earlier month</span>';
+  if(r.c===null) return '<span class="nv-delta nv-flat">new this month</span>';
+  const cls = r.c===0 ? 'nv-flat' : r.c>0 ? 'nv-good' : 'nv-bad';
+  return `<span class="nv-delta ${cls}" title="${nvEsc(r.note)}">${r.c>0?'▲':r.c<0?'▼':'■'} ${Math.abs(r.c)}%</span>`;
+}
+function nvSpark(vals, mtd) {
+  const pts0 = vals.map((v,i)=>[i,v]).filter(x=>x[1]!=null);
+  if(pts0.length < 2) return '<svg class="sp" viewBox="0 0 120 34" aria-hidden="true"></svg>';
+  const W=120,H=34,pad=4,n=vals.length,mn=Math.min(...pts0.map(x=>x[1])),mx=Math.max(...pts0.map(x=>x[1])),rng=(mx-mn)||1;
+  const pts = pts0.map(([i,v])=>[pad+i*(W-2*pad)/(n-1), H-pad-((v-mn)/rng)*(H-2*pad)]);
+  const line = pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const area = 'M'+pts[0][0].toFixed(1)+','+H+' L'+line.replace(/ /g,' L')+' L'+pts[pts.length-1][0].toFixed(1)+','+H+' Z', last = pts[pts.length-1];
+  return `<svg class="sp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${area}" fill="#00539B" opacity=".12"/><polyline points="${line}" fill="none" stroke="#00539B" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.2" fill="${mtd?'#fff':'#00539B'}" stroke="#00539B" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+// Only touch the DOM when the markup really changed (this view re-renders on every live data update).
+function nvSet(id, html) { const el = document.getElementById(id); if(el && el._h !== html) { el._h = html; el.innerHTML = html; } }
+
+// ── activities, grouped ──
+const nvItems = p => ALL.filter(i => i.startDate?.startsWith(p) && deliverableTypeFor(i));
+function nvGroups(p) {
+  const m = {};
+  nvItems(p).forEach(i => {
+    if(NV.by==='entity') (i.entity||[]).forEach(e => (m[e] = m[e] || []).push(i));
+    else if(i.department) (m[i.department] = m[i.department] || []).push(i);
+  });
+  return m;
+}
+const nvColor = name => NV.by==='entity' ? '#00539B' : deptStyle(name).t;
+function nvInGroup(i, name) { return !name || (NV.by==='entity' ? (i.entity||[]).includes(name) : i.department===name); }
+const nvKind = i => nvIsPost(i) ? 'post' : i.type==='Event' ? 'event' : 'campaign';
+function nvRailItems(name) {
+  const t = nvToday(), end = nvAdd(t,13);
+  const acts = ALL.filter(i => i.startDate && i.startDate>=t && i.startDate<=end && i.status!=='Cancelled' &&
+    (nvIsPost(i) || i.type==='Event' || i.type==='Campaign') && nvInGroup(i,name)).map(i => ({ d:i.startDate, k:nvKind(i), it:i }));
+  const health = name ? [] : HEALTH_DAYS.filter(h => h.date && h.date>=t && h.date<=end).map(h => ({ d:h.date, k:'health', h }));
+  return [...acts, ...health].sort((a,b)=>a.d.localeCompare(b.d));
+}
+const nvGcal = (title,iso) => 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+'&dates='+iso.replace(/-/g,'')+'/'+nvAdd(iso,1).replace(/-/g,'')+'&details='+encodeURIComponent('From the IMC Marketing & BD Hub');
+
+// ── detail panel (the page's own side panel, reused) ──
+function nvPanel(title, badges, body) {
+  document.getElementById('dp-title').textContent = title;
+  document.getElementById('dp-badges').innerHTML = badges || '';
+  document.getElementById('dp-body').innerHTML = body;
+  document.getElementById('detail-overlay').classList.add('open');
+  document.getElementById('detail-panel').classList.add('open');
+}
+function nvToast(t) {
+  let el = document.getElementById('nv-toast');
+  if(!el) { el = document.createElement('div'); el.id = 'nv-toast'; el.className = 'nv-toast'; el.setAttribute('role','status'); document.body.appendChild(el); }
+  el.textContent = t; el.classList.add('on'); clearTimeout(nvToast._t); nvToast._t = setTimeout(()=>el.classList.remove('on'), 2400);
+}
+async function nvCopy(text, ok) {
+  try { await navigator.clipboard.writeText(text); nvToast(ok||'Copied'); }
+  catch(e) { const ta = document.querySelector('#detail-panel.open textarea, #nv-msg'); if(ta) ta.select(); nvToast('Could not copy automatically. The text is selected: press Ctrl+C.'); }
+}
+const nvRow = (label,val,pct,color,attrs) => `<div class="nv-drow${attrs?' go':''}" ${attrs||''}><span>${label}</span><b>${val}</b><div class="bar"><i style="width:${Math.max(2,pct)}%;background:${color}"></i></div></div>`;
+function nvMonthBars(def, p) {
+  const months = nvMonthsBack(p,6), vals = months.map(m=>def.get(m)), mx = Math.max(1,...vals.filter(v=>v!=null));
+  return months.map((m,i)=>nvRow(nvMonthShort(m)+(nvIsCurrent(m)?' (so far)':''), vals[i]==null?'—':fmt(vals[i]), vals[i]==null?0:vals[i]/mx*100, m===p?'#00539B':'#C5CBD8')).join('');
+}
+
+// ── render ──
+function renderNewDashboard() {
+  try {
+    nvResolvePending();
+    const p = nvPeriod(), periods = getAvailablePeriods();
+    document.getElementById('nv-period').textContent = periodLabel(p) + (nvIsCurrent(p) ? ' (so far)' : '');
+    document.getElementById('nv-prev').disabled = dashPeriodIdx >= periods.length-1;
+    document.getElementById('nv-next').disabled = dashPeriodIdx <= 0;
+    nvAsOf(); nvHero(p); nvBoard(p); nvOutput(p); nvTiles(p); nvExplorer(p); nvSocial(p); nvFunnel(p); nvWorked(p); nvComing(p); nvSpot(p);
+  } catch(e) { console.error('New dashboard error:', e); }
+}
+function nvAsOf() {
+  const el = document.getElementById('nv-asof'); if(!el) return;
+  const u = METRICOOL_STATS?.updatedAt, d = u ? (u.toDate ? u.toDate() : new Date(u)) : null;
+  let newest = '';
+  Object.entries(METRICOOL_STATS?.series||{}).forEach(([k,arr]) => { if(/followers$/.test(k)) return; (arr||[]).forEach(x => { if(x.source!=='manual' && x.date>newest) newest = x.date; }); });
+  const behind = newest ? Math.round((new Date(nvToday()+'T00:00:00Z') - new Date(newest+'T00:00:00Z'))/86400000) : null;
+  el.classList.toggle('stale', behind!=null && behind>3);
+  nvSet('nv-asof', '<i></i>' + (d && !isNaN(d) ? `Social data synced ${nvEsc(d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}))}${newest?`, newest daily figures ${nvEsc(new Date(newest+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}))}`:''}` : 'Social data not synced yet') + ' · activities, leads and the calendar are live');
+}
+function nvHero(p) {
+  const reach = NV_DEFS.reach.get(p), leads = NV_DEFS.leads.get(p), booked = NV_DEFS.booked.get(p), month = nvMonthName(p);
+  document.getElementById('nv-h-eyebrow').textContent = periodLabel(p) + (nvIsCurrent(p) ? ' · so far' : '');
+  const r = nvPct(NV_DEFS.reach,p);
+  let title;
+  if(reach!=null) title = `<em>${fmt(reach)}</em> people reached on Instagram in ${nvEsc(month)}` + (r && r.c!=null ? `, ${r.c>=0?'up':'down'} <strong>${Math.abs(r.c)}%</strong> ${nvIsCurrent(p)?'on the same share of last month':'on '+nvEsc(nvMonthName(nvPrev(p)))}` : '') + '.';
+  else if(leads!=null) title = `<em>${fmt(leads)}</em> new leads in ${nvEsc(month)}.`;
+  else title = `${nvEsc(month)} at a glance.`;
+  document.getElementById('nv-h-title').innerHTML = title;
+  const vid = NV_DEFS.video.get(p), bits = [];
+  if(vid!=null) bits.push(`${fmt(vid)} video views`);
+  if(leads!=null) bits.push(`${fmt(leads)} new leads${booked!=null?` and ${fmt(booked)} booked so far`:''}`);
+  document.getElementById('nv-h-sub').textContent = bits.length ? bits.join(' · ') + '.' : '';
+}
+function nvBoard(p) {
+  const order = ['reach','video','engage','followers','leads','booked'], mtd = nvIsCurrent(p);
+  const sub = { reach:'Instagram, each person counted once', video:'Instagram reels and TikTok', engage:'Likes and comments', followers:'Instagram, LinkedIn and X', leads:'Live from the Leads CRM', booked:'Of the leads that arrived this month' };
+  nvSet('nv-board', order.map(k => { const d = NV_DEFS[k], v = d.get(p);
+    return `<button class="nv-cell" type="button" data-nv-cell="${k}"><span class="lab">${d.label}</span><span class="val">${v==null?'—':fmt(v)}</span>${nvDeltaHtml(nvPct(d,p))}${nvSpark(nvMonthsBack(p,6).map(m=>d.get(m)), mtd)}<span class="sub">${sub[k]}</span></button>`; }).join(''));
+}
+const NV_OUT = [ ['total','Activities','planned and delivered'], ['Videos','Videos','planned and delivered'], ['Social Posts','Social posts','photos and carousels'], ['Events','Events','seminars, talks, community'], ['Print','Print pieces','brochures, signage, flyers'], ['offers','Live offers','in the catalogue now'] ];
+function nvCounts(p) { const c = { Videos:0,'Social Posts':0,Events:0,Print:0,'Website Updates':0 }; ALL.filter(i=>i.startDate?.startsWith(p)).forEach(i=>{ const t=deliverableTypeFor(i); if(t) c[t]++; }); c.total = Object.values(c).reduce((a,b)=>a+b,0); return c; }
+function nvOutput(p) {
+  const months = nvMonthsBack(p,6), cs = months.map(nvCounts), cur = cs[cs.length-1], prev = cs[cs.length-2];
+  document.getElementById('nv-output-p').textContent = `Everything planned and delivered in ${periodLabel(p)}. Open any number to see which departments it came from.`;
+  nvSet('nv-outboard', NV_OUT.map(([k,label,sub]) => {
+    if(k==='offers') { const n = (OFFERS_META && typeof OFFERS_META.rowCount==='number') ? OFFERS_META.rowCount : null; return `<button class="nv-cell" type="button" data-nv-out="offers"><span class="lab">${label}</span><span class="val">${n==null?'—':n}</span><span class="nv-delta nv-flat">right now</span><svg class="sp" viewBox="0 0 120 34" aria-hidden="true"></svg><span class="sub">${sub}</span></button>`; }
+    const c = cur[k], pv = prev[k], r = pv>0 ? { c:Math.round((c/pv-1)*100), note:'vs last month' } : (c>0 ? { c:null, note:'' } : { c:0, note:'' });
+    return `<button class="nv-cell" type="button" data-nv-out="${nvEsc(k)}"><span class="lab">${label}</span><span class="val">${c}</span>${nvDeltaHtml(r)}${nvSpark(cs.map(x=>x[k]), false)}<span class="sub">${sub}</span></button>`; }).join(''));
+}
+function nvTiles(p) {
+  document.querySelectorAll('#nv-groupby button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.nvBy===NV.by)));
+  const g = nvGroups(p), entries = Object.entries(g).map(([n,l])=>[n,l.length]).sort((a,b)=>b[1]-a[1]), mx = Math.max(1,...entries.map(e=>e[1]));
+  nvSet('nv-tiles', entries.length ? entries.map(([n,c]) => `<button class="nv-tile" type="button" data-nv-tile="${nvEsc(n)}" aria-pressed="${NV.cur===n}" style="--c:${nvColor(n)}"><span class="n">${nvEsc(n)}</span><span class="c"><b>${c}</b><span>activit${c===1?'y':'ies'}</span></span><span class="bar"><i style="width:${c/mx*100}%"></i></span></button>`).join('') : '<div class="nv-empty">No activity recorded for this month yet.</div>');
+  const names = NV.by==='entity' ? ALL_ENTITIES.map(e=>e.name) : DEPARTMENTS, rest = names.filter(n=>!g[n]);
+  nvSet('nv-more', rest.length ? `<label style="font-size:12px;color:var(--text-3)">Or choose another ${NV.by}: <select class="nv-select" id="nv-pick"><option value="">Select…</option>${rest.map(n=>`<option value="${nvEsc(n)}">${nvEsc(n)}</option>`).join('')}</select></label>` : '');
+}
+function nvPostCard(i, c) {
+  const link = nvSafeUrl(i.postLink), img = nvSafeUrl(i.socialImageUrl);
+  const media = img ? (isVideoUrl(img) ? `<video src="${nvEsc(img)}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${nvEsc(img)}" loading="lazy" alt="">`) : '';
+  const cap = i.captionAR || i.captionEN;
+  return `<article class="nv-pc" style="--c:${c}"><div class="th">${media}<span>${nvEsc(i.contentType||i.type)}</span></div><div class="bd"><h5 dir="auto">${nvEsc(i.title)}</h5><div class="mt"><span>${nvEsc(i.startDate||'')}</span>${nvDots(i.channels)}</div></div><div class="ac">${link ? `<button class="nv-btn pri" type="button" data-nv-share="${nvEsc(i.id)}">Share</button><button class="nv-btn" type="button" data-nv-copy="link:${nvEsc(i.id)}">Copy link</button>` : '<span class="nv-empty" style="padding:0">Link not added yet</span>'}${cap ? `<button class="nv-btn" type="button" data-nv-copy="cap:${nvEsc(i.id)}">Copy caption</button>` : ''}</div></article>`;
+}
+function nvTeamMessage(name, live, ups) {
+  const shareable = live.filter(i => nvSafeUrl(i.postLink)).slice(0,3), nx = ups.find(u => u.k==='post' || u.k==='event');
+  return `IMC ${name}: posts to share this week\n\n` + (shareable.length ? shareable.map((i,k) => `${k+1}. ${i.title}${i.contentType?' ('+i.contentType+')':''}\n   ${nvSafeUrl(i.postLink)}`).join('\n') : 'No new posts with links yet.') + '\n\n' + (nx ? `Coming up: ${nx.it.title}, ${nvWd(nx.d)} ${nx.d.slice(8)} ${nvMonthShort(nx.d.slice(0,7))}.\n\n` : '') + 'Please share with your contacts and patients. Thank you.';
+}
+function nvExplorer(p) {
+  const box = document.getElementById('nv-explorer'); if(!box) return;
+  if(!NV.cur) { nvSet('nv-explorer', '<div class="nv-how"><div><b>1. Find your department</b>Pick it above. Everything about it is gathered in one place.</div><div><b>2. Share what is live</b>Send a post to your contacts and patients with one tap, or copy its caption.</div><div><b>3. Keep your team in step</b>Copy a ready-written message with this week\'s posts for your group, and add upcoming posts to your calendar.</div></div>'); return; }
+  const name = NV.cur, c = nvColor(name), items = (nvGroups(p)[name]||[]), live = items.filter(i => nvIsPost(i) && i.status==='Published').sort(nvByDateDesc);
+  const ups = nvRailItems(name).filter(u => u.k!=='health'), leads = NV.by==='department' ? ((LEAD_STATS?.byMonthDept?.[p]||{})[name]) : ((LEAD_STATS?.byMonthEntity?.[p]||{})[name]);
+  const show = NV.all ? live : live.slice(0,6);
+  nvSet('nv-explorer', `<div class="nv-xhead"><span class="nv-dept" style="background:${c}1a;color:${c};font-size:12px">${NV.by==='department'?'Department':'Entity'}</span><h3>${nvEsc(name)}</h3><span class="sp"></span><button class="nv-btn" type="button" data-nv-act="link">Copy direct link</button><button class="nv-btn" type="button" data-nv-act="clear">Clear</button></div>
+    <div class="nv-stats4"><div><b>${items.length}</b><span>Activities</span></div><div><b>${live.length}</b><span>Posts live</span></div><div><b>${leads==null?'—':leads}</b><span>Leads this month</span></div><div><b>${ups.length}</b><span>Coming in 14 days</span></div></div>
+    <div class="nv-xsub"><h4>Live now: share these</h4><span>${nvEsc(periodLabel(p))}. Newest first.</span></div>
+    ${live.length ? `<div class="nv-pgrid">${show.map(i=>nvPostCard(i,c)).join('')}</div>${live.length>6?`<div style="margin-top:12px"><button class="nv-btn" type="button" data-nv-act="more">${NV.all?'Show fewer':'Show all '+live.length}</button></div>`:''}` : '<div class="nv-empty">Nothing published yet this month. See what is coming below.</div>'}
+    <div class="nv-cols" style="margin-top:6px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div><div class="nv-xsub"><h4>Coming up</h4><span>Add to your calendar</span></div><div class="nv-upl">${ups.length ? ups.slice(0,6).map(u=>`<div class="nv-ur"><div class="d"><b>${u.d.slice(8)}</b>${nvWd(u.d)}</div><div class="t"><span dir="auto">${nvEsc(u.it.title)}</span><small>${nvEsc(u.k==='post'?(u.it.contentType||'Post')+' · '+u.it.status:u.k==='event'?'Event · '+u.it.status:'Campaign')}</small></div><a class="nv-btn" href="${nvGcal(u.it.title,u.d)}" target="_blank" rel="noopener">Add</a></div>`).join('') : '<div class="nv-empty">Nothing scheduled in the next 14 days.</div>'}</div></div>
+    <div><div class="nv-xsub"><h4>Message for your team</h4><span>Paste into your group</span></div><textarea class="nv-msg" id="nv-msg" readonly>${nvEsc(nvTeamMessage(name,live,ups))}</textarea><div style="margin-top:8px"><button class="nv-btn pri" type="button" data-nv-act="msg">Copy message</button></div></div></div>`);
+}
+function nvSocial(p) {
+  const months = nvMonthsBack(p,6), vals = months.map(m => NV_DEFS.video.get(m)), have = vals.filter(v=>v!=null);
+  document.getElementById('nv-plat-title').textContent = 'By platform, ' + nvMonthName(p);
+  if(!have.length || !(Math.max(...have) > 0)) { nvSet('nv-bars', ''); nvSet('nv-plat', '<div class="nv-empty">No social media numbers synced yet.</div>'); return; }
+  const W=660,H=230,L=48,B=32,T=24,R=10,iw=W-L-R,ih=H-T-B;
+  // one scale for the bars and the axis: pick a tidy step so there are at most 5 gridlines
+  const top = Math.max(...have), mag = Math.pow(10, Math.floor(Math.log10(top))), nice = [1,2,2.5,5,10].map(m=>m*mag).find(s=>top/s<=5) || mag*10, mx = Math.ceil(top/nice)*nice;
+  let s = '';
+  for(let t=0;t<=mx+1e-9;t+=nice){ const y=T+ih-(t/mx)*ih; s+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#E2E6F0"/><text x="${L-8}" y="${y+4}" text-anchor="end" font-size="10.5" fill="#8890A8">${t===0?'0':fmt(t)}</text>`; }
+  const bw = iw/months.length*.54;
+  months.forEach((m,i)=>{ const v=vals[i], cx=L+iw/months.length*(i+.5), cur=m===p; if(v!=null){ const h=v/mx*ih, y=T+ih-h; s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${h}" rx="3" fill="#00A3D9" opacity="${cur?1:.5}"><title>${nvEsc(nvMonthName(m))}: ${fmt(v)}</title></rect><text x="${cx}" y="${y-7}" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0F1423">${fmt(v)}</text>`; } s+=`<text x="${cx}" y="${H-10}" text-anchor="middle" font-size="11.5" fill="${cur?'#00539B':'#8890A8'}" font-weight="${cur?700:400}">${nvMonthShort(m)}${nvIsCurrent(m)?' (so far)':''}</text>`; });
+  nvSet('nv-bars', s);
+  const rows = [['Instagram reach','instagram_reach','People reached'],['Instagram reel views','instagram_reel_views','Views'],['TikTok video views','tiktok_video_views','Views'],['LinkedIn impressions','linkedin_impressions','Impressions']].map(([n,k,u])=>[n,nvMv(k,p),u]).filter(r=>r[1]!=null), mx2 = Math.max(1,...rows.map(r=>r[1]));
+  const fol = [['Instagram','instagram_followers'],['LinkedIn','linkedin_followers'],['X','twitter_followers']].map(([n,k])=>[n,nvLastKnown(k,p)]).filter(r=>r[1]!=null);
+  nvSet('nv-plat', rows.map(([n,v,u])=>`<div class="nv-plat"><div class="n">${n}</div><div class="v">${fmt(v)}</div><div class="bar"><i style="width:${v/mx2*100}%"></i></div><div class="meta">${u}</div></div>`).join('') + (fol.length ? `<div class="nv-dh4">Followers</div>${fol.map(([n,v])=>`<div class="nv-plat"><div class="n">${n}</div><div class="v">${fmt(v)}</div></div>`).join('')}` : ''));
+}
+function nvFunnel(p) {
+  const v = [NV_DEFS.reach.get(p), NV_DEFS.engage.get(p), NV_DEFS.leads.get(p), NV_DEFS.booked.get(p)], sec = document.getElementById('nv-sec-funnel');
+  const ok = v.every(x => x!=null && x>0); sec.hidden = !ok; if(!ok) return;
+  const st = [['Reached','Instagram reach',100],['Engaged','Likes and comments',78],['Leads','New leads, all sources',56],['Booked','Booked so far',34]];
+  nvSet('nv-funnel', st.map(([k,d,w],i)=>`<div class="nv-step"><div class="k">${k}</div><div class="v">${fmt(v[i])}</div><div class="d">${d}</div><div class="bar" style="width:${w}%"></div>${i<3?`<div class="conv">${(v[i+1]/v[i]*100).toFixed(v[i+1]/v[i]<.1?1:0)}% go on</div>`:''}</div>`).join(''));
+}
+function nvWorked(p) {
+  const name = NV.cur, camps = LEAD_STATS?.campaigns || [], mc = LEAD_STATS?.byMonthCampaign?.[p] || {};
+  document.getElementById('nv-worked-p').textContent = `Campaigns ranked by leads that arrived in ${periodLabel(p)}, and the recent posts behind them.`;
+  nvSet('nv-campf', name ? `<span class="nv-fchip">Showing ${nvEsc(name)}<button type="button" data-nv-act="clear" aria-label="Show everyone">✕</button></span>` : '');
+  const init = c => ALL.find(i => i.id===c.campaignId);
+  const rows = camps.map(c => ({ c, m:mc[c.campaignId]||0, i:init(c) })).filter(x => x.m>0 && (!name || (x.i && nvInGroup(x.i,name)))).sort((a,b)=>b.m-a.m).slice(0,6);
+  nvSet('nv-camp', `<thead><tr><th>Campaign</th><th class="r">Leads</th><th class="r">Cost per lead</th><th class="r">Booked</th><th class="r">Return</th></tr></thead><tbody>${rows.length ? rows.map(({c,m,i})=>{ const col = i ? deptStyle(i.department).t : '#00539B'; const roi = c.roi==null?'—':`${c.roi>=0?'+':''}${c.roi}%`;
+    return `<tr><td><div style="font-weight:500">${nvEsc(c.title)}</div>${i&&i.department?`<span class="nv-dept" style="background:${col}1a;color:${col}">${nvEsc(i.department)}</span>`:''}</td><td class="r"><b>${m}</b></td><td class="r">${c.cpl!=null?'SAR '+c.cpl.toLocaleString():'—'}</td><td class="r">${fmt(c.booked)}</td><td class="r" style="color:${c.roi==null?'var(--text-3)':c.roi>=0?'var(--green)':'var(--red)'};font-weight:600">${roi}</td></tr>`; }).join('') : `<tr><td colspan="5" class="nv-empty">${name?`No campaign brought in leads for ${nvEsc(name)} this month.`:'No campaign-attributed leads this month yet.'}</td></tr>`}</tbody>`);
+  const posts = ALL.filter(i => i.socialImageUrl && nvSafeUrl(i.postLink) && i.startDate?.startsWith(p) && nvInGroup(i,name)).sort(nvByDateDesc).slice(0,4);
+  nvSet('nv-posts', posts.length ? posts.map(i => { const img = nvSafeUrl(i.socialImageUrl);
+    return `<a class="nv-rp" href="${nvEsc(nvSafeUrl(i.postLink))}" target="_blank" rel="noopener"><div class="im">${img ? (isVideoUrl(img) ? `<video src="${nvEsc(img)}#t=0.1" muted playsinline preload="metadata"></video>` : `<img src="${nvEsc(img)}" loading="lazy" alt="">`) : ''}</div><div><h5 dir="auto">${nvEsc(i.title)}</h5><small>${nvEsc(i.department||'')} · ${nvEsc(i.startDate||'')}</small></div></a>`; }).join('') : '<div class="nv-empty">No synced posts with images for this selection.</div>');
+}
+function nvComing(p) {
+  const name = NV.cur, chips = [['all','All'],['post','Posts'],['event','Events'],['health','Health days'],['campaign','Campaigns']];
+  nvSet('nv-chips', (name ? `<span class="nv-fchip" style="margin:0 6px 0 0">${nvEsc(name)}<button type="button" data-nv-act="clear" aria-label="Show everyone">✕</button></span>` : '') + chips.map(([k,l])=>`<button class="nv-chip" type="button" aria-pressed="${NV.filt===k}" data-nv-filt="${k}">${l}</button>`).join(''));
+  const t = nvToday(), items = nvRailItems(name).filter(u => NV.filt==='all' || u.k===NV.filt);
+  let html = '';
+  for(let n=0;n<14;n++){ const d = nvAdd(t,n), day = items.filter(u=>u.d===d);
+    html += `<div class="nv-day${n===0?' today':''}"><div class="dh"><b>${d.slice(8)}</b><span>${n===0?'Today':nvWd(d)}</span></div><div class="stack">${day.length ? day.map(u => {
+      const it = u.it, h = u.h, title = it ? it.title : (h.name || h.title || 'Health day'), tag = u.k==='post'?(it.contentType||'Post'):u.k==='health'?'Health day':u.k==='event'?'Event':'Campaign';
+      const col = it && it.department ? deptStyle(it.department).t : '#00539B', sc = it ? (it.status==='Published'?'#0D6E44':it.status==='Ready'?'#0E7A55':it.status==='In Production'?'#9B5800':'#C5CBD8') : '';
+      return `<button class="nv-ev ${u.k}" type="button" data-nv-ev="${it?nvEsc(it.id):''}" data-nv-hd="${h?nvEsc(h.id||h.name||''):''}" data-nv-date="${u.d}" style="--c:${col}"><div class="t"><span>${nvEsc(tag)}</span>${it&&it.status?`<span class="nv-sdot" style="background:${sc}" title="${nvEsc(it.status)}"></span>`:''}</div><div class="ttl" dir="auto">${nvEsc(title)}</div>${it&&it.channels&&it.channels.length?`<div class="m">${nvDots(it.channels)}</div>`:''}</button>`; }).join('') : '<div class="nv-empty">Nothing planned</div>'}</div></div>`; }
+  nvSet('nv-rail', html);
+  // plan adherence: only meaningful for the month that is still running
+  const posts = ALL.filter(i => nvIsPost(i) && i.status!=='Cancelled' && i.startDate?.startsWith(p));
+  if(nvIsCurrent(p) && posts.length) {
+    const due = posts.filter(i=>i.startDate<=t), pub = due.filter(i=>i.status==='Published').length, late = due.length-pub, ahead = posts.filter(i=>i.startDate>t), ready = ahead.filter(i=>i.status==='Ready').length, rest = ahead.length-ready, n = posts.length;
+    nvSet('nv-adhere', `<div class="txt"><b>${nvEsc(nvMonthName(p))} plan:</b> ${pub} of ${due.length} due posts are published${late?`, ${late} ${late===1?'is':'are'} late`:''}, ${ready} more ${ready===1?'is':'are'} ready and ${rest} ${rest===1?'is':'are'} still planned. ${n} posts in total.</div><div class="meter"><i style="width:${pub/n*100}%;background:var(--green)"></i><i style="width:${late/n*100}%;background:var(--red)"></i><i style="width:${ready/n*100}%;background:var(--blue)"></i><i style="width:${rest/n*100}%;background:var(--border-strong)"></i></div>`);
+  } else nvSet('nv-adhere', '');
+  const dim = nvDaysIn(p), per = {}; posts.forEach(i => { const d = +i.startDate.slice(8,10); per[d] = (per[d]||0)+1; });
+  document.getElementById('nv-dens-title').textContent = nvMonthName(p) + ' at a glance';
+  document.getElementById('nv-dens-a').textContent = '1 ' + nvMonthShort(p); document.getElementById('nv-dens-b').textContent = dim + ' ' + nvMonthShort(p);
+  let cells = ''; for(let d=1; d<=31; d++){ if(d>dim){ cells += '<i class="x"></i>'; continue; } const n = per[d]||0, today = nvIsCurrent(p) && p+'-'+nvPad(d)===t; cells += `<i class="${n>=4?'t3':n>=2?'t2':n>=1?'t1':''}${today?' now':''}" title="${d} ${nvMonthShort(p)}: ${n} post${n===1?'':'s'}"></i>`; }
+  nvSet('nv-dens', cells);
+}
+function nvRunning(c, t) { if(c.cancelled || !c.startDate || c.startDate>t) return false; return !c.endDate || c.endDate>=t; }
+function nvSpot(p) {
+  const today = nvToday(), isCur = nvIsCurrent(p), mEnd = p+'-'+nvPad(nvDaysIn(p)), t = isCur ? today : mEnd; // for a finished month: the campaigns that ran in it
+  const camps = LEAD_STATS?.campaigns || [], mc = LEAD_STATS?.byMonthCampaign?.[p] || {};
+  const pick = camps.filter(c => isCur ? nvRunning(c,t) : (!c.cancelled && c.startDate && c.startDate<=mEnd && (!c.endDate || c.endDate>=p+'-01'))).sort((a,b)=>(mc[b.campaignId]||0)-(mc[a.campaignId]||0) || (b.leads||0)-(a.leads||0))[0];
+  const init = pick ? ALL.find(i=>i.id===pick.campaignId) : null;
+  let hero;
+  if(pick) {
+    const total = pick.endDate ? Math.max(1,(new Date(pick.endDate)-new Date(pick.startDate))/86400000+1) : null, done = total ? Math.min(total,Math.max(0,(new Date(t)-new Date(pick.startDate))/86400000+1)) : null;
+    const dept = init && init.department;
+    hero = `<div class="nv-hc"><div class="nv-eyebrow">Campaign in the spotlight</div><h3 dir="auto">${nvEsc(pick.title)}</h3><div class="range">${dept?nvEsc(dept)+' · ':''}${nvEsc(pick.startDate)}${pick.endDate?' to '+nvEsc(pick.endDate):''}${total?` · day ${Math.round(done)} of ${Math.round(total)}`:''}</div>${total?`<div class="nv-prog"><i style="width:${done/total*100}%"></i></div>`:''}<div class="nv-hstats"><div><b>${fmt(pick.leads)}</b><span>Leads</span></div><div><b>${pick.cpl!=null?'SAR '+pick.cpl.toLocaleString():'—'}</b><span>Cost per lead</span></div><div><b>${fmt(pick.booked)}</b><span>Booked</span></div><div><b>${pick.roi==null?'—':(pick.roi>=0?'+':'')+pick.roi+'%'}</b><span>Return</span></div></div>${dept?`<div><button class="nv-btn" type="button" data-nv-dept="${nvEsc(dept)}" style="background:transparent;border-color:rgba(255,255,255,.5);color:#fff">See the ${nvEsc(dept)} posts</button></div>`:''}</div>`;
+  } else hero = `<div class="nv-hc"><div class="nv-eyebrow">Campaign in the spotlight</div><h3>${isCur ? 'No campaign is running right now' : 'No campaign ran in '+nvEsc(nvMonthName(p))}</h3><div class="range">${isCur ? 'Upcoming campaigns appear under Coming up.' : 'Use the arrows above to go back to this month.'}</div></div>`;
+  const live = ALL.filter(i => nvIsPost(i) && i.status==='Published' && i.startDate<=t).sort(nvByDateDesc), latest = live.find(i=>nvSafeUrl(i.socialImageUrl)) || live.find(i=>nvSafeUrl(i.postLink)) || live[0];
+  let postCard = '<div class="nv-panel nv-mini"><div class="nv-eyebrow">Latest post</div><div class="nv-empty">No published posts yet.</div></div>';
+  if(latest) { const img = nvSafeUrl(latest.socialImageUrl), link = nvSafeUrl(latest.postLink), col = deptStyle(latest.department).t;
+    postCard = `<div class="nv-panel nv-mini"><div class="nv-eyebrow">Latest post</div><div class="nv-pc" style="--c:${col};border:0"><div class="th" style="height:120px;border-radius:10px">${img?(isVideoUrl(img)?`<video src="${nvEsc(img)}#t=0.1" muted playsinline preload="metadata"></video>`:`<img src="${nvEsc(img)}" loading="lazy" alt="">`):''}<span>${nvEsc(latest.contentType||latest.type)}</span></div></div><h3 dir="auto">${nvEsc(latest.title)}</h3><div style="font-size:12px;color:var(--text-2)">${nvEsc(latest.department||'')} · ${nvEsc(latest.startDate||'')}</div>${link?`<div><button class="nv-btn pri" type="button" data-nv-share="${nvEsc(latest.id)}">Share</button></div>`:''}</div>`; }
+  const bm = LEAD_STATS?.byMonth || {}, months = Object.keys(bm).filter(m=>bm[m] && bm[m].booked!=null).sort(), best = months.reduce((a,m)=>(!a||bm[m].booked>bm[a].booked)?m:a, null), cur = bm[p] ? bm[p].booked : null;
+  let mile = '<div class="nv-panel nv-mini"><div class="nv-eyebrow">Milestone</div><div class="nv-empty">Bookings will appear once leads are tracked.</div></div>';
+  if(best && cur!=null) mile = `<div class="nv-panel nv-mini"><div class="nv-eyebrow">Milestone</div><div class="big">${cur}</div><h3>${cur>=bm[best].booked && cur>0 ? `Bookings from ${nvEsc(nvMonthName(p))}'s leads, the best month so far` : `Bookings from ${nvEsc(nvMonthName(p))}'s leads${isCur?' so far':''}`}</h3><div style="font-size:12px;color:var(--text-2)">${cur>=bm[best].booked && cur>0 ? 'Leads are counted by the month they arrived.' : `Best month so far: ${bm[best].booked} (${nvEsc(nvMonthName(best))}).`}</div></div>`;
+  nvSet('nv-spot', hero + postCard + mile);
+  const feat = ALL.filter(i=>i.featured===true);
+  nvSet('nv-featured', feat.length ? `<div class="nv-eyebrow" style="margin-bottom:8px">Also featured</div><div class="nv-chips">${feat.slice(0,8).map(i=>`<button class="nv-chip" type="button" data-nv-feat="${nvEsc(i.id)}">${nvEsc(i.title)}</button>`).join('')}</div>` : '');
+}
+
+// ── drawers ──
+function nvKpiPanel(k) {
+  const p = nvPeriod(), d = NV_DEFS[k], v = d.get(p), r = nvPct(d,p);
+  let b = `<div class="nv-dbig">${v==null?'—':fmt(v)}</div><div style="margin-top:6px">${nvDeltaHtml(r)} <span style="font-size:12px;color:var(--text-3)">${nvEsc(r?r.note:'')}</span></div><p style="margin-top:14px;font-size:13px;color:var(--text-2)">${nvEsc(d.def)}</p><div class="nv-dh4">Month by month</div>${nvMonthBars(d,p)}`;
+  if(k==='leads') { const byD = LEAD_STATS?.byMonthDept?.[p] || {}, rows = Object.entries(byD).sort((a,b)=>b[1]-a[1]).slice(0,8), mx = rows.length?rows[0][1]:1;
+    if(rows.length) b += `<div class="nv-dh4">By department</div>` + rows.map(([n,c])=>nvRow(nvEsc(n),c,c/mx*100,deptStyle(n).t,`data-nv-dept="${nvEsc(n)}" role="button" tabindex="0"`)).join(''); }
+  b += `<div class="nv-dh4">Source</div><div class="nv-dsrc">${nvEsc(d.src)}</div>`;
+  nvPanel(d.label, `<span class="badge" style="background:var(--bg);color:var(--text-2)">${nvEsc(periodLabel(p))}</span>`, b);
+}
+function nvOutPanel(k) {
+  const p = nvPeriod(), cs = nvCounts(p), items = nvItems(p), names = { total:'Activities', Videos:'Videos', 'Social Posts':'Social posts', Events:'Events', Print:'Print pieces', offers:'Live offers' };
+  let b;
+  if(k==='offers') b = `<div class="nv-dbig">${OFFERS_META && typeof OFFERS_META.rowCount==='number' ? OFFERS_META.rowCount : '—'}</div><p style="font-size:13px;color:var(--text-2)">Live offers are a snapshot of the offers catalogue right now, so they do not change by month.</p>`;
+  else {
+    const sel = items.filter(i => k==='total' || deliverableTypeFor(i)===k), by = {}; sel.forEach(i => { if(i.department) by[i.department] = (by[i.department]||0)+1; });
+    const rows = Object.entries(by).sort((a,b)=>b[1]-a[1]), mx = rows.length?rows[0][1]:1;
+    b = `<div class="nv-dbig">${cs[k]}</div><div class="nv-dh4">By department <span style="text-transform:none;letter-spacing:0">· tap one to open it</span></div>` + (rows.length ? rows.map(([n,c])=>nvRow(nvEsc(n),c,c/mx*100,deptStyle(n).t,`data-nv-dept="${nvEsc(n)}" role="button" tabindex="0"`)).join('') : '<div class="nv-empty">None yet.</div>');
+    if(k==='total') b += `<div class="nv-dh4">By type</div>` + ['Videos','Social Posts','Events','Print','Website Updates'].map(t=>nvRow(t==='Social Posts'?'Social posts':t==='Print'?'Print pieces':t==='Website Updates'?'Website updates':t, cs[t], cs[t]/Math.max(1,cs.total)*100, '#00539B')).join('');
+    if(k==='Events'||k==='Print') b += `<div class="nv-dh4">${names[k]}</div>` + (sel.length ? sel.sort((a,c)=>(a.startDate||'').localeCompare(c.startDate||'')).map(i=>`<div class="nv-drow"><span dir="auto">${nvEsc(i.title)}</span><b style="font-weight:500;color:var(--text-3)">${nvEsc((i.startDate||'').slice(5))}</b></div>`).join('') : '<div class="nv-empty">None.</div>');
+  }
+  b += `<div class="nv-dh4">Source</div><div class="nv-dsrc">Live from the Activities list: cancelled items and campaign containers are not counted, so nothing is counted twice.</div>`;
+  nvPanel(names[k]||k, `<span class="badge" style="background:var(--bg);color:var(--text-2)">${nvEsc(periodLabel(p))}</span>`, b);
+}
+function nvSharePanel(id) {
+  const i = ALL.find(x=>x.id===id); if(!i) return; const link = nvSafeUrl(i.postLink); if(!link) return;
+  const text = `${i.title}\n${link}\n\nFrom IMC${i.department?' '+i.department:''}. Please share with your contacts.`;
+  const wa = 'https://wa.me/?text='+encodeURIComponent(text), li = 'https://www.linkedin.com/sharing/share-offsite/?url='+encodeURIComponent(link), x = 'https://twitter.com/intent/tweet?text='+encodeURIComponent(i.title)+'&url='+encodeURIComponent(link);
+  nvPanel('Share this post', `<span class="badge" style="background:var(--bg);color:var(--text-2)">${nvEsc(i.department||'')}</span>`,
+    `<div style="font-weight:600;margin-bottom:12px" dir="auto">${nvEsc(i.title)}</div><div class="nv-dh4" style="margin-top:0">Message</div><textarea class="nv-msg" id="nv-msg" readonly style="min-height:96px">${nvEsc(text)}</textarea>
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"><a class="nv-btn pri" style="text-align:center" href="${wa}" target="_blank" rel="noopener">WhatsApp</a><a class="nv-btn" style="text-align:center" href="${li}" target="_blank" rel="noopener">LinkedIn</a><a class="nv-btn" style="text-align:center" href="${x}" target="_blank" rel="noopener">X</a><button class="nv-btn" type="button" data-nv-act="msg">Copy message</button></div>
+     <div class="nv-dsrc" style="margin-top:14px">Each button opens that app with this message ready. Nothing is posted for you.</div>`);
+}
+function nvEventPanel(btn) {
+  const id = btn.dataset.nvEv, date = btn.dataset.nvDate;
+  if(id) { const i = ALL.find(x=>x.id===id); if(!i) return;
+    const dep = i.department, link = nvSafeUrl(i.postLink);
+    nvPanel(i.title, `<span class="badge" style="background:var(--bg);color:var(--text-2)">${nvEsc(i.type==='SM Content'?(i.contentType||'Post'):i.type)}</span>${i.status?' '+statusBadge(i.status):''}`,
+      `<div class="nv-drow"><span>Date</span><b>${nvEsc(nvWd(date)+' '+date)}</b></div>${dep?`<div class="nv-drow"><span>Department</span><b>${nvEsc(dep)}</b></div>`:''}${(i.channels||[]).length?`<div class="nv-drow"><span>Channels</span><b style="font-size:12px">${nvEsc(i.channels.join(', '))}</b></div>`:''}
+       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><a class="nv-btn" href="${nvGcal(i.title,date)}" target="_blank" rel="noopener">Add to my calendar</a>${dep?`<button class="nv-btn" type="button" data-nv-dept="${nvEsc(dep)}">Open ${nvEsc(dep)}</button>`:''}${link&&i.status==='Published'?`<button class="nv-btn pri" type="button" data-nv-share="${nvEsc(i.id)}">Share</button>`:''}</div>
+       <div class="nv-dsrc" style="margin-top:14px">${nvIsPost(i)?'The caption and design brief stay in the admin panel until the post is published. This page only shows the title, date, channels and department.':'Details come from the Activities list.'}</div>`); return; }
+  const h = HEALTH_DAYS.find(x => (x.id||x.name)===btn.dataset.nvHd && x.date===date) || HEALTH_DAYS.find(x=>x.date===date);
+  if(h) nvPanel(h.name||h.title||'Health day', '<span class="badge b-moh">Health day</span>', `<div class="nv-drow"><span>Date</span><b>${nvEsc(nvWd(date)+' '+date)}</b></div>${h.nameAr?`<div class="nv-drow"><span>Arabic</span><b dir="rtl">${nvEsc(h.nameAr)}</b></div>`:''}<div style="margin-top:14px"><a class="nv-btn" href="${nvGcal(h.name||'Health day',date)}" target="_blank" rel="noopener">Add to my calendar</a></div><div class="nv-dsrc" style="margin-top:14px">Awareness days come from the Health Days calendar and anchor the content plan around them.</div>`);
+}
+
+// ── department / entity selection with a direct link (#dept-cardiology, #entity-imc) ──
+function nvSetCur(name, scroll) {
+  NV.cur = name; NV.all = false;
+  const want = name ? (NV.by==='department'?'dept-':'entity-') + nvSlug(name) : '';
+  if(location.hash.replace('#','') !== want) { try { history.replaceState(null,'', want ? '#'+want : location.pathname+location.search); } catch(e) { /* a viewer that blocks it just won't show the link in the address bar */ } }
+  renderNewDashboard();
+  if(scroll && name) document.getElementById('nv-sec-dept')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function nvReadHash() {
+  const h = location.hash.replace('#',''); let m = /^dept-([a-z0-9-]+)$/.exec(h);
+  if(m) return { by:'department', slug:m[1] };
+  m = /^entity-([a-z0-9-]+)$/.exec(h);
+  return m ? { by:'entity', slug:m[1] } : null;
+}
+function nvResolvePending() {
+  if(!NV.pending) return;
+  const names = NV.pending.by==='entity' ? ALL_ENTITIES.map(e=>e.name) : [...DEPARTMENTS, ...ALL.map(i=>i.department).filter(Boolean)];
+  const hit = names.find(n => nvSlug(n)===NV.pending.slug);
+  if(hit) { NV.by = NV.pending.by; NV.cur = hit; NV.pending = null; setTimeout(()=>document.getElementById('nv-sec-dept')?.scrollIntoView(), 80); }
+  else if((NV.pending.by==='department' && ALL.length) || (NV.pending.by==='entity' && ALL_ENTITIES.length)) NV.pending = null; // data is in and the name is unknown: ignore it
+}
+NV.pending = nvReadHash();
+window.addEventListener('hashchange', () => { const h = nvReadHash(); if(h) { NV.pending = h; renderNewDashboard(); } });
+if(dashView === 'new') renderNewDashboard(); // first paint (empty states) before the data arrives
+
+document.addEventListener('click', e => {
+  const T = e.target; let t;
+  if((t = T.closest('[data-nv-act]'))) {
+    const a = t.dataset.nvAct;
+    if(a==='classic') setDashView('classic');
+    else if(a==='newview') setDashView('new');
+    else if(a==='prev') { const ps = getAvailablePeriods(); dashPeriodIdx = Math.min(ps.length-1, dashPeriodIdx+1); renderNewDashboard(); }
+    else if(a==='next') { dashPeriodIdx = Math.max(0, dashPeriodIdx-1); renderNewDashboard(); }
+    else if(a==='clear') nvSetCur(null);
+    else if(a==='more') { NV.all = !NV.all; renderNewDashboard(); }
+    else if(a==='msg') { const ta = document.getElementById('nv-msg'); if(ta) nvCopy(ta.value, 'Message copied'); }
+    else if(a==='link') nvCopy(location.href.split('#')[0] + '#' + (NV.by==='department'?'dept-':'entity-') + nvSlug(NV.cur), 'Direct link copied');
+    else if(a==='present') { const on = document.body.classList.toggle('present'); t.textContent = on ? 'Exit' : 'Present'; try { if(on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{}); else if(!on && document.fullscreenElement) document.exitFullscreen().catch(()=>{}); } catch(err) {} }
+    return;
+  }
+  if((t = T.closest('[data-nv-by]'))) { NV.by = t.dataset.nvBy; nvSetCur(null); return; }
+  if((t = T.closest('[data-nv-dept]'))) { closeDetail(); NV.by = 'department'; nvSetCur(t.dataset.nvDept, true); return; }
+  if((t = T.closest('[data-nv-tile]'))) { const n = t.dataset.nvTile; nvSetCur(NV.cur===n ? null : n, false); return; }
+  if((t = T.closest('[data-nv-cell]'))) { nvKpiPanel(t.dataset.nvCell); return; }
+  if((t = T.closest('[data-nv-out]'))) { nvOutPanel(t.dataset.nvOut); return; }
+  if((t = T.closest('[data-nv-filt]'))) { NV.filt = t.dataset.nvFilt; renderNewDashboard(); return; }
+  if((t = T.closest('.nv-ev'))) { nvEventPanel(t); return; }
+  if((t = T.closest('[data-nv-share]'))) { nvSharePanel(t.dataset.nvShare); return; }
+  if((t = T.closest('[data-nv-copy]'))) { const [kind,id] = t.dataset.nvCopy.split(':'), i = ALL.find(x=>x.id===id); if(i) { if(kind==='link') nvCopy(nvSafeUrl(i.postLink),'Link copied'); else nvCopy([i.captionAR,i.captionEN].filter(Boolean).join('\n\n'),'Caption copied'); } return; }
+  if((t = T.closest('[data-nv-feat]'))) { const i = ALL.find(x=>x.id===t.dataset.nvFeat); if(i) openDetail(i); return; }
+});
+document.addEventListener('change', e => { if(e.target && e.target.id==='nv-pick' && e.target.value) nvSetCur(e.target.value, true); });
+document.addEventListener('keydown', e => { if((e.key==='Enter'||e.key===' ') && e.target.matches && e.target.matches('.nv-drow.go')) { e.preventDefault(); e.target.click(); } });
 
 // Only KPIs — called by period navigation, no chart re-render
 const DASHBOARD_KPI_CARDS = [
