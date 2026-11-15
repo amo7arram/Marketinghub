@@ -163,6 +163,85 @@ export function matchDepartment(raw) {
   return partial || null;
 }
 
+// ══ Department from keywords ═══════════════════════════════════════════════
+// Most Meta lead forms carry no clear "department" column, so the department is
+// guessed from EVERYTHING the row says: the ad / offer / campaign / form names
+// (strong evidence), the lead's own comment, and the form answers. Plain
+// keyword rules — free, instant, the same every time — run before the AI, which
+// is then only asked about what these rules could not place.
+// Keywords are Arabic or English, matched on whole words (Arabic prefixes like
+// ال / ب / ل / و are allowed in front; a trailing * lets the word continue, so
+// "اسنان*" also finds "اسنانك"). A longer phrase beats a shorter word inside it
+// ("تاخر الحمل" is Fertility, not Women's Health "حمل"). Edit the table to tune.
+export function normText(s) {
+  return String(s ?? '').toLowerCase()
+    .replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c))
+    .replace(/[ً-ٰٟـ]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+const DEPT_KEYWORDS = [
+  ['Dental', ['اسنان*', 'سنان*', 'تبييض الاسنان', 'ابتسامه هوليود', 'فينير*', 'تقويم الاسنان', 'زراعه الاسنان', 'حشو العصب', 'dental', 'dentist*', 'teeth', 'tooth', 'orthodont*', 'invisalign', 'veneer*', 'teeth whitening']],
+  ['Dermatology & Plastics', ['جلديه', 'جلد', 'بشره', 'ليزر', 'بوتوكس', 'بوتكس', 'فيلر', 'حب الشباب', 'تصبغات', 'ندبات', 'ازاله الشعر', 'زراعه الشعر', 'تساقط الشعر', 'شفط الدهون', 'نحت الجسم', 'تجميل', 'تجميليه', 'نضاره', 'هيدرافيشل', 'derma*', 'skin*', 'laser', 'botox', 'filler*', 'acne', 'hair removal', 'hair transplant', 'hair loss', 'plastic*', 'cosmetic*', 'rhinoplasty', 'liposuction', 'hydrafacial', 'prp', 'pigmentation']],
+  ['Orthopedics', ['عظام', 'مفاصل', 'مفصل', 'ركبه', 'الركبه', 'غضروف', 'كسور', 'اربطه', 'ديسك', 'الم الظهر', 'الم الكتف', 'عمود فقري', 'استبدال المفصل', 'منظار المفصل', 'ortho*', 'knee*', 'shoulder', 'spine', 'spinal', 'joint*', 'fracture*', 'arthroscop*', 'back pain', 'bone*']],
+  ['Cardiology', ['قلب*', 'القلب', 'قسطره', 'شرايين', 'ضغط الدم', 'جلطه القلب', 'دقات القلب', 'سكته قلبيه', 'cardio*', 'cardiac', 'heart*', 'angio*', 'ecg', 'echo', 'blood pressure', 'hypertension', 'cholesterol']],
+  ['Diabetes & Chronic', ['سكري', 'داء السكر', 'مرض السكر', 'سكر الدم', 'سكر دم', 'غده درقيه', 'الغده الدرقيه', 'غدد صماء', 'انسولين', 'diabet*', 'endocrin*', 'insulin', 'thyroid', 'hba1c', 'chronic', 'امراض مزمنه', 'مزمنه']],
+  ["Women's Health", ['نساء', 'ولاده', 'الولاده', 'حمل', 'حامل', 'نسائيه', 'رحم', 'الدوره الشهريه', 'ماموجرام', 'الثدي', 'سن الياس', 'متابعه الحمل', 'ولاده طبيعيه', 'ولاده قيصريه', 'مسحه عنق الرحم', 'obgyn', 'ob gyn', 'gyne*', 'pregnan*', 'maternity', 'antenatal', 'prenatal', 'women*', 'mammogram', 'cesarean', 'c section', 'menopause', 'pap smear']],
+  ['Fertility & IVF', ['حقن مجهري', 'عقم', 'تاخر الحمل', 'تاخر الانجاب', 'اطفال انابيب', 'اطفال الانابيب', 'تلقيح صناعي', 'تلقيح', 'خصوبه', 'اخصاب', 'ivf', 'icsi', 'iui', 'fertility', 'infertility']],
+  ["Children's Health", ['اطفال', 'طفل', 'طفلي', 'رضيع', 'رضع', 'حديثي الولاده', 'تطعيم الاطفال', 'تطعيمات', 'نمو الطفل', 'pediatric*', 'paediatric*', 'child*', 'baby', 'babies', 'infant*', 'newborn*', 'vaccin*', 'kids']],
+  ['Oncology', ['سرطان*', 'اورام', 'ورم', 'كيماوي', 'علاج اشعاعي', 'oncolog*', 'cancer*', 'tumor*', 'tumour*', 'chemotherapy', 'screening for cancer']],
+  ['General Surgery', ['جراحه عامه', 'جراحه السمنه', 'عمليات السمنه', 'تكميم المعده', 'تكميم', 'بالون المعده', 'تحويل مسار', 'فتق', 'مراره', 'الزايده الدوديه', 'بواسير', 'bariatric*', 'sleeve gastrectomy', 'gastric sleeve', 'gastric balloon', 'hernia', 'gallbladder', 'appendix', 'appendectomy', 'hemorrhoid*', 'general surgery', 'weight loss surgery']],
+  ['Internal Medicine', ['باطنه', 'باطنيه', 'الباطنيه', 'فحص شامل', 'فحوصات شامله', 'كشف شامل', 'فحص دوري', 'internal medicine', 'check up', 'checkup', 'health check*', 'full body check*', 'executive check*']],
+  ['ENT (Otolaryngology)', ['انف', 'اذن', 'حنجره', 'لوزتين', 'اللوزتين', 'الجيوب الانفيه', 'جيوب انفيه', 'سمع', 'ضعف السمع', 'لحميه', 'التهاب الاذن', 'ent', 'otolaryng*', 'tonsil*', 'sinus*', 'hearing', 'adenoid*', 'ear nose throat', 'throat']],
+  ['Ophthalmology', ['عيون', 'عين', 'عيني', 'نظر', 'ضعف النظر', 'ليزك', 'تصحيح النظر', 'ازاله النظارات', 'قرنيه', 'مياه بيضاء', 'مياه زرقاء', 'شبكيه', 'حول العين', 'ophthalm*', 'eye*', 'lasik', 'cataract*', 'retina*', 'glaucoma', 'vision', 'cornea*', 'optical']],
+  ['Urology', ['مسالك بوليه', 'مسالك', 'بروستات', 'حصوات الكلى', 'حصوه الكلى', 'ذكوره', 'ضعف الانتصاب', 'سلس البول', 'ختان', 'عقم الرجال', 'تاخر الانجاب عند الرجال', 'urolog*', 'prostate', 'kidney stone*', 'erectile', 'circumcision', 'vasectomy', "men's health", 'male infertility']],
+  ['Neurology', ['اعصاب', 'الاعصاب', 'صداع', 'شقيقه', 'صرع', 'جلطه دماغيه', 'سكته دماغيه', 'دوخه', 'تنميل', 'باركنسون', 'الزهايمر', 'neuro*', 'migraine*', 'epilep*', 'stroke', 'headache*', 'dizziness', 'parkinson*', 'alzheimer*']],
+  ['Nephrology', ['غسيل كلوي', 'فشل كلوي', 'الكلى', 'كلى', 'كلوي*', 'nephro*', 'dialysis', 'kidney*', 'renal']],
+  ['Gastroenterology', ['جهاز هضمي', 'الجهاز الهضمي', 'منظار المعده', 'منظار القولون', 'منظار', 'قولون', 'معده', 'كبد', 'قرحه', 'ارتجاع', 'ارتجاع المريء', 'فيروس سي', 'دهون الكبد', 'gastro*', 'endoscop*', 'colonoscop*', 'liver', 'ibs', 'gerd', 'reflux', 'stomach', 'digestive']],
+  ['Pulmonology', ['صدريه', 'امراض الصدر', 'ربو', 'رئه', 'الرئه', 'تنفس', 'ضيق التنفس', 'انقطاع النفس', 'شخير', 'الشخير', 'طب النوم', 'عياده النوم', 'سعال', 'pulmon*', 'asthma', 'copd', 'sleep apnea', 'sleep clinic', 'sleep', 'snoring', 'respiratory', 'lung*']],
+  ['Physiotherapy & Rehabilitation', ['علاج طبيعي', 'العلاج الطبيعي', 'تاهيل', 'اعاده تاهيل', 'تمارين علاجيه', 'physio*', 'rehab*', 'physical therapy']],
+  ['Psychiatry & Mental Health', ['نفسي', 'نفسيه', 'استشارات نفسيه', 'اكتئاب', 'قلق', 'توتر', 'ادمان', 'اضطراب*', 'psych*', 'mental*', 'depress*', 'anxiety', 'counsel*', 'adhd', 'therapy session*']],
+  ['Nutrition & Dietetics', ['تغذيه', 'اخصائي تغذيه', 'حميه', 'رجيم', 'نظام غذائي', 'زياده الوزن', 'انقاص الوزن', 'خساره الوزن', 'خسارة الوزن','نحافه', 'nutrition*', 'dietit*', 'diet', 'weight management', 'weight loss']],
+  ['Family Medicine', ['طب الاسره', 'طبيب الاسره', 'عياده الاسره', 'فحص ما قبل الزواج', 'ما قبل الزواج', 'انفلونزا', 'family medicine', 'family doctor', 'general practitioner', 'premarital', 'flu']],
+  ['Home Healthcare', ['رعايه منزليه', 'زياره منزليه', 'تمريض منزلي', 'العنايه المنزليه', 'نقاهه', 'home care', 'home visit*', 'home health*', 'home nursing']],
+  ['Radiology & Imaging', ['اشعه', 'اشعه مقطعيه', 'رنين مغناطيسي', 'تصوير بالرنين', 'تصوير مقطعي', 'سونار', 'تصوير الثدي', 'radiolog*', 'mri', 'ct scan', 'x ray', 'xray', 'ultrasound', 'imaging', 'sonar']],
+  ['Emergency Medicine (ER)', ['طوارئ', 'الطوارئ', 'emergency', 'urgent care']],
+];
+const KW_PREFIX = '(?:وال|بال|فال|كال|لل|ال|و|ب|ل|ف|ك)?';
+const KW_RULES = (() => {
+  const rules = [];
+  DEPT_KEYWORDS.forEach(([dept, kws]) => {
+    if(!DEPARTMENTS.includes(dept)) return; // a department that was renamed must not silently stay in the table
+    kws.forEach(k => {
+      const star = k.endsWith('*'), words = normText(k.replace(/\*$/, '')).split(' ').filter(Boolean);
+      if(!words.length) return;
+      const body = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(' ');
+      rules.push({ dept, re: new RegExp('(^| )' + KW_PREFIX + body + (star ? '[^ ]*' : '') + '(?= |$)', 'g'), weight: words.length > 1 ? 2 : 1, len: body.length });
+    });
+  });
+  return rules.sort((a, b) => b.len - a.len); // longest phrase first, so it uses up its words before a shorter keyword can
+})();
+
+// parts = [{ text, weight }]. → { dept, score } when ONE department is clearly ahead, else null
+// (the caller then falls back to the AI, then to the default department).
+export function guessDepartment(parts) {
+  const score = {};
+  (parts || []).forEach(p => {
+    let t = normText(p && p.text);
+    if(!t) return;
+    const w = (p && p.weight) || 1;
+    KW_RULES.forEach(r => {
+      let hit = false;
+      t = t.replace(r.re, m => { hit = true; return ' '.repeat(m.length); }); // used words can't be matched again
+      if(hit) score[r.dept] = (score[r.dept] || 0) + r.weight * w; // each keyword counts once per part, however often it repeats
+    });
+  });
+  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  if(!ranked.length || ranked[0][1] < 2) return null;
+  if(ranked[1] && ranked[1][1] === ranked[0][1]) return null; // a tie is not a decision
+  return { dept: ranked[0][0], score: ranked[0][1] };
+}
+
 export function mapLeadStatus(raw) {
   const r = String(raw).toLowerCase().trim();
   if(r.includes('book'))                          return { contactStatus:'Reached',   outcome:'Booked' };
@@ -220,34 +299,95 @@ export function sniffColumnByContent(headers, rows, exclude, test) {
   return best;
 }
 
+// The offer / ad the lead came from. A column NAMED for the offer wins; failing
+// that, Meta's own ad_name. Claimed before the name column because "offer name"
+// contains the word "name" and would otherwise be read as the patient's name.
+const AD_NAME_KEYWORDS = ['offer name', 'offer_name', 'offername', 'اسم العرض', 'offer', 'العرض'];
+// The lead's own free-text message. Header words first; failing that, the one
+// remaining column whose values are long and different from row to row (a
+// multiple-choice answer repeats, an address is excluded by name).
+const COMMENT_KEYWORDS = ['comment', 'تعليق', 'message', 'رسالة', 'رسالتك', 'inquiry', 'enquiry', 'استفسار', 'how can we help', 'كيف يمكننا', 'anything else', 'remark', 'ملاحظ', 'note'];
+const NOT_COMMENT_HEADER = /address|عنوان|city|مدين|street|district|حي |location|موقع|insurance|تأمين|تامين/i;
+export function sniffFreeTextColumn(headers, rows, exclude) {
+  let best = null, bestScore = 0;
+  for(const h of headers) {
+    if(exclude.has(h) || /_id$/i.test(h.trim()) || NOT_COMMENT_HEADER.test(h)) continue;
+    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
+    if(vals.length < 3) continue;
+    const avg = vals.reduce((a, v) => a + v.length, 0) / vals.length;
+    const distinct = new Set(vals.map(v => v.toLowerCase())).size / vals.length;
+    if(avg >= 20 && distinct >= 0.6 && avg * distinct > bestScore) { best = h; bestScore = avg * distinct; }
+  }
+  return best;
+}
+
 export function detectLeadColumns(headers, rows) {
   const used = new Set();
   const claim = col => { if (col) used.add(col); return col; };
   const sniffExclude = () => new Set([...used, ...headers.filter(h => META_SYSTEM_COLUMNS.has(h))]);
 
-  const nameCol      = claim(findColByKeywords(headers, ['name','اسم'], META_SYSTEM_COLUMNS));
-  const phoneCol      = claim(findColByKeywords(headers, ['phone','mobile','number','هاتف','جوال','موبايل'], META_SYSTEM_COLUMNS)
+  const adNameCol     = claim(findColByKeywords(headers, AD_NAME_KEYWORDS, META_SYSTEM_COLUMNS) || headers.find(h => h.trim().toLowerCase() === 'ad_name') || null);
+  const sys = new Set([...META_SYSTEM_COLUMNS, ...(adNameCol ? [adNameCol] : [])]); // never offered as name/phone/email/… even if it happens to contain the word
+  const nameCol      = claim(findColByKeywords(headers, ['name','اسم'], sys));
+  const phoneCol      = claim(findColByKeywords(headers, ['phone','mobile','number','هاتف','جوال','موبايل'], sys)
                           || sniffColumnByContent(headers, rows, sniffExclude(), v => { const d = v.replace(/\D/g,''); return d.length >= 7 && d.length <= 15; }));
-  const emailCol      = claim(findColByKeywords(headers, ['email','ايميل','إيميل','بريد'], META_SYSTEM_COLUMNS)
+  const emailCol      = claim(findColByKeywords(headers, ['email','ايميل','إيميل','بريد'], sys)
                           || sniffColumnByContent(headers, rows, sniffExclude(), v => v.includes('@')));
-  const platformCol   = claim(findColByKeywords(headers, ['platform'], META_SYSTEM_COLUMNS));
-  const sourceCol      = platformCol || claim(findColByKeywords(headers, ['source'], META_SYSTEM_COLUMNS));
-  const dateCol        = claim(findColByKeywords(headers, ['date'], META_SYSTEM_COLUMNS) || (headers.includes('created_time') ? 'created_time' : null));
-  const statusCol      = claim(findColByKeywords(headers, ['status'], META_SYSTEM_COLUMNS));
-  const deptCol        = claim(findColByKeywords(headers, ['department','dept'], META_SYSTEM_COLUMNS));
-  const entityCol      = claim(findColByKeywords(headers, ['entity','branch'], META_SYSTEM_COLUMNS));
-  const notesCol       = claim(findColByKeywords(headers, ['note','comment','notes'], META_SYSTEM_COLUMNS));
+  const platformCol   = claim(findColByKeywords(headers, ['platform'], sys));
+  const sourceCol      = platformCol || claim(findColByKeywords(headers, ['source'], sys));
+  const dateCol        = claim(findColByKeywords(headers, ['date'], sys) || (headers.includes('created_time') ? 'created_time' : null));
+  const statusCol      = claim(findColByKeywords(headers, ['status'], sys));
+  const deptCol        = claim(findColByKeywords(headers, ['department','dept','specialty','speciality','clinic','تخصص','قسم','عيادة'], sys));
+  const entityCol      = claim(findColByKeywords(headers, ['entity','branch'], sys));
   // Deliberately no META_SYSTEM_COLUMNS exclusion here — campaign_name is
   // the one Meta bookkeeping field worth surfacing as a real value (the
   // ad campaign's human-readable name), unlike ad_name/adset_name/form_name.
-  const campaignCol    = claim(findColByKeywords(headers, ['campaign']));
+  const campaignCol    = claim(findColByKeywords(headers, ['campaign'], new Set(adNameCol ? [adNameCol] : [])));
+  const commentCol     = claim(findColByKeywords(headers, COMMENT_KEYWORDS, sys) || sniffFreeTextColumn(headers, rows, sniffExclude()));
 
   // Anything left — e.g. a lead form's custom questions — isn't a column we
   // recognize but isn't Meta bookkeeping either. Carried into notes below
   // rather than silently dropped.
   const leftoverCols = headers.filter(h => !used.has(h) && !META_SYSTEM_COLUMNS.has(h));
 
-  return { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource: !!platformCol, dateCol, statusCol, deptCol, entityCol, notesCol, campaignCol, leftoverCols };
+  return { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource: !!platformCol, dateCol, statusCol, deptCol, entityCol, adNameCol, commentCol, campaignCol, leftoverCols };
+}
+
+// Everything the department guess may read from one row: ad/offer/campaign/form
+// names count most, the lead's comment next, then the form answers (and, when an
+// answer is not "no", the question it answers — a knee-pain form says so in its
+// questions). The lead's name, phone, email, date and status are never read.
+const NEGATIVE_ANSWER = /^(no|none|n\/a|na|-|—|لا|لا يوجد|لايوجد|لا اعاني|لا أعاني)$/i;
+export function leadDeptEvidence(row, c, headers) {
+  const skip = new Set([c.nameCol, c.phoneCol, c.emailCol, c.dateCol, c.statusCol, c.sourceCol, c.entityCol, c.deptCol].filter(Boolean));
+  const strongSys = new Set(['ad_name', 'adset_name', 'campaign_name', 'form_name']);
+  const clean = s => String(s ?? '').replace(/_/g, ' ').trim();
+  const parts = [];
+  headers.forEach(h => {
+    const lh = h.trim().toLowerCase();
+    if(skip.has(h) || /_id$/.test(lh) || ['id', 'created_time', 'is_organic', 'lead_status', 'platform'].includes(lh)) return;
+    const v = clean(row[h]);
+    if(!v) return;
+    if(strongSys.has(lh) || h === c.adNameCol || h === c.campaignCol) parts.push({ text: v, weight: 3 });
+    else if(h === c.commentCol) parts.push({ text: v, weight: 2 });
+    else { parts.push({ text: v, weight: 1 }); if(!NEGATIVE_ANSWER.test(v)) parts.push({ text: clean(h), weight: 1 }); }
+  });
+  return parts;
+}
+
+// The values common to all three import paths (automatic sync, Excel, Google Sheet)
+// so they can never drift apart. `notes` is now only the leftover form answers;
+// the lead's own comment and the offer name have fields of their own.
+export function leadRowFields(row, c, headers) {
+  const dept = c.deptCol ? String(row[c.deptCol] ?? '').trim() : '';
+  const fromCol = matchDepartment(dept) || (dept ? (guessDepartment([{ text: dept, weight: 3 }]) || {}).dept || null : null);
+  return {
+    adName: c.adNameCol ? String(row[c.adNameCol] ?? '').replace(/_/g, ' ').trim() : '',
+    comment: c.commentCol ? String(row[c.commentCol] ?? '').trim() : '',
+    notes: buildLeadNotesWithLeftover(row, c.leftoverCols, ''),
+    department: fromCol,                                   // a real department column (or a clear answer in it)
+    deptGuess: fromCol ? null : ((guessDepartment(leadDeptEvidence(row, c, headers)) || {}).dept || null), // from keywords anywhere in the row
+  };
 }
 
 // ig/fb are Meta's own shorthand for where the lead form was shown — only
@@ -292,8 +432,10 @@ export function buildCandidates(csvText) {
   const idCol = headers.find(h => h.toLowerCase() === 'id') || null;
   const timeCol = headers.find(h => h.toLowerCase() === 'created_time') || c.dateCol || null;
   const hintCols = headers.filter(h => ['form_name', 'ad_name', 'adset_name', 'campaign_name'].includes(h.toLowerCase()));
+  if(c.adNameCol && !hintCols.includes(c.adNameCol)) hintCols.push(c.adNameCol); // an "offer name" column is as good a hint as Meta's ad_name
   const candidates = rows.map(r => {
     const rowTimeMs = timeCol ? parseRowTimeMs(r[timeCol]) : null;
+    const f = leadRowFields(r, c, headers);
     return {
       rowId: idCol ? (r[idCol] || '') : '',
       rowTimeMs,
@@ -303,8 +445,8 @@ export function buildCandidates(csvText) {
       source: c.sourceCol ? normalizeLeadSource(r[c.sourceCol], c.isPlatformSource) : '',
       entity: c.entityCol ? (r[c.entityCol] || '') : '',
       sheetDate: c.dateCol ? parseExcelDate(r[c.dateCol]) : '',
-      notes: buildLeadNotesWithLeftover(r, c.leftoverCols, c.notesCol ? (r[c.notesCol] || '') : ''),
-      department: matchDepartment(c.deptCol ? r[c.deptCol] : ''),
+      notes: f.notes, comment: f.comment, adName: f.adName,
+      department: f.department, deptGuess: f.deptGuess,
       campaignName: c.campaignCol ? (r[c.campaignCol] || '') : '',
       hint: hintCols.map(h => r[h] ? `${h.replace(/_/g, ' ')}: ${r[h]}` : '').filter(Boolean).join(' | '),
     };
@@ -414,6 +556,8 @@ export function buildLeadDoc(r, cfg, nowMs) {
     dateCreated: r.rowTimeMs != null ? riyadhDate(r.rowTimeMs) : (r.sheetDate || riyadhDate(nowMs)),
     contactStatus: 'Untouched', outcome: 'Pending',
     notes: r.notes || '',
+    comment: String(r.comment || '').slice(0, 2000),   // always present (even empty): a lead WITHOUT this field is from before it existed
+    adName: String(r.adName || '').slice(0, 200),
     department: r.department || cfg.defaultDepartment || '',
     campaign: r.campaignName || '',
     campaignId: r._campaignId || null,
@@ -438,7 +582,7 @@ export function buildLeadDoc(r, cfg, nowMs) {
 export async function runLeadSync(d) {
   const cfg = d.config || {};
   const now = d.now;
-  const result = { startedAt: now, sheetRows: 0, imported: 0, assignedNew: 0, assignedBacklog: 0, classified: 0, pendingDept: 0,
+  const result = { startedAt: now, sheetRows: 0, imported: 0, assignedNew: 0, assignedBacklog: 0, classified: 0, keywordDept: 0, pendingDept: 0,
                    skipped: {}, capped: false, agentsOnline: 0, error: '', warning: '', sheets: [] };
   const sheets = getSheets(cfg);
   const wmIn = { ...(d.watermarks || {}) };
@@ -467,7 +611,15 @@ export async function runLeadSync(d) {
     catch(e) { info.error = e.message || String(e); continue; }
     if(parsed.error) { info.error = parsed.error; continue; }
     info.rows = parsed.candidates.length; result.sheetRows += info.rows;
-    parsed.candidates.forEach(r => { if(!r.department && sheet.department) r.department = sheet.department; }); // a sheet dedicated to one department
+    // Which sheet column fed each field, so the admin can see (and correct the sheet) if a guess was wrong.
+    const cl = parsed.columns || {}, short = s => (s ? String(s).slice(0, 80) : '');
+    info.map = { adName: short(cl.adNameCol), comment: short(cl.commentCol), department: short(cl.deptCol), campaign: short(cl.campaignCol) };
+    // Department order: the sheet's own department column (already applied) → a sheet dedicated to one department
+    // → keywords found anywhere in the row → (below) the AI → the default.
+    parsed.candidates.forEach(r => {
+      if(!r.department && sheet.department) r.department = sheet.department;
+      else if(!r.department && r.deptGuess) { r.department = r.deptGuess; r.departmentSource = 'keyword'; }
+    });
     const cutoffMs = Math.max(sheet.startFromMs || 0, prevWm ? prevWm - SYNC_OVERLAP_MS : 0);
     const sel = selectEligible(parsed.candidates, known, { cutoffMs, campaignIdFor });
     Object.entries(sel.skipped).forEach(([k, n]) => { sumSkipped[k] = (sumSkipped[k] || 0) + n; });
@@ -487,7 +639,8 @@ export async function runLeadSync(d) {
   let eligible = pool.slice().sort((a, b) => (a.rowTimeMs ?? 0) - (b.rowTimeMs ?? 0));
   if(eligible.length > SYNC_MAX_PER_RUN) { eligible = eligible.slice(0, SYNC_MAX_PER_RUN); result.capped = true; }
 
-  // Department: a sheet column (or a dedicated sheet) always wins; otherwise the AI where this page can run it.
+  // Department: a sheet column (or a dedicated sheet) always wins, then keywords; otherwise the AI where this page can run it.
+  result.keywordDept = eligible.filter(r => r.departmentSource === 'keyword').length;
   const needDept = eligible.filter(r => !r.department);
   if(needDept.length && cfg.classifyWithAI) {
     if(d.classify) { await d.classify(needDept); }

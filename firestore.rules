@@ -61,7 +61,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'name','phone','email','source','entity','dateCreated','contactStatus','outcome','notes',
              'department','departmentSource','deptPending','sourceHint','campaign','campaignId',
-             'sourceRowId','autoImported','autoImportedAt','assignedAgentUid','assignedAgentName','createdAt']);
+             'sourceRowId','autoImported','autoImportedAt','assignedAgentUid','assignedAgentName','createdAt',
+             'adName','comment']);
     }
 
     // ── PUBLIC READ, ADMIN WRITE ─────────────────────────────────────────

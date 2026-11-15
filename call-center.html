@@ -154,12 +154,12 @@ tr:hover td{background:var(--bg)}
       </div>
 
       <div style="overflow-x:auto">
-        <table style="min-width:1000px">
+        <table style="min-width:1300px">
           <thead><tr>
-            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
+            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Entity</th><th>Source</th>
+            <th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Comment</th><th></th>
           </tr></thead>
-          <tbody id="table-body"><tr class="empty-row"><td colspan="13">Loading leads...</td></tr></tbody>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="15">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
@@ -206,6 +206,7 @@ tr:hover td{background:var(--bg)}
         <label class="field-label">Revenue Value (SAR) <span style="color:var(--text-3);font-weight:400">— if known, once booked</span></label>
         <input class="field-input" type="number" id="edit-revenue" placeholder="0.00" min="0" step="0.01">
       </div>
+      <div class="field-group" id="edit-comment-wrap" style="display:none"><label class="field-label">Lead's comment <span style="color:var(--text-3);font-weight:400">— what they wrote in the form</span></label><div id="edit-comment-view" dir="auto" style="font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;white-space:pre-wrap;max-height:120px;overflow:auto"></div></div>
       <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" id="edit-notes" placeholder="Call notes, follow-up needed, etc."></textarea></div>
       <div class="readonly-note">Department, Entity, and Campaign are set by the marketing team and can't be changed here.</div>
     </div>
@@ -464,17 +465,24 @@ function renderTable() {
         const oc = l.outcome || 'Pending';
         const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
         const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
-        // Department replaces the old Campaign column for now; a lead that belongs
-        // to a campaign keeps the ℹ️ agent-script link beside its department.
         const deptCell = `${esc(l.department)||'—'}` +
           (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong">🤖</span>' : '') +
-          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting to be classified">⏳</span>' : '') +
-          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="${esc(l.campaign || campaignTitleFor(l.campaignId) || 'Campaign')} — view agent script & post link">ℹ️</a>` : '');
+          (l.departmentSource === 'keyword' ? ' <span title="Found from keywords in the lead\'s answers or the offer name — may be wrong">🔎</span>' : '') +
+          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting to be classified">⏳</span>' : '');
+        // A lead that belongs to a campaign keeps the ℹ️ agent-script link beside the campaign name.
+        const campCell = (esc(l.campaign || campaignTitleFor(l.campaignId)) || '—') +
+          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script &amp; post link">ℹ️</a>` : '');
+        // Comment = what the lead wrote. Leads from before this field existed show their old notes (greyed) instead of going blank.
+        const legacyCmt = l.comment === undefined;
+        const cmtText = legacyCmt ? (l.notes || '') : (l.comment || '');
+        const cmtTip = [legacyCmt ? '' : (l.comment ? 'Comment: ' + l.comment : ''), l.notes ? (legacyCmt ? 'Notes: ' : 'Notes (other form answers): ') + l.notes : ''].filter(Boolean).join('\n\n');
         return `<tr>
           <td style="font-weight:600">${esc(l.name)||'—'}</td>
           <td>${esc(l.phone)||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${esc(l.email)||'—'}</td>
           <td style="color:var(--text-2);font-size:11px;font-weight:500">${deptCell}</td>
+          <td style="color:var(--text-2);font-size:11px;max-width:170px">${campCell}</td>
+          <td style="color:var(--text-2);font-size:11px;max-width:170px">${esc(l.adName)||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${esc(l.entity)||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${esc(l.source)||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${esc(l.assignedAgentName)||'— Unassigned —'}</td>
@@ -500,14 +508,14 @@ function renderTable() {
               </select>`
             : `<span style="color:var(--text-3);font-size:11px">—</span>`}
           </td>
-          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${esc(l.notes)}">${esc(l.notes)||'—'}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${legacyCmt?'var(--text-3)':'var(--text-2)'};${legacyCmt?'font-style:italic;':''}font-size:11px" title="${esc(cmtTip)}" dir="auto">${esc(cmtText)||'—'}</td>
           <td>
             ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call">📞</a>`:''}
             <button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button>
           </td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="13">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="15">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
 
   renderPagination(data.length, totalPages, startIdx, pageData.length);
 }
@@ -556,6 +564,8 @@ window.openEditModal = function(id) {
   document.getElementById('edit-phone').value = l.phone||'';
   document.getElementById('edit-revenue').value = l.revenueValue ?? '';
   document.getElementById('edit-notes').value = l.notes||'';
+  document.getElementById('edit-comment-wrap').style.display = l.comment ? '' : 'none';
+  document.getElementById('edit-comment-view').textContent = l.comment || '';
   document.getElementById('edit-overlay').classList.add('open');
 }
 window.closeEditModal = function() { document.getElementById('edit-overlay').classList.remove('open'); }

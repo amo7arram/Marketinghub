@@ -534,7 +534,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
       <!-- Toolbar -->
       <div class="toolbar">
         <div class="filters">
-          <input class="filter-input" type="text" id="lead-search" placeholder="Search name or phone..." oninput="resetLeadsPageAndRender()" style="width:180px">
+          <input class="filter-input" type="text" id="lead-search" placeholder="Search name, phone, campaign or ad..." oninput="resetLeadsPageAndRender()" style="width:240px">
           <select class="filter-select" id="lead-filter-contact" onchange="resetLeadsPageAndRender()">
             <option value="">All Contact Status</option>
           </select>
@@ -579,13 +579,13 @@ tr.row-overdue:hover td{background:#FFD6D6}
       </div>
       <!-- Table -->
       <div style="overflow-x:auto">
-        <table style="min-width:1080px">
+        <table style="min-width:1380px">
           <thead><tr>
             <th style="width:32px"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
-            <th>Name</th><th>Phone</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
+            <th>Name</th><th>Phone</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Entity</th><th>Source</th>
+            <th>Agent</th><th>Date Created</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Comment</th><th></th>
           </tr></thead>
-          <tbody id="leads-table-body"><tr><td colspan="13" class="empty">Loading leads...</td></tr></tbody>
+          <tbody id="leads-table-body"><tr><td colspan="15" class="empty">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div id="leads-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)"></div>
@@ -2030,7 +2030,11 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <div class="field-group"><label class="field-label">Date Created</label><input class="field-input" type="date" id="lead-date"></div>
         <div class="field-group" id="lead-revenue-wrap"><label class="field-label">Revenue Value (SAR) <span style="color:var(--text-3);font-weight:400;font-size:11px">— if known, once booked</span></label><input class="field-input" type="number" id="lead-revenue" placeholder="0.00" min="0" step="0.01"></div>
       </div>
-      <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" style="min-height:60px" id="lead-notes" placeholder="Follow-up notes, preferences, etc."></textarea></div>
+      <div class="field-row">
+        <div class="field-group"><label class="field-label">Ad name <span style="color:var(--text-3);font-weight:400;font-size:11px">— the offer / ad the lead came from</span></label><input class="field-input" id="lead-adname" maxlength="200"></div>
+      </div>
+      <div class="field-group"><label class="field-label">Comment <span style="color:var(--text-3);font-weight:400;font-size:11px">— what the lead wrote in the form</span></label><textarea class="field-textarea" style="min-height:50px" id="lead-comment" maxlength="2000" dir="auto"></textarea></div>
+      <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" style="min-height:60px" id="lead-notes" placeholder="Follow-up notes, other form answers, etc."></textarea></div>
       <div id="lead-history-section" style="display:none">
         <div class="field-section-title">Contact History <span style="color:var(--text-3);font-weight:400;font-size:11px;text-transform:none;letter-spacing:0">— other interactions from this phone number</span></div>
         <div id="lead-history-list"></div>
@@ -2226,7 +2230,7 @@ import {
 } from './firebase-data.js';
 import {
   parseCSVText, parseExcelDate, matchDepartment, mapLeadStatus,
-  detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover,
+  detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover, leadRowFields,
   createLeadAutomationRunner, eligibleAgents, PRESENCE_FRESH_MS,
   getSheets, sheetKey, SYNC_MAX_SHEETS, parseCSVRecords
 } from './lead-sync.js';
@@ -8161,7 +8165,7 @@ async function sweepPendingDepartments() {
   const pending = ALL_LEADS.filter(l => l.deptPending === true).slice(0, 200);
   if(!pending.length) return;
   laLastSweepAt = Date.now();
-  const rows = pending.map(l => ({ id: l.id, name: l.name, phone: l.phone, email: l.email, notes: l.notes, hint: l.sourceHint || '', department: null }));
+  const rows = pending.map(l => ({ id: l.id, name: l.name, phone: l.phone, email: l.email, notes: l.notes, comment: l.comment || '', hint: l.sourceHint || '', department: null }));
   try {
     await autoSyncClassify(rows);
     for(const r of rows) {
@@ -8445,12 +8449,15 @@ function renderLeadAutomationStatus() {
       lines.push(`Last check: <strong>${laAgo(st.lastRunAt)}</strong>${r && r.runBy ? ` · by ${esc(r.runBy)} (${esc(r.runPage || '')} page)` : ''}`);
       if(r && r.error) lines.push(`<span style="color:var(--red)">⚠ ${esc(r.error)}</span>`);
       else if(r) lines.push(`Result: <strong>${r.imported || 0}</strong> imported · <strong>${assigned}</strong> assigned${r.assignedBacklog ? ` (${r.assignedBacklog} were waiting)` : ''}` +
-        (r.classified ? ` · ${r.classified} classified by AI` : '') + (r.pendingDept ? ` · ${r.pendingDept} awaiting AI` : '') +
+        (r.keywordDept ? ` · ${r.keywordDept} department${r.keywordDept === 1 ? '' : 's'} found by keyword` : '') + (r.classified ? ` · ${r.classified} classified by AI` : '') + (r.pendingDept ? ` · ${r.pendingDept} awaiting AI` : '') +
         ` · ${sumSkipped} already known/older skipped` + (r.capped ? ' · <span style="color:var(--orange)">hit the 300-per-check limit — the rest follow next check</span>' : ''));
       if(r && !r.error && r.warning) lines.push(`<span style="color:var(--orange)">⚠ A sheet couldn't be read (the others synced): ${esc(r.warning)}</span>`);
       // one line per sheet when there is more than one, so you can see which is delivering
       if(r && Array.isArray(r.sheets) && r.sheets.length > 1) lines.push(r.sheets.map(s =>
         `<span style="font-size:11px;color:${s.error ? 'var(--red)' : 'var(--text-2)'}">• ${esc(s.label)}: ${s.error ? '⚠ ' + esc(s.error) : `${s.rows || 0} rows, <strong>${s.imported || 0}</strong> imported`}</span>`).join('<br>'));
+      // which sheet column fed Ad name / Comment / Department / Campaign on the last check (so a wrong guess can be fixed in the sheet)
+      if(r && Array.isArray(r.sheets)) r.sheets.filter(s => s.map && !s.error).forEach(s => lines.push(
+        `<span style="font-size:11px;color:var(--text-3)">Columns${r.sheets.length > 1 ? ` in ${esc(s.label)}` : ''}: Ad name ← <strong>${esc(s.map.adName) || 'none found'}</strong> · Comment ← <strong>${esc(s.map.comment) || 'none found'}</strong> · Department ← <strong>${esc(s.map.department) || 'keywords in the row'}</strong> · Campaign ← <strong>${esc(s.map.campaign) || 'none found'}</strong></span>`));
     } else if(cfg && cfg.enabled) lines.push('Waiting for the first check…');
     lines.push(`Agents online now: <strong>${online.length}</strong>${online.length ? ' — ' + online.map(a => esc(a.name)).join(', ') : ' <span style="color:var(--text-3)">(new leads wait unassigned until one appears)</span>'}`);
     box.innerHTML = lines.join('<br>');
@@ -9665,9 +9672,9 @@ function exportLeadsToExcel(leads, filenamePrefix='leads-export') {
   if(!leads.length) { showToast('No leads to export', true); return; }
   const rows = leads.map(l => ({
     Name: l.name||'', Phone: l.phone||'', Department: l.department||'', Entity: l.entity||'',
-    Source: l.source||'', Campaign: l.campaign || campaignTitleFor(l.campaignId) || '',
+    Source: l.source||'', Campaign: l.campaign || campaignTitleFor(l.campaignId) || '', 'Ad name': l.adName||'',
     'Date Created': l.dateCreated||'', 'Contact Status': l.contactStatus||'Untouched',
-    Outcome: l.outcome||'Pending', Revenue: l.revenueValue ?? '', Notes: l.notes||'',
+    Outcome: l.outcome||'Pending', Revenue: l.revenueValue ?? '', Comment: l.comment ?? '', Notes: l.notes||'',
   }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Leads');
@@ -9697,7 +9704,7 @@ function getFilteredLeads() {
     if(entityF && l.entity!==entityF) return false;
     if(campaignF && l.campaignId!==campaignF) return false;
     if(agentF==='__unassigned__' ? l.assignedAgentUid : (agentF && l.assignedAgentUid!==agentF)) return false;
-    if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.source} ${l.landingPageId||''}`.toLowerCase().includes(q)) return false;
+    if(q && !`${l.name} ${l.phone} ${l.campaign} ${l.adName||''} ${l.source} ${l.landingPageId||''}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -9722,18 +9729,26 @@ window.renderLeadsTable = function() {
         const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
         const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
         const isChecked = selectedLeadIds.has(l.id);
-        // The Department column replaces the old Campaign column for now (campaign
-        // is still stored, filterable and in the Campaign Performance panel). A lead
-        // that belongs to a campaign keeps the ℹ️ agent-script link right here.
         const deptCell = `${esc(l.department)||'—'}` +
           (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong. Edit the lead to correct it.">🤖</span>' : '') +
-          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting for the AI to classify it from the lead\'s notes">⏳</span>' : '') +
-          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="${esc(l.campaign || campaignTitleFor(l.campaignId) || 'Campaign')} — view agent script & post link">ℹ️</a>` : '');
+          (l.departmentSource === 'keyword' ? ' <span title="Found from keywords in the lead\'s answers or the offer name — may be wrong. Edit the lead to correct it.">🔎</span>' : '') +
+          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting for the AI to classify it from the lead\'s notes">⏳</span>' : '');
+        // The campaign as typed in the sheet (or the linked campaign's title); a lead that belongs
+        // to a campaign keeps the ℹ️ agent-script link beside it.
+        const campName = l.campaign || campaignTitleFor(l.campaignId) || '';
+        const campCell = (esc(campName) || '—') +
+          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script &amp; post link">ℹ️</a>` : '');
+        // Comment = what the lead wrote. Leads imported before this field existed have none, so they show their old notes (greyed) instead of going blank.
+        const legacyCmt = l.comment === undefined;
+        const cmtText = legacyCmt ? (l.notes || '') : (l.comment || '');
+        const cmtTip = [legacyCmt ? '' : (l.comment ? 'Comment: ' + l.comment : ''), l.notes ? (legacyCmt ? 'Notes: ' : 'Notes (other form answers): ') + l.notes : ''].filter(Boolean).join('\n\n');
         return `<tr style="${isChecked?'background:#F0F7FF':''}">
           <td><input type="checkbox" class="lead-select-cb" ${isChecked?'checked':''} onchange="toggleLeadSelect('${l.id}',this.checked)"></td>
           <td style="font-weight:600">${esc(l.name)||'—'}</td>
           <td style="font-size:12px">${esc(l.phone)||'—'}</td>
           <td style="font-size:11px;color:var(--text-2);font-weight:500">${deptCell}</td>
+          <td style="font-size:11px;color:var(--text-2);max-width:170px">${campCell}</td>
+          <td style="font-size:11px;color:var(--text-2);max-width:170px">${esc(l.adName)||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${esc(l.entity)||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${esc(l.source)||'—'}</td>
           <td style="font-size:11px;color:var(--text-3)">${esc(l.assignedAgentName)||'— Unassigned —'}</td>
@@ -9761,7 +9776,7 @@ window.renderLeadsTable = function() {
                 </select>`
               : `<span style="font-size:10px;color:var(--text-3)">—</span>`}
           </td>
-          <td style="font-size:11px;color:var(--text-3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(l.notes)}">${esc(l.notes)||'—'}</td>
+          <td style="font-size:11px;color:${legacyCmt?'var(--text-3)':'var(--text-2)'};${legacyCmt?'font-style:italic;':''}max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cmtTip)}" dir="auto">${esc(cmtText)||'—'}</td>
           <td class="row-actions">
             ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call">📞</a>`:''}
             <button class="btn btn-sm" onclick="openAssignLeadModal('${l.id}')">Assign</button>
@@ -9770,7 +9785,7 @@ window.renderLeadsTable = function() {
           </td>
         </tr>`;
       }).join('')
-    : `<tr><td colspan="13" class="empty">${!ALL_LEADS.length ? 'No leads yet — upload an Excel, import from a Google Sheet, or add manually' : leadsShowAll ? 'No leads match filters' : `No leads match filters in ${document.getElementById('leads-month-label').textContent} — try another month or Show All Time`}</td></tr>`;
+    : `<tr><td colspan="15" class="empty">${!ALL_LEADS.length ? 'No leads yet — upload an Excel, import from a Google Sheet, or add manually' : leadsShowAll ? 'No leads match filters' : `No leads match filters in ${document.getElementById('leads-month-label').textContent} — try another month or Show All Time`}</td></tr>`;
 
   const selectAllCb = document.getElementById('lead-select-all');
   if(selectAllCb) {
@@ -9987,6 +10002,8 @@ window.openLeadForm = function(lead=null) {
   document.getElementById('lead-date').value           = lead?.dateCreated||new Date().toISOString().split('T')[0];
   document.getElementById('lead-revenue').value        = lead?.revenueValue ?? '';
   document.getElementById('lead-notes').value          = lead?.notes||'';
+  document.getElementById('lead-adname').value         = lead?.adName||'';
+  document.getElementById('lead-comment').value        = lead?.comment||'';
   renderLeadContactHistory(lead);
   document.getElementById('lead-overlay').classList.add('open');
 }
@@ -10035,8 +10052,13 @@ window.saveLead = async function() {
     campaign:      campaignId ? campaignTitleFor(campaignId) : '',
     dateCreated:   document.getElementById('lead-date').value,
     notes:         document.getElementById('lead-notes').value.trim(),
+    adName:        document.getElementById('lead-adname').value.trim(),
     revenueValue:  parseFloat(document.getElementById('lead-revenue').value) || null,
   };
+  const commentVal = document.getElementById('lead-comment').value.trim();
+  const originalLead = editingLeadId ? ALL_LEADS.find(x=>x.id===editingLeadId) : null;
+  // A lead from before the Comment field existed keeps showing its old notes there until a comment is actually typed.
+  if(!originalLead || originalLead.comment !== undefined || commentVal) data.comment = commentVal;
   if(editingLeadId) {
     const original = ALL_LEADS.find(x=>x.id===editingLeadId);
     if(original?.outcome==='Booked' && (data.contactStatus!==original.contactStatus || data.outcome!==original.outcome)) {
@@ -10142,8 +10164,9 @@ window.handleExcelUpload = function(input) {
       if(!rows.length){showToast('No data found in the file',true);return;}
 
       const headers = Object.keys(rows[0]);
+      const lc = detectLeadColumns(headers, rows);
       const { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource, dateCol, statusCol,
-              deptCol, entityCol, notesCol, campaignCol, leftoverCols } = detectLeadColumns(headers, rows);
+              deptCol, entityCol, adNameCol, commentCol, campaignCol, leftoverCols } = lc;
 
       if(!nameCol||!phoneCol){showToast('Could not find Name or Phone columns',true);return;}
 
@@ -10156,7 +10179,8 @@ window.handleExcelUpload = function(input) {
 
       pendingImportRows = rows.map((r,idx)=>{
         const rawDept = deptCol ? r[deptCol] : '';
-        const matchedDept = matchDepartment(rawDept);
+        const f = leadRowFields(r, lc, headers);
+        const matchedDept = f.department || f.deptGuess; // the department column, else keywords found anywhere in the row
         const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
         return {
           name:          r[nameCol]||'',
@@ -10168,21 +10192,23 @@ window.handleExcelUpload = function(input) {
           dateCreated:   dateCol ? parseExcelDate(rawRows[idx][dateCol]) : todayStr,
           contactStatus: mappedStatus.contactStatus,
           outcome:       mappedStatus.outcome,
-          notes:         buildLeadNotesWithLeftover(r, leftoverCols, notesCol ? r[notesCol]||'' : ''),
+          notes:         f.notes,
+          comment:       f.comment,
+          adName:        f.adName,
           department:    matchedDept,
+          ...(!f.department && f.deptGuess ? { departmentSource: 'keyword' } : {}),
           _rawDept:      rawDept ? String(rawDept) : '',
         };
       }).filter(r=>r.name&&r.phone);
 
       const matchedCount   = pendingImportRows.filter(r=>r.department).length;
+      const keywordCount   = pendingImportRows.filter(r=>r.departmentSource==='keyword').length;
       const unmatchedCount = pendingImportRows.length - matchedCount;
-      const deptStatus = deptCol
-        ? `${matchedCount} matched to a department${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`
-        : `No department column found — all rows will use the default below`;
+      const deptStatus = `${matchedCount} matched to a department${deptCol ? '' : ' (no department column — found from keywords in the rows)'}${keywordCount && deptCol ? ` (${keywordCount} of them from keywords)` : ''}${unmatchedCount?`, ${unmatchedCount} will use the default below`:''}`;
       const dateStatus = dateCol ? '' : `<br>No date column found — all rows will use today's date (${todayStr})`;
       const emailStatus = emailCol ? '' : `<br>No email column found`;
       const leftoverStatus = leftoverCols.length ? `<br>${leftoverCols.length} extra column(s) (e.g. custom form questions) appended to Notes` : '';
-      importColInfoText = `Detected: ${[nameCol,phoneCol,emailCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>${deptStatus}${dateStatus}${emailStatus}${leftoverStatus}`;
+      importColInfoText = `Detected: ${[nameCol,phoneCol,emailCol,deptCol,entityCol,sourceCol,campaignCol,dateCol,statusCol].filter(Boolean).join(', ')}<br>Ad name ← ${esc(adNameCol)||'(none found)'} · Comment ← ${esc(commentCol)||'(none found)'}<br>${deptStatus}${dateStatus}${emailStatus}${leftoverStatus}`;
 
       document.getElementById('import-dept').value = DEPARTMENTS[0];
       document.getElementById('import-campaign').value = '';
@@ -10238,7 +10264,7 @@ window.renderExcelImportPreview = function() {
       <td style="padding:5px 10px;font-size:11px;font-weight:600">${r.name}${r._isDuplicate?' <span style="color:var(--orange);font-weight:700">(duplicate)</span>':''}</td>
       <td style="padding:5px 10px;font-size:11px">${r.phone}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.email||'—'}</td>
-      <td style="padding:5px 10px;font-size:11px">${r.department?`<span style="color:var(--navy);font-weight:600">${r.department}</span>`:`<span style="color:var(--orange)">${r._rawDept?'No match: "'+r._rawDept+'"':'Not in sheet'} → uses default</span>`}</td>
+      <td style="padding:5px 10px;font-size:11px">${r.department?`<span style="color:var(--navy);font-weight:600">${esc(r.department)}</span>${r.departmentSource==='keyword'?' <span title="Found from keywords in the lead\'s answers or the offer name — may be wrong">🔎</span>':''}`:`<span style="color:var(--orange)">${r._rawDept?'No match: "'+r._rawDept+'"':'Not in sheet'} → uses default</span>`}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.source}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.campaign}</td>
       <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${r.dateCreated||'<span style="color:var(--red)">not parsed</span>'}</td>
@@ -10309,7 +10335,7 @@ const LEAD_DEPT_TEXT_MAX = 600;
 const leadDeptCache = new Map();      // redacted text -> { department|null, confidence } — this page session only
 
 function leadDeptText(row, hint) {
-  return advRedact([hint, row.notes].filter(Boolean).join('\n'), row).replace(/\s+/g, ' ').trim().slice(0, LEAD_DEPT_TEXT_MAX);
+  return advRedact([hint, row.comment, row.notes].filter(Boolean).join('\n'), row).replace(/\s+/g, ' ').trim().slice(0, LEAD_DEPT_TEXT_MAX);
 }
 
 async function classifyLeadDepartments(rows, onProgress) {
@@ -10405,8 +10431,9 @@ window.fetchAndPreviewSheet = async function() {
     if(!rows.length) { statusEl.textContent = 'No rows found in that sheet'; statusEl.style.color = 'var(--red)'; return; }
 
     const headers = Object.keys(rows[0]);
+    const lc = detectLeadColumns(headers, rows);
     const { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource, dateCol, statusCol,
-            deptCol, entityCol, notesCol, leftoverCols } = detectLeadColumns(headers, rows);
+            deptCol, entityCol, adNameCol, commentCol, leftoverCols } = lc;
 
     if(!nameCol||!phoneCol) { statusEl.textContent = 'Could not find Name or Phone columns in that sheet'; statusEl.style.color = 'var(--red)'; return; }
 
@@ -10436,6 +10463,7 @@ window.fetchAndPreviewSheet = async function() {
       const mappedStatus = statusCol ? mapLeadStatus(r[statusCol]) : { contactStatus:'Untouched', outcome:'Pending' };
       const phone = normalizePhone(r[phoneCol]);
       const pairKey = `${phone}__${campaignId||''}`;
+      const f = leadRowFields(r, lc, headers);
       const row = {
         name: r[nameCol]||'', phone,
         email: emailCol ? r[emailCol]||'' : '',
@@ -10444,14 +10472,14 @@ window.fetchAndPreviewSheet = async function() {
         dateCreated: dateCol ? parseExcelDate(r[dateCol]) : '',
         contactStatus: mappedStatus.contactStatus,
         outcome: mappedStatus.outcome,
-        notes: buildLeadNotesWithLeftover(r, leftoverCols, notesCol ? r[notesCol]||'' : ''),
-        department: matchDepartment(rawDept),
+        notes: f.notes, comment: f.comment, adName: f.adName,
+        department: f.department || f.deptGuess,   // the department column, else keywords found anywhere in the row; the AI only gets what is still empty
         campaignId: campaignId || null,
         campaign: campaignId ? campaignName : '',
         _isDuplicate: (sourceRowId && knownRowIds.has(sourceRowId)) || existingPhoneCampaignPairs.has(pairKey), // older leads have no row id, so the phone+campaign rule still applies
       };
+      if(!f.department && f.deptGuess) row.departmentSource = 'keyword';
       if(sourceRowId) row.sourceRowId = sourceRowId;
-      row.department = matchDepartment(rawDept);
       row._classifyText = row.department ? '' : leadDeptText(row, hintCols.map(h => r[h] ? `${h.replace(/_/g, ' ')}: ${r[h]}` : '').filter(Boolean).join(' | '));
       return row;
     }).filter(r=>r.name && r.phone);
@@ -10491,7 +10519,7 @@ window.fetchAndPreviewSheet = async function() {
         <td style="padding:5px 10px;font-size:11px">${esc(r.phone)}</td>
         <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${esc(r.email)||'—'}</td>
         <td style="padding:5px 10px;font-size:11px">${r.department
-          ? `${esc(r.department)}${r.departmentSource === 'ai' ? ` <span title="Auto-classified from the lead's notes${r._aiConfidence === 'low' ? ' (low confidence)' : ''}">🤖${r._aiConfidence === 'low' ? '?' : ''}</span>` : ''}`
+          ? `${esc(r.department)}${r.departmentSource === 'keyword' ? ' <span title="Found from keywords in the lead\'s answers or the offer name — may be wrong">🔎</span>' : ''}${r.departmentSource === 'ai' ? ` <span title="Auto-classified from the lead's notes${r._aiConfidence === 'low' ? ' (low confidence)' : ''}">🤖${r._aiConfidence === 'low' ? '?' : ''}</span>` : ''}`
           : `<span style="color:var(--orange)">uses default</span>`}</td>
         <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${esc(r.source)}</td>
         <td style="padding:5px 10px;font-size:11px;color:var(--text-3)">${esc(r.dateCreated)||'—'}</td>
@@ -10500,7 +10528,9 @@ window.fetchAndPreviewSheet = async function() {
 
     const emailStatus = emailCol ? '' : ' — no email column found';
     const leftoverStatus = leftoverCols.length ? ` — ${leftoverCols.length} extra column(s) appended to Notes` : '';
-    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}${emailStatus}${leftoverStatus}${classifyStatus}`;
+    const kwCount = pendingSheetImportRows.filter(r => r.departmentSource === 'keyword').length;
+    const mapStatus = `<br>Ad name ← ${esc(adNameCol)||'(none found)'} · Comment ← ${esc(commentCol)||'(none found)'}${kwCount ? ` · 🔎 ${kwCount} department(s) found from keywords` : ''}`;
+    statusEl.innerHTML = `✓ ${pendingSheetImportRows.length} new lead(s) ready to import${dupCount?` — ${dupCount} skipped as already imported for this campaign`:''}${emailStatus}${leftoverStatus}${mapStatus}${classifyStatus}`;
     statusEl.style.color = 'var(--green)';
     document.getElementById('sheet-import-preview-wrap').style.display = 'block';
     document.getElementById('confirm-sheet-import-btn').disabled = pendingSheetImportRows.length === 0;
