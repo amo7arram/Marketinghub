@@ -80,6 +80,19 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--bg)}
 .empty-row td{text-align:center;padding:30px;color:var(--text-3)}
+/* Leads table: Name stays on the left and the action buttons on the right while the middle scrolls sideways;
+   related values share a cell (Entity/Source, Agent/Date, the status dropdowns) so far less scrolling is needed. */
+.lead-wrap{overflow-x:auto;border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.lead-tbl{min-width:1050px;overflow:visible;box-shadow:none}
+.lead-tbl tbody tr{background:var(--surface)}
+.lead-tbl th.stk,.lead-tbl td.stk{position:sticky;z-index:2;background:inherit}
+.lead-tbl th.stk{z-index:3;background:var(--navy)}
+.lead-tbl tr:hover td.stk{background:var(--bg)}
+.lead-tbl .stk-name{left:0;min-width:150px;max-width:190px;box-shadow:6px 0 8px -6px rgba(0,0,0,.22)}
+.lead-tbl .stk-act{right:0;box-shadow:-6px 0 8px -6px rgba(0,0,0,.22)}
+.lead-tbl .stack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.lead-tbl .sub{font-size:10px;color:var(--text-3);margin-top:2px}
+.lead-tbl .row-actions{display:flex;gap:6px}
 .status-select{font-size:10px;padding:3px 6px;border-radius:4px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid transparent}
 .pagination{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)}
 
@@ -153,13 +166,13 @@ tr:hover td{background:var(--bg)}
         <select class="filter-select" id="f-dept" onchange="resetPageAndRender()"><option value="">All Departments</option></select>
       </div>
 
-      <div style="overflow-x:auto">
-        <table style="min-width:1300px">
+      <div class="lead-wrap">
+        <table class="lead-tbl">
           <thead><tr>
-            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Entity</th><th>Source</th>
-            <th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Comment</th><th></th>
+            <th class="stk stk-name">Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Entity / Source</th>
+            <th>Agent / Date</th><th>Status · Outcome · Closure</th><th>Comment</th><th class="stk stk-act"></th>
           </tr></thead>
-          <tbody id="table-body"><tr class="empty-row"><td colspan="15">Loading leads...</td></tr></tbody>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="11">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
@@ -477,45 +490,46 @@ function renderTable() {
         const cmtText = legacyCmt ? (l.notes || '') : (l.comment || '');
         const cmtTip = [legacyCmt ? '' : (l.comment ? 'Comment: ' + l.comment : ''), l.notes ? (legacyCmt ? 'Notes: ' : 'Notes (other form answers): ') + l.notes : ''].filter(Boolean).join('\n\n');
         return `<tr>
-          <td style="font-weight:600">${esc(l.name)||'—'}</td>
-          <td>${esc(l.phone)||'—'}</td>
+          <td class="stk stk-name" style="font-weight:600">${esc(l.name)||'—'}</td>
+          <td style="white-space:nowrap">${esc(l.phone)||'—'}</td>
           <td style="color:var(--text-3);font-size:11px">${esc(l.email)||'—'}</td>
           <td style="color:var(--text-2);font-size:11px;font-weight:500">${deptCell}</td>
           <td style="color:var(--text-2);font-size:11px;max-width:170px">${campCell}</td>
           <td style="color:var(--text-2);font-size:11px;max-width:170px">${esc(l.adName)||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${esc(l.entity)||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${esc(l.source)||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${esc(l.assignedAgentName)||'— Unassigned —'}</td>
-          <td style="color:var(--text-3);font-size:11px;white-space:nowrap">${l.dateCreated||'—'}</td>
-          <td>${oc==='Booked'
-            ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
-            : `<select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
-                ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
-              </select>`}
-          </td>
-          <td>${oc==='Booked'
-            ? `<span class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" title="Booked leads are locked — ask an admin to change this">${oc}</span>`
-            : cs==='Reached'
-              ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
-                  ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
-                </select>`
-              : `<span style="color:var(--text-3);font-size:11px">—</span>`}
-          </td>
-          <td>${oc==='Closed - Unsuccessful'
-            ? `<select class="status-select" style="background:var(--bg);color:var(--text-2)" onchange="changeClosureReason('${l.id}',this.value)">
-                <option value=""${!l.closureReason?' selected':''}>— Select —</option>
-                ${CLOSURE_REASONS.map(r=>`<option${l.closureReason===r?' selected':''}>${r}</option>`).join('')}
-              </select>`
-            : `<span style="color:var(--text-3);font-size:11px">—</span>`}
+          <td style="color:var(--text-2);font-size:11px">${esc(l.entity)||'—'}<div class="sub">${esc(l.source)||'—'}</div></td>
+          <td style="color:var(--text-2);font-size:11px">${esc(l.assignedAgentName)||'— Unassigned —'}<div class="sub" style="white-space:nowrap">${l.dateCreated||'—'}</div></td>
+          <td>
+            <div class="stack">
+              ${oc==='Booked'
+                ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
+                : `<select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
+                    ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
+                  </select>`}
+              ${oc==='Booked'
+                ? `<span class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" title="Booked leads are locked — ask an admin to change this">${oc}</span>`
+                : cs==='Reached'
+                  ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
+                      ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
+                    </select>`
+                  : ''}
+              ${oc==='Closed - Unsuccessful'
+                ? `<select class="status-select" style="background:var(--bg);color:var(--text-2)" onchange="changeClosureReason('${l.id}',this.value)">
+                    <option value=""${!l.closureReason?' selected':''}>— Closure reason —</option>
+                    ${CLOSURE_REASONS.map(r=>`<option${l.closureReason===r?' selected':''}>${r}</option>`).join('')}
+                  </select>`
+                : ''}
+            </div>
           </td>
           <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${legacyCmt?'var(--text-3)':'var(--text-2)'};${legacyCmt?'font-style:italic;':''}font-size:11px" title="${esc(cmtTip)}" dir="auto">${esc(cmtText)||'—'}</td>
-          <td>
-            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call">📞</a>`:''}
-            <button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button>
+          <td class="stk stk-act">
+            <div class="row-actions">
+              ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp" aria-label="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call" aria-label="Call">📞</a>`:''}
+              <button class="btn btn-sm" onclick="openEditModal('${l.id}')" title="Edit" aria-label="Edit">✏️ Edit</button>
+            </div>
           </td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="15">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="11">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
 
   renderPagination(data.length, totalPages, startIdx, pageData.length);
 }
