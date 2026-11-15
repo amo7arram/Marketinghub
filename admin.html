@@ -116,6 +116,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
 .lead-tbl .stk-act{right:0;box-shadow:-6px 0 8px -6px rgba(0,0,0,.22)}
 .lead-tbl .stack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .lead-tbl .sub{font-size:10px;color:var(--text-3);margin-top:2px}
+.lead-tbl .cmt{max-width:260px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;word-break:break-word}
 .badge{display:inline-flex;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px}
 .b-planned{background:#E4EDFF;color:#1649A3}
 .b-production{background:#FFF0D4;color:#9B5800}
@@ -571,6 +572,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <a class="btn" href="docs/lead-management-process.html" target="_blank" title="Reference: the end-to-end lead management process, from lead generation to revenue attribution">📋 Process Reference</a>
           <button class="btn" onclick="openMigrateLeadsPrompt()" title="One-time: converts old-style lead statuses to the new model">↻ Migrate Old Statuses</button>
           <button class="btn" onclick="openNormalizePhonesPrompt()" title="One-time: unifies phone number formatting across all leads">☎ Normalize Phone Numbers</button>
+          <button class="btn" onclick="openFixLeadEntitiesPrompt()" title="One-time: changes the sheet's own wording (جده, مكه, First clinic) on existing leads to the system entities (IMC, Makkah, TFC)">🏷 Fix Entities</button>
           <button class="btn" onclick="openFixLeadYearsPrompt()" title="One-time: corrects leads whose Date Created was misread as year 2001 by a since-fixed Excel import bug">🗓 Fix Corrupted Dates</button>
           <label class="btn" style="cursor:pointer">
             📁 Upload Excel
@@ -595,8 +597,8 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <table class="lead-tbl">
           <thead><tr>
             <th class="stk stk-chk"><input type="checkbox" id="lead-select-all" onchange="toggleSelectAllLeads(this)"></th>
-            <th class="stk stk-name">Name</th><th>Phone</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Entity / Source</th>
-            <th>Agent / Date created</th><th>Status · Outcome · Closure</th><th>Comment</th><th class="stk stk-act"></th>
+            <th class="stk stk-name">Name</th><th>Phone</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Comment</th><th>Entity / Source</th>
+            <th>Agent / Date created</th><th>Status · Outcome · Closure</th><th class="stk stk-act"></th>
           </tr></thead>
           <tbody id="leads-table-body"><tr><td colspan="11" class="empty">Loading leads...</td></tr></tbody>
         </table>
@@ -1170,9 +1172,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
               <div></div>
             </div>
             <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:14px">
-              <input type="checkbox" id="la-ai" style="width:16px;height:16px;margin-top:2px;cursor:pointer">
-              <label for="la-ai" style="font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer">🤖 Classify each lead's department with AI
-                <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5">Runs from admin pages only (the AI key isn't available on the call-center page). If an agent's page imports a lead first, it is marked pending and classified at the next admin check. Same rules as the manual import: names, phones and emails are never sent.</span></label>
+              <input type="checkbox" id="la-ai" disabled style="width:16px;height:16px;margin-top:2px">
+              <label for="la-ai" style="font-size:12px;font-weight:600;color:var(--text-3)">🤖 Classify each lead's department with AI — <em>paused</em>
+                <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5">For now a lead's department is the sheet's own department column; a lead without one gets the default department above. (The AI code is still there — it is switched off by <code>AI_DEPT_ENABLED</code> in <code>lead-sync.js</code>.)</span></label>
             </div>
             <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:6px">
               <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px">
@@ -2128,9 +2130,9 @@ tr.row-overdue:hover td{background:#FFD6D6}
         <input class="field-input" id="sheet-import-url" placeholder="https://docs.google.com/spreadsheets/d/...">
       </div>
       <div class="field-group" style="display:flex;align-items:flex-start;gap:8px">
-        <input type="checkbox" id="sheet-import-classify" checked style="width:16px;height:16px;margin-top:2px;cursor:pointer">
-        <label for="sheet-import-classify" style="font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer">🤖 Auto-classify each lead's department from its notes and form/ad name
-          <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5;margin-top:2px">Uses AI, so it will sometimes be wrong — leads it classified are marked 🤖 so you can spot-check and correct them. Names, phone numbers and emails are removed before anything is sent. A department column in the sheet always wins over the AI.</span></label>
+        <input type="checkbox" id="sheet-import-classify" disabled style="width:16px;height:16px;margin-top:2px">
+        <label for="sheet-import-classify" style="font-size:12px;font-weight:600;color:var(--text-3)">🤖 Auto-classify departments with AI — <em>paused</em>
+          <span style="display:block;font-weight:400;font-size:10px;color:var(--text-3);line-height:1.5;margin-top:2px">For now a lead's department is the sheet's own department column; leads without one get the Default Department chosen below.</span></label>
       </div>
       <div class="field-group">
         <label class="field-label">Default Department <span style="color:var(--text-3);font-weight:400;font-size:11px">(used for leads that can't be classified)</span></label>
@@ -2231,7 +2233,7 @@ import {
   watchWellspanPackages, addWellspanPackage, updateWellspanPackage, deleteWellspanPackage, WELLSPAN_ITEM_TYPES,
   watchLoyaltyCards, addLoyaltyCard, updateLoyaltyCard, deleteLoyaltyCard, SAMPLE_LOYALTY_CARDS,
   watchLeads, addLead, updateLead, deleteLead, bulkAddLeads, migrateLegacyLeadStatuses,
-  normalizePhone, normalizeAllLeadPhones, fixCorruptedLeadYears,
+  normalizePhone, normalizeAllLeadPhones, fixCorruptedLeadYears, updateLeadEntities,
   watchMarketingActions, addMarketingAction, updateMarketingAction, deleteMarketingAction, ACTION_STATUSES,
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
@@ -2243,7 +2245,7 @@ import {
 } from './firebase-data.js';
 import {
   parseCSVText, parseExcelDate, matchDepartment, mapLeadStatus,
-  detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover, leadRowFields,
+  detectLeadColumns, normalizeLeadSource, buildLeadNotesWithLeftover, leadRowFields, mapEntity, AI_DEPT_ENABLED,
   createLeadAutomationRunner, eligibleAgents, PRESENCE_FRESH_MS,
   getSheets, sheetKey, SYNC_MAX_SHEETS, parseCSVRecords
 } from './lead-sync.js';
@@ -8173,7 +8175,7 @@ async function autoSyncClassify(rows) {
 // them. Classified here, then released from "pending".
 async function sweepPendingDepartments() {
   const cfg = LEAD_AUTOMATION;
-  if(!cfg || !cfg.classifyWithAI || !ANTHROPIC_API_KEY) return;
+  if(!AI_DEPT_ENABLED || !cfg || !cfg.classifyWithAI || !ANTHROPIC_API_KEY) return; // AI classification is paused (lead-sync.js)
   if(Date.now() - laLastSweepAt < 90000) return;
   const pending = ALL_LEADS.filter(l => l.deptPending === true).slice(0, 200);
   if(!pending.length) return;
@@ -8362,7 +8364,7 @@ function loadLeadAutomationForm() {
   document.getElementById('la-interval').value = String(c.intervalMinutes || 2);
   document.getElementById('la-dept').value = c.defaultDepartment || '';
   document.getElementById('la-entity').value = c.defaultEntity || '';
-  document.getElementById('la-ai').checked = c.classifyWithAI !== false;      // on unless switched off
+  document.getElementById('la-ai').checked = false;                           // AI classification is paused (AI_DEPT_ENABLED in lead-sync.js)
   document.getElementById('la-assign').checked = c.autoAssign !== false;      // on unless switched off
   document.getElementById('la-cap').value = c.maxUntouchedPerAgent || '';
   document.getElementById('la-msg').textContent = '';
@@ -8414,7 +8416,7 @@ window.saveLeadAutomationForm = async function() {
       sheetUrl: sheets.length ? sheets[0].url : '', startFromMs: sheets.length ? sheets[0].startFromMs : null,
       intervalMinutes: parseInt($('la-interval').value, 10) || 2,
       defaultDepartment, defaultEntity: $('la-entity').value,
-      classifyWithAI: $('la-ai').checked, autoAssign: $('la-assign').checked,
+      classifyWithAI: false, autoAssign: $('la-assign').checked,
       maxUntouchedPerAgent: cap, excludedAgentUids,
       startFromMode: mode, agentDirectory: laDesiredDirectory(),
     }, myMemberName() || currentAdminEmail);
@@ -8470,7 +8472,8 @@ function renderLeadAutomationStatus() {
         `<span style="font-size:11px;color:${s.error ? 'var(--red)' : 'var(--text-2)'}">• ${esc(s.label)}: ${s.error ? '⚠ ' + esc(s.error) : `${s.rows || 0} rows, <strong>${s.imported || 0}</strong> imported`}</span>`).join('<br>'));
       // which sheet column fed Ad name / Comment / Department / Campaign on the last check (so a wrong guess can be fixed in the sheet)
       if(r && Array.isArray(r.sheets)) r.sheets.filter(s => s.map && !s.error).forEach(s => lines.push(
-        `<span style="font-size:11px;color:var(--text-3)">Columns${r.sheets.length > 1 ? ` in ${esc(s.label)}` : ''}: Ad name ← <strong>${esc(s.map.adName) || 'none found'}</strong> · Comment ← <strong>${esc(s.map.comment) || 'none found'}</strong> · Department ← <strong>${esc(s.map.department) || 'keywords in the row'}</strong> · Campaign ← <strong>${esc(s.map.campaign) || 'none found'}</strong></span>`));
+        `<span style="font-size:11px;color:var(--text-3)">Columns${r.sheets.length > 1 ? ` in ${esc(s.label)}` : ''}: Ad name ← <strong>${esc(s.map.adName) || 'none found'}</strong> · Comment ← <strong>${esc(s.map.comment) || 'none found'}</strong> · Department ← <strong>${esc(s.map.department) || 'none (default department)'}</strong> · Entity ← <strong>${esc(s.map.entity) || 'none (default entity)'}</strong> · Campaign ← <strong>${esc(s.map.campaign) || 'none found'}</strong></span>`));
+      if(r && Array.isArray(r.entityUnmapped) && r.entityUnmapped.length) lines.push(`<span style="color:var(--orange)">⚠ Entity wording not recognised (those leads got the default entity): ${r.entityUnmapped.map(v => '“' + esc(v) + '”').join(', ')}</span>`);
     } else if(cfg && cfg.enabled) lines.push('Waiting for the first check…');
     lines.push(`Agents online now: <strong>${online.length}</strong>${online.length ? ' — ' + online.map(a => esc(a.name)).join(', ') : ' <span style="color:var(--text-3)">(new leads wait unassigned until one appears)</span>'}`);
     box.innerHTML = lines.join('<br>');
@@ -9762,6 +9765,7 @@ window.renderLeadsTable = function() {
           <td style="font-size:11px;color:var(--text-2);font-weight:500">${deptCell}</td>
           <td style="font-size:11px;color:var(--text-2);max-width:170px">${campCell}</td>
           <td style="font-size:11px;color:var(--text-2);max-width:170px">${esc(l.adName)||'—'}</td>
+          <td style="font-size:11px;color:${legacyCmt?'var(--text-3)':'var(--text-2)'};${legacyCmt?'font-style:italic;':''}min-width:170px"><div class="cmt" title="${esc(cmtTip)}" dir="auto">${esc(cmtText)||'—'}</div></td>
           <td style="font-size:11px;color:var(--text-2)">${esc(l.entity)||'—'}<div class="sub">${esc(l.source)||'—'}</div></td>
           <td style="font-size:11px;color:var(--text-2)">${esc(l.assignedAgentName)||'— Unassigned —'}<div class="sub" style="white-space:nowrap">${l.dateCreated||'—'}</div></td>
           <td>
@@ -9785,7 +9789,6 @@ window.renderLeadsTable = function() {
                 : ''}
             </div>
           </td>
-          <td style="font-size:11px;color:${legacyCmt?'var(--text-3)':'var(--text-2)'};${legacyCmt?'font-style:italic;':''}max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cmtTip)}" dir="auto">${esc(cmtText)||'—'}</td>
           <td class="stk stk-act">
             <div class="row-actions">
               ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp" aria-label="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call" aria-label="Call">📞</a>`:''}
@@ -10134,6 +10137,20 @@ window.openNormalizePhonesPrompt = async function() {
   } catch(e) { showToast('Normalization failed: '+e.message, true); }
 }
 
+// Leads imported before entities were mapped carry the sheet's own wording ("جده", "First clinic").
+window.openFixLeadEntitiesPrompt = async function() {
+  const changing = ALL_LEADS.map(l => ({ l, to: mapEntity(l.entity) })).filter(x => x.l.entity && x.to && x.to !== x.l.entity);
+  if(!changing.length) { showToast('Every lead entity already matches the system entities ✓'); return; }
+  const counts = {};
+  changing.forEach(x => { const k = `${x.l.entity}  →  ${x.to}`; counts[k] = (counts[k] || 0) + 1; });
+  const summary = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, n]) => `${n} × ${k}`).join('\n');
+  if(!confirm(`This will change the Entity of ${changing.length} lead(s) to the system's names:\n\n${summary}\n\nOnly the Entity field is touched. Safe to run more than once. Proceed?`)) return;
+  try {
+    const result = await updateLeadEntities(changing.map(x => ({ id: x.l.id, entity: x.to })));
+    showToast(`✓ Corrected the entity on ${result.migrated} lead(s)`);
+  } catch(e) { showToast('Correction failed: ' + e.message, true); }
+}
+
 window.openFixLeadYearsPrompt = async function() {
   const changing = ALL_LEADS.filter(l => l.dateCreated && l.dateCreated.startsWith('2001-'));
   if(!changing.length) { showToast('No leads with the corrupted 2001 date found — nothing to fix ✓'); return; }
@@ -10199,7 +10216,7 @@ window.handleExcelUpload = function(input) {
           email:         emailCol ? r[emailCol]||'' : '',
           source:        sourceCol ? normalizeLeadSource(r[sourceCol], isPlatformSource) : '',
           campaign:      campaignCol ? r[campaignCol]||'' : '',
-          entity:        entityCol ? r[entityCol]||'' : '',
+          entity:        f.entity,   // mapped to the system's entities (جده → IMC …); '' if the sheet's wording isn't one we know
           dateCreated:   dateCol ? parseExcelDate(rawRows[idx][dateCol]) : todayStr,
           contactStatus: mappedStatus.contactStatus,
           outcome:       mappedStatus.outcome,
@@ -10479,7 +10496,7 @@ window.fetchAndPreviewSheet = async function() {
         name: r[nameCol]||'', phone,
         email: emailCol ? r[emailCol]||'' : '',
         source: sourceCol ? normalizeLeadSource(r[sourceCol], isPlatformSource) : '',
-        entity: entityCol ? r[entityCol]||'' : '',
+        entity: f.entity,   // mapped to the system's entities (جده → IMC …)
         dateCreated: dateCol ? parseExcelDate(r[dateCol]) : '',
         contactStatus: mappedStatus.contactStatus,
         outcome: mappedStatus.outcome,
@@ -10501,7 +10518,7 @@ window.fetchAndPreviewSheet = async function() {
     // Classify only what will actually be imported (duplicates are skipped, so
     // no point paying to classify them).
     let classifyStatus = '';
-    const wantsAi = document.getElementById('sheet-import-classify').checked;
+    const wantsAi = AI_DEPT_ENABLED && document.getElementById('sheet-import-classify').checked; // AI classification is paused (see lead-sync.js)
     if(wantsAi && pendingSheetImportRows.some(r => !r.department && r._classifyText)) {
       if(!ANTHROPIC_API_KEY) {
         classifyStatus = ' — department auto-classification skipped (no API key set under Campaign Generator → AI Setup)';

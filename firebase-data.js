@@ -1183,6 +1183,16 @@ export async function normalizeAllLeadPhones() {
   return { migrated: updates.length };
 }
 
+// One-time correction of lead entities (e.g. a sheet's "جده" → "IMC"). The caller works out
+// what each lead's entity should be (lead-sync.js mapEntity) and passes [{ id, entity }];
+// only the entity field is written, in chunks.
+export async function updateLeadEntities(updates) {
+  for(let i = 0; i < updates.length; i += 400) {
+    await Promise.all(updates.slice(i, i + 400).map(u => updateDoc(doc(db, LEADS, u.id), { entity: u.entity })));
+  }
+  return { migrated: updates.length };
+}
+
 // One-time correction for a real incident: parseExcelDate() (admin.html)
 // used to silently misread 2-digit-year dates (e.g. "8/19/01") as year 2001
 // instead of 2026 — corrupting 241 leads' dateCreated on an Excel import.

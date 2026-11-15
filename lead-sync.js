@@ -321,6 +321,48 @@ export function sniffFreeTextColumn(headers, rows, exclude) {
   return best;
 }
 
+// ══ Entity ═════════════════════════════════════════════════════════════════
+// The sheet says where the lead belongs in its own words (a city, a clinic name);
+// the system's entities are IMC, Makkah, TFC, JP, RSM. Edit this table to add a
+// spelling. Order matters: the first entity whose alias appears as a whole word
+// wins, so "First clinic - Jeddah" is TFC, not IMC.
+const ENTITY_ALIASES = [
+  ['TFC',    ['first clinic', 'the first clinic', 'tfc', 'فيرست كلينك', 'فرست كلينك', 'فيرست كلنك', 'ذا فيرست كلينك']],
+  ['Makkah', ['makkah', 'makka', 'mecca', 'مكه', 'مكه المكرمه']],
+  ['IMC',    ['jeddah', 'jedda', 'jed', 'imc', 'جده', 'international medical center', 'المركز الطبي الدولي']],
+  ['JP',     ['jp']],
+  ['RSM',    ['rsm']],
+];
+const ENTITY_RULES = ENTITY_ALIASES.flatMap(([entity, aliases]) => aliases.map(a => ({
+  entity, re: new RegExp('(^| )' + KW_PREFIX + normText(a).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?= |$)'),
+})));
+// → the system entity name for a sheet value, or '' when it isn't one we know.
+export function mapEntity(raw) {
+  const t = normText(raw);
+  if(!t) return '';
+  const hit = ENTITY_RULES.find(r => r.re.test(t));
+  return hit ? hit.entity : '';
+}
+// A column whose values are (mostly) places we can map — found by content, so it works whatever the header says.
+function sniffEntityColumn(headers, rows, exclude) {
+  let best = null, bestScore = 0;
+  for(const h of headers) {
+    if(exclude.has(h) || /_id$/i.test(h.trim())) continue;
+    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
+    if(!vals.length) continue;
+    const score = vals.filter(v => mapEntity(v)).length / vals.length;
+    if(score > 0.5 && score > bestScore) { best = h; bestScore = score; }
+  }
+  return best;
+}
+
+// Department by AI / by keywords found anywhere in the row — both PAUSED by the admin's decision:
+// for now a lead's department is the sheet's own department column, else the default.
+// (The code stays; flip these to bring either back. A department column's own value is
+// still translated, e.g. an Arabic "القلب" → Cardiology.)
+export const AI_DEPT_ENABLED = false;
+export const ROW_KEYWORD_DEPT_ENABLED = false;
+
 export function detectLeadColumns(headers, rows) {
   const used = new Set();
   const claim = col => { if (col) used.add(col); return col; };
@@ -337,8 +379,9 @@ export function detectLeadColumns(headers, rows) {
   const sourceCol      = platformCol || claim(findColByKeywords(headers, ['source'], sys));
   const dateCol        = claim(findColByKeywords(headers, ['date'], sys) || (headers.includes('created_time') ? 'created_time' : null));
   const statusCol      = claim(findColByKeywords(headers, ['status'], sys));
-  const deptCol        = claim(findColByKeywords(headers, ['department','dept','specialty','speciality','clinic','تخصص','قسم','عيادة'], sys));
-  const entityCol      = claim(findColByKeywords(headers, ['entity','branch'], sys));
+  // Entity BEFORE department: a column holding "جده / مكه / First clinic" may well be headed "clinic", which would otherwise be taken for the department.
+  const entityCol      = claim(findColByKeywords(headers, ['entity','branch','فرع'], new Set([...sys, ...used])) || sniffEntityColumn(headers, rows, sniffExclude()));
+  const deptCol        = claim(findColByKeywords(headers, ['department','dept','specialty','speciality','clinic','تخصص','قسم','عيادة'], new Set([...sys, ...used]))); // not a column already taken (e.g. the entity column headed "clinic")
   // Deliberately no META_SYSTEM_COLUMNS exclusion here — campaign_name is
   // the one Meta bookkeeping field worth surfacing as a real value (the
   // ad campaign's human-readable name), unlike ad_name/adset_name/form_name.
@@ -386,7 +429,9 @@ export function leadRowFields(row, c, headers) {
     comment: c.commentCol ? String(row[c.commentCol] ?? '').trim() : '',
     notes: buildLeadNotesWithLeftover(row, c.leftoverCols, ''),
     department: fromCol,                                   // a real department column (or a clear answer in it)
-    deptGuess: fromCol ? null : ((guessDepartment(leadDeptEvidence(row, c, headers)) || {}).dept || null), // from keywords anywhere in the row
+    deptGuess: (!ROW_KEYWORD_DEPT_ENABLED || fromCol) ? null : ((guessDepartment(leadDeptEvidence(row, c, headers)) || {}).dept || null), // from keywords anywhere in the row (paused)
+    entity: c.entityCol ? mapEntity(row[c.entityCol]) : '',  // IMC / Makkah / TFC … (never the sheet's own wording)
+    entityRaw: c.entityCol ? String(row[c.entityCol] ?? '').trim() : '',
   };
 }
 
@@ -443,7 +488,7 @@ export function buildCandidates(csvText) {
       phone: normalizePhone(r[c.phoneCol]),
       email: c.emailCol ? (r[c.emailCol] || '') : '',
       source: c.sourceCol ? normalizeLeadSource(r[c.sourceCol], c.isPlatformSource) : '',
-      entity: c.entityCol ? (r[c.entityCol] || '') : '',
+      entity: f.entity, entityRaw: f.entityRaw,
       sheetDate: c.dateCol ? parseExcelDate(r[c.dateCol]) : '',
       notes: f.notes, comment: f.comment, adName: f.adName,
       department: f.department, deptGuess: f.deptGuess,
@@ -582,7 +627,7 @@ export function buildLeadDoc(r, cfg, nowMs) {
 export async function runLeadSync(d) {
   const cfg = d.config || {};
   const now = d.now;
-  const result = { startedAt: now, sheetRows: 0, imported: 0, assignedNew: 0, assignedBacklog: 0, classified: 0, keywordDept: 0, pendingDept: 0,
+  const result = { startedAt: now, sheetRows: 0, imported: 0, assignedNew: 0, assignedBacklog: 0, classified: 0, keywordDept: 0, entityUnmapped: [], pendingDept: 0,
                    skipped: {}, capped: false, agentsOnline: 0, error: '', warning: '', sheets: [] };
   const sheets = getSheets(cfg);
   const wmIn = { ...(d.watermarks || {}) };
@@ -613,7 +658,7 @@ export async function runLeadSync(d) {
     info.rows = parsed.candidates.length; result.sheetRows += info.rows;
     // Which sheet column fed each field, so the admin can see (and correct the sheet) if a guess was wrong.
     const cl = parsed.columns || {}, short = s => (s ? String(s).slice(0, 80) : '');
-    info.map = { adName: short(cl.adNameCol), comment: short(cl.commentCol), department: short(cl.deptCol), campaign: short(cl.campaignCol) };
+    info.map = { adName: short(cl.adNameCol), comment: short(cl.commentCol), department: short(cl.deptCol), campaign: short(cl.campaignCol), entity: short(cl.entityCol) };
     // Department order: the sheet's own department column (already applied) → a sheet dedicated to one department
     // → keywords found anywhere in the row → (below) the AI → the default.
     parsed.candidates.forEach(r => {
@@ -641,8 +686,10 @@ export async function runLeadSync(d) {
 
   // Department: a sheet column (or a dedicated sheet) always wins, then keywords; otherwise the AI where this page can run it.
   result.keywordDept = eligible.filter(r => r.departmentSource === 'keyword').length;
+  // Entity values in the sheet that are not one of ours — those leads get the default entity; say which wording, so it can be added.
+  result.entityUnmapped = [...new Set(eligible.filter(r => r.entityRaw && !r.entity).map(r => r.entityRaw))].slice(0, 5);
   const needDept = eligible.filter(r => !r.department);
-  if(needDept.length && cfg.classifyWithAI) {
+  if(AI_DEPT_ENABLED && needDept.length && cfg.classifyWithAI) {
     if(d.classify) { await d.classify(needDept); }
     else needDept.forEach(r => { r._aiFailed = true; });
     needDept.forEach(r => { if(r.department) result.classified++; else if(r._aiFailed) { r._pending = true; result.pendingDept++; } });
