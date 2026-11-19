@@ -72,6 +72,7 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
 .status-Pending{background:#FFF3D6;color:#8A6100}
 .status-Accepted{background:#E8F8F0;color:#0E7A55}
+.status-Completed{background:var(--navy);color:#fff}
 .status-Rejected{background:#FFE8E8;color:#9B2020}
 .status-NeedsInfo{background:#E3EEFF;color:#1A4FA0}
 .status-Withdrawn{background:#EEF0F5;color:#5A6178}
@@ -279,7 +280,7 @@ window.showView = function(view) {
   document.getElementById('view-btn-myrequests').classList.toggle('active', view==='myrequests');
 }
 
-const REQ_STATUS_CLASS = {'Pending':'status-Pending','Needs Info':'status-NeedsInfo','Accepted':'status-Accepted','Rejected':'status-Rejected','Withdrawn':'status-Withdrawn'};
+const REQ_STATUS_CLASS = {'Pending':'status-Pending','Needs Info':'status-NeedsInfo','Accepted':'status-Accepted','Completed':'status-Completed','Rejected':'status-Rejected','Withdrawn':'status-Withdrawn'};
 const replyDrafts = {}; // request id -> in-progress reply text, so a live update doesn't wipe what's being typed
 
 function renderQuotaNote() {
@@ -348,8 +349,11 @@ function renderMyRequests() {
     } else if(r.linkedInitiativeId) {
       const info = myReqInitiativeInfo(r.linkedInitiativeId);
       parts.push(info
-        ? `Now: <strong>${esc(info.title)}</strong> <span style="color:var(--text-3)">(${esc(info.status)})</span>`
+        ? `${status === 'Completed' ? 'Delivered' : 'Now'}: <strong>${esc(info.title)}</strong> <span style="color:var(--text-3)">(${esc(info.status)})</span>`
         : `<s>${esc(r.linkedInitiativeTitle||'Untitled')}</s> <span style="color:var(--text-3)">(deleted)</span>`);
+      if(status === 'Completed' && r.completedAt?.toDate) parts.push(`<div style="color:var(--text-3);margin-top:4px">Completed on ${r.completedAt.toDate().toLocaleDateString('en-GB')}</div>`);
+    } else if(status === 'Completed') {
+      parts.push(`<span style="color:var(--text-3)">Completed${r.completedAt?.toDate ? ' on ' + r.completedAt.toDate().toLocaleDateString('en-GB') : ''}</span>`);
     } else if(status === 'Accepted') {
       parts.push('<span style="color:var(--text-3)">Accepted — not yet linked to an activity</span>');
     } else if(status === 'Pending' && r.infoReply) {

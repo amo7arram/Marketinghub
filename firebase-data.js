@@ -714,6 +714,16 @@ export function reviewRequest(id, data) {
   return updateDoc(doc(db, REQUESTS, id), { ...data, reviewedAt: Timestamp.now() });
 }
 
+// Marking a request done / undoing it. Deliberately NOT reviewRequest(): that stamps
+// reviewedAt, which is the "decision time" used for time-to-decide — completing a
+// request weeks later must not rewrite when it was accepted.
+export function completeRequest(id, by) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Completed", completedAt: Timestamp.now(), completedBy: by || "" });
+}
+export function reopenRequest(id) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Accepted", completedAt: null, completedBy: null });
+}
+
 export const DAILY_REQUEST_LIMIT = 5;
 
 // Rolling 24-hour window (not "since midnight"): a request stops counting
@@ -750,10 +760,11 @@ export const REQUEST_TYPES = [
 ];
 export const PRIORITIES = ["Normal","High","Urgent"];
 
-// Pending → (Needs Info ⇄ Pending) → Accepted | Rejected; Withdrawn is the
-// requester pulling it back. "In production"/"Delivered" are deliberately NOT
-// stored — they're read live from the linked initiative's own status.
-export const REQUEST_STATUSES = ["Pending", "Needs Info", "Accepted", "Rejected", "Withdrawn"];
+// Pending → (Needs Info ⇄ Pending) → Accepted → Completed | Rejected; Withdrawn is the
+// requester pulling it back. "In production"/"Published" are still NOT stored — they're read
+// live from the linked initiative's own status; Completed is the admin's own "this request is
+// done" (markRequestComplete in admin.html), which can be undone back to Accepted.
+export const REQUEST_STATUSES = ["Pending", "Needs Info", "Accepted", "Completed", "Rejected", "Withdrawn"];
 export const REQUEST_REJECTION_REASONS = [
   "Insufficient Detail / Needs Clarification", "Outside Marketing Scope", "Duplicate Request",
   "Budget Not Available", "Lower Priority Than Current Workload",

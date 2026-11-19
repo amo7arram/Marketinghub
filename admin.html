@@ -123,6 +123,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
 .b-ready{background:#E4F8F0;color:#0E7A55}
 .b-published{background:#D4F0E2;color:#0D6E44}
 .b-cancelled{background:#FFE8E8;color:#9B2020}
+.b-completed{background:var(--navy);color:#fff}
 .type-pill{font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:#EEF0FF;color:#2E3BAA}
 
 /* ── MODAL FORM ── */
@@ -2209,7 +2210,7 @@ import {
   getInitiatives, watchInitiatives, addInitiative, updateInitiative, deleteInitiative,
   watchResources, addResource, updateResource, deleteResource, RESOURCE_TYPES,
   watchRequests, deleteRequest, reviewRequest, updateRequest, REQUEST_TYPES,
-  REQUEST_STATUSES, REQUEST_REJECTION_REASONS, migrateLegacyRequestStatuses,
+  REQUEST_STATUSES, REQUEST_REJECTION_REASONS, migrateLegacyRequestStatuses, completeRequest, reopenRequest,
   watchRequestAccounts, createRequestAccounts, deleteRequestAccount,
   watchLandingPages, createLandingPage, saveLandingPage, deleteLandingPage,
   getLandingPageBySlug, slugify, LANDING_PAGE_STATUSES,
@@ -4736,7 +4737,7 @@ window.renderResourcesTable = function() {
 
 // ── REQUESTS (filters, sort, accept/reject + initiative link, delete) ────
 const PRIORITY_CLASS = {'Urgent':'b-cancelled','High':'b-production','Normal':'b-ready'};
-const REQUEST_STATUS_CLASS = {'Pending':'b-planned','Needs Info':'b-production','Accepted':'b-published','Rejected':'b-cancelled','Withdrawn':'b-ready'};
+const REQUEST_STATUS_CLASS = {'Pending':'b-planned','Needs Info':'b-production','Accepted':'b-published','Completed':'b-completed','Rejected':'b-cancelled','Withdrawn':'b-ready'};
 const ADMIN_BASE_TITLE = document.title;
 
 // Everything a coordinator typed (title, description, notes, replies) is
@@ -4933,12 +4934,33 @@ window.saveRequestAccept = async function() {
     }
     // else: no link, or an explicit Unlink — both stay null.
 
-    await reviewRequest(id, { status: 'Accepted', linkedInitiativeId, linkedInitiativeTitle, reviewedBy: currentAdminEmail, ...handlerStampFor(r) });
+    // "Edit Link" on a request that is already Completed must not quietly turn it back into Accepted.
+    await reviewRequest(id, { status: requestStatusOf(r) === 'Completed' ? 'Completed' : 'Accepted', linkedInitiativeId, linkedInitiativeTitle, reviewedBy: currentAdminEmail, ...handlerStampFor(r) });
     showToast('Request accepted');
     closeRequestAcceptForm();
   } catch (e) {
     showToast('Save failed: ' + e.message + ' — if a new initiative was already created, check the Activities tab.', true);
   }
+}
+
+// ── Complete / reopen ──
+// "Completed" = the admin says this request is done. It is separate from the linked activity's own
+// status (Planned / Published …), which stays visible beside the link.
+window.markRequestComplete = async function(id) {
+  const r = ALL_REQUESTS.find(x => x.id === id);
+  if(!r) return;
+  const info = r.linkedInitiativeId ? initiativeInfoFor(r.linkedInitiativeId) : null;
+  if(info && info.status !== 'Published' && !confirm(`The linked activity "${info.title}" is still ${info.status}, not Published.\n\nMark this request complete anyway?`)) return;
+  if(!r.linkedInitiativeId && !confirm('This request is not linked to any activity. Mark it complete anyway?')) return;
+  try {
+    await completeRequest(id, myMemberName() || currentAdminEmail || '');
+    showToast('Request marked complete ✓');
+  } catch(e) { showToast('Save failed: ' + e.message, true); }
+}
+window.reopenRequestRow = async function(id) {
+  if(!confirm('Put this request back to Accepted?')) return;
+  try { await reopenRequest(id); showToast('Request reopened (Accepted)'); }
+  catch(e) { showToast('Save failed: ' + e.message, true); }
 }
 
 // ── Reject modal ──
@@ -4996,6 +5018,9 @@ window.renderRequestsTable = function() {
         const green = 'color:var(--green);border-color:var(--green)', red = 'color:var(--red);border-color:var(--red)';
         const btnAccept = `<button class="btn btn-sm" style="${green}" onclick="openRequestAcceptForm('${r.id}')">✓ Accept</button>`;
         const btnReject = `<button class="btn btn-sm" style="${red}" onclick="openRequestRejectForm('${r.id}')">✕ Reject</button>`;
+        // Highlighted when the linked activity is already Published — that is the moment to close the request.
+        const readyToComplete = status === 'Accepted' && info && info.status === 'Published';
+        const btnComplete = `<button class="btn btn-sm" style="${green}${readyToComplete ? ';font-weight:700;background:#E8F8F0' : ''}" onclick="markRequestComplete('${r.id}')" title="${readyToComplete ? 'The linked activity is Published — mark this request complete' : 'Mark this request as done'}">✓ Mark complete</button>`;
         const btnInfo   = `<button class="btn btn-sm" onclick="openRequestInfoForm('${r.id}')">❓ ${status === 'Needs Info' ? 'Re-ask' : 'Need Info'}</button>`;
         const btnTake   = !r.handledBy
           ? `<button class="btn btn-sm" onclick="claimRequest('${r.id}')">✋ Take it</button>`
@@ -5004,13 +5029,18 @@ window.renderRequestsTable = function() {
         let actions = btnDelete;
         if (status === 'Pending')         actions = btnTake + btnAccept + btnInfo + btnReject + btnDelete;
         else if (status === 'Needs Info') actions = btnTake + btnAccept + btnInfo + btnReject + btnDelete;
-        else if (status === 'Accepted')   actions = `<button class="btn btn-sm" onclick="openRequestAcceptForm('${r.id}')">✏️ Edit Link</button>` + btnReject + btnDelete;
+        else if (status === 'Accepted')   actions = btnComplete + `<button class="btn btn-sm" onclick="openRequestAcceptForm('${r.id}')">✏️ Edit Link</button>` + btnReject + btnDelete;
+        else if (status === 'Completed')  actions = `<button class="btn btn-sm" onclick="openRequestAcceptForm('${r.id}')">✏️ Edit Link</button>` + `<button class="btn btn-sm" onclick="reopenRequestRow('${r.id}')" title="Put it back to Accepted">↩ Reopen</button>` + btnDelete;
         else if (status === 'Rejected')   actions = btnAccept + btnDelete;
         // Withdrawn: nothing to decide — Delete only.
 
         let statusCell = `<span class="badge ${REQUEST_STATUS_CLASS[status]||'b-planned'}">${esc(status)}</span>`;
         if (status === 'Rejected' && r.rejectionReason) {
           statusCell += `<br><span style="font-size:10px;color:var(--text-3)">${esc(r.rejectionReason)}${r.rejectionNote?': '+esc(r.rejectionNote):''}</span>`;
+        } else if (status === 'Completed') {
+          statusCell += `<br><span style="font-size:10px;color:var(--text-3)">${r.completedAt?.toDate ? r.completedAt.toDate().toLocaleDateString('en-GB') : ''}${r.completedBy ? ' · ' + esc(r.completedBy) : ''}</span>`;
+        } else if (readyToComplete) {
+          statusCell += `<br><span style="font-size:10px;color:var(--green)">✓ activity is Published — ready to complete</span>`;
         } else if (status === 'Needs Info' && r.infoRequest) {
           statusCell += `<br><span style="font-size:10px;color:var(--text-3)">Asked: ${previewWithMore(r.infoRequest, 80, r.id)}</span>`;
         } else if (status === 'Pending' && r.infoReply) {
@@ -5121,11 +5151,12 @@ function renderUserRequests() {
   const counts = Object.fromEntries(REQUEST_STATUSES.map(s => [s, 0]));
   mine.forEach(r => { const s = requestStatusOf(r); counts[s] = (counts[s] || 0) + 1; });
   const total = mine.length, open = counts['Pending'] + counts['Needs Info'];
-  const decided = counts['Accepted'] + counts['Rejected'];
+  const accepted = counts['Accepted'] + counts['Completed']; // a completed request was accepted first
+  const decided = accepted + counts['Rejected'];
   const now = Date.now();
   const last24 = mine.filter(r => now - ts(r) < 86400000).length;
   const last30 = mine.filter(r => now - ts(r) < 30 * 86400000).length;
-  const turn = mine.filter(r => ['Accepted', 'Rejected'].includes(requestStatusOf(r)) && r.reviewedAt?.toMillis && ts(r))
+  const turn = mine.filter(r => ['Accepted', 'Completed', 'Rejected'].includes(requestStatusOf(r)) && r.reviewedAt?.toMillis && ts(r))
     .map(r => r.reviewedAt.toMillis() - ts(r)).filter(d => d >= 0);
   const avgTurn = turn.length ? turn.reduce((a, b) => a + b, 0) / turn.length : null;
 
@@ -5170,7 +5201,7 @@ function renderUserRequests() {
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           ${tile('Submitted', total, `${last30} in last 30 days`)}
           ${tile('Open now', open, counts['Needs Info'] ? `${counts['Needs Info']} awaiting their reply` : 'pending a decision', open ? 'var(--orange)' : '')}
-          ${tile('Accepted', decided ? Math.round(counts['Accepted'] / decided * 100) + '%' : '—', decided ? `${counts['Accepted']} of ${decided} decided` : 'nothing decided yet', decided && counts['Accepted'] / decided >= 0.5 ? 'var(--green)' : '')}
+          ${tile('Accepted', decided ? Math.round(accepted / decided * 100) + '%' : '—', decided ? `${accepted} of ${decided} decided${counts['Completed'] ? ` · ${counts['Completed']} completed` : ''}` : 'nothing decided yet', decided && accepted / decided >= 0.5 ? 'var(--green)' : '')}
           ${tile('Time to decide', avgTurn == null ? '—' : '≈ ' + fmtDuration(avgTurn), avgTurn == null ? '' : 'average, submit → decision')}
         </div>
         <div style="font-size:11px;color:var(--text-3);margin-top:8px">Last request ${fmtReqTs(sorted[0].createdAt)}${last24 ? ` · <strong>${last24}</strong> in the last 24 h` : ''}</div>
@@ -5238,6 +5269,7 @@ function renderRequestDetail() {
       ${row('Linked initiative', linked)}
       ${r.reviewedBy ? row('Last reviewed', `${esc(r.reviewedBy)} · ${fmtReqTs(r.reviewedAt)}`) : ''}
       ${status === 'Rejected' ? row('Rejection', `<strong>${esc(r.rejectionReason||'No reason given')}</strong>${r.rejectionNote?`<br>${esc(r.rejectionNote)}`:''}`) : ''}
+      ${status === 'Completed' ? row('Completed', `${fmtReqTs(r.completedAt)}${r.completedBy ? ' · ' + esc(r.completedBy) : ''}`) : ''}
       ${status === 'Withdrawn' ? row('Withdrawn', fmtReqTs(r.withdrawnAt)) : ''}
     </div>
     ${(r.infoRequest || r.infoReply) ? `<div class="rd-section">
