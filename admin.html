@@ -509,9 +509,12 @@ tr.row-overdue:hover td{background:#FFD6D6}
           <button class="btn btn-sm" onclick="shiftLeadsMonth(1)">▶</button>
           <button class="btn btn-sm" onclick="jumpToCurrentLeadsMonth()" id="leads-today-btn" style="display:none">Today</button>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer">
-          <input type="checkbox" id="leads-show-all" onchange="toggleLeadsShowAll()"> Show All Time
-        </label>
+        <div style="display:flex;align-items:center;gap:14px">
+          <button class="btn btn-sm" id="leads-month-dl" onclick="exportLeadsMonth()" title="Excel file with every lead of the month shown on the left — Date, Name, Phone, Department, Comment (ignores the filters below)">⬇️ Download month</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="leads-show-all" onchange="toggleLeadsShowAll()"> Show All Time
+          </label>
+        </div>
       </div>
       <!-- Stats row -->
       <div class="budget-stats" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px">
@@ -9509,6 +9512,37 @@ function refreshLeadsMonthNav() {
   document.getElementById('leads-today-btn').style.display = (!leadsShowAll && leadsMonthOffset !== 0) ? 'inline-block' : 'none';
   document.getElementById('leads-month-nav').style.opacity = leadsShowAll ? '0.4' : '1';
   document.getElementById('leads-show-all').checked = leadsShowAll;
+  const dl = document.getElementById('leads-month-dl');
+  if(dl) {
+    const n = leadsShowAll ? 0 : ALL_LEADS.filter(l => (l.dateCreated||'').startsWith(period)).length;
+    dl.disabled = leadsShowAll;
+    dl.textContent = leadsShowAll ? '⬇️ Download month' : `⬇️ Download ${new Date(y, m-1, 1).toLocaleDateString('en-US', {month:'short', year:'numeric'})} (${n})`;
+    dl.title = leadsShowAll ? 'Switch off "Show All Time" and pick a month to download it' : 'Excel file with every lead of this month — Date, Name, Phone, Department, Comment (ignores the filters below)';
+  }
+}
+
+// One month's full lead list for sharing: every lead whose Date Created is in the month shown in the
+// navigator (all departments, statuses and agents — the filters below do not apply), oldest first.
+window.exportLeadsMonth = function() {
+  if(leadsShowAll) { showToast('Switch off "Show All Time" and pick a month first', true); return; }
+  const period = currentLeadsPeriod();
+  const leads = ALL_LEADS.filter(l => (l.dateCreated||'').startsWith(period))
+    .sort((a, b) => (a.dateCreated||'').localeCompare(b.dateCreated||'') || (a.createdAt?.toMillis?.()||0) - (b.createdAt?.toMillis?.()||0));
+  if(!leads.length) { showToast('No leads in this month', true); return; }
+  const rows = leads.map(l => ({
+    Date: l.dateCreated || '',
+    Name: l.name || '',
+    Phone: l.phone || '',
+    Department: l.department || '',
+    // the lead's own comment; leads from before that field existed fall back to their old notes, as the table does
+    Comment: (l.comment !== undefined ? l.comment : l.notes) || '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows, { header: ['Date', 'Name', 'Phone', 'Department', 'Comment'] });
+  ws['!cols'] = [{ wch: 12 }, { wch: 28 }, { wch: 16 }, { wch: 26 }, { wch: 70 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, period);
+  XLSX.writeFile(wb, `leads-${period}.xlsx`);
+  showToast(`✓ Downloaded ${leads.length} lead${leads.length === 1 ? '' : 's'} for ${document.getElementById('leads-month-label').textContent}`);
 }
 function rerenderLeadsForScope() {
   currentLeadsPage = 1;
