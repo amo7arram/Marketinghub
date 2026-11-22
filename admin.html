@@ -1079,6 +1079,7 @@ tr.row-overdue:hover td{background:#FFD6D6}
         </div>
       </div>
 
+      <div class="field-group" id="fld-paidplatforms-wrap"><label class="field-label">Paid Media Platforms <span style="color:var(--text-3);font-weight:400;font-size:11px">— select all that apply</span></label><div class="chip-select" id="fld-paidPlatforms"></div></div>
       <div class="field-group" id="fld-channels-wrap"><label class="field-label">Channels</label><div class="chip-select" id="fld-channels"></div></div>
       <div class="field-group" id="fld-contenttype-wrap"><label class="field-label">Content Type</label><select class="field-select" id="fld-contentType"></select></div>
       <div class="field-group" id="fld-printtype-wrap"><label class="field-label">Print Type</label><select class="field-select" id="fld-printType"></select></div>
@@ -1782,7 +1783,7 @@ import {
   CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS,
   fetchGoogleSheetCSV, parseGoogleSheetId, setLeadStats,
   getDepartmentRevenueEstimates, setDepartmentRevenueEstimates, watchDepartmentRevenueEstimates,
-  DEPARTMENTS, CHANNELS, STATUSES, TYPES, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
+  DEPARTMENTS, CHANNELS, STATUSES, TYPES, PAID_MEDIA_PLATFORMS, CONTENT_TYPES, PRINT_TYPES, WEBSITE_UPDATE_TYPES,
   HEALTH_DAY_CATEGORIES, getDeptColor
 } from './firebase-data.js';
 
@@ -1830,6 +1831,7 @@ let promoSortDir = 'desc';
 let selectedPromoEntities = [];
 let selectedEntities = [];
 let selectedChannels = [];
+let selectedPaidPlatforms = [];
 let unsubInitiatives = null;
 let unsubHealthDays = null;
 let unsubTeamMembers = null;
@@ -2225,6 +2227,10 @@ function populateStaticSelects() {
   document.getElementById('fld-channels').innerHTML = CHANNELS.map(c=>
     `<div class="chip" data-val="${c}" onclick="toggleChip(this,'channels')">${c}</div>`
   ).join('');
+
+  document.getElementById('fld-paidPlatforms').innerHTML = PAID_MEDIA_PLATFORMS.map(p=>
+    `<div class="chip" data-val="${p}" onclick="toggleChip(this,'paidPlatforms')">${p}</div>`
+  ).join('');
 }
 
 window.toggleOtherDept = function() {
@@ -2234,7 +2240,9 @@ window.toggleOtherDept = function() {
 
 window.toggleChip = function(el, group) {
   el.classList.toggle('active');
-  const arr = group==='entity' ? selectedEntities : selectedChannels;
+  const arr = group==='entity' ? selectedEntities
+            : group==='paidPlatforms' ? selectedPaidPlatforms
+            : selectedChannels;
   const val = el.dataset.val;
   const idx = arr.indexOf(val);
   if(el.classList.contains('active') && idx===-1) arr.push(val);
@@ -2254,7 +2262,8 @@ window.selectType = function(type) {
   show('fld-enddate-wrap',           isCampaign);
   show('fld-sheetlink-wrap',         isCampaign);
   show('fld-objective-wrap',         true);
-  show('fld-channels-wrap',          type==='Event' || type==='SM Content' || type==='Physician Video');
+  show('fld-channels-wrap',          type==='Event' || type==='SM Content' || type==='Physician Video' || type==='Paid Media');
+  show('fld-paidplatforms-wrap',     type==='Paid Media');
   show('fld-contenttype-wrap',       type==='SM Content' || type==='Physician Video');
   show('fld-printtype-wrap',         type==='Print');
   show('fld-websiteupdatetype-wrap', type==='Website Update');
@@ -2265,9 +2274,9 @@ window.selectType = function(type) {
   show('fld-postlink-wrap',          isCampaign || type==='SM Content' || type==='Event' || type==='Print' || type==='Physician Video');
   show('fld-agentscript-wrap',       isCampaign);
   show('fld-caption-gen-wrap',       type==='Event' || type==='SM Content' || type==='Print' || type==='Physician Video');
-  show('fld-perf-wrap',              isCampaign || type==='SM Content' || type==='Physician Video');
-  show('fld-eng-wrap',               isCampaign || type==='SM Content' || type==='Physician Video');
-  show('section-perf',               isCampaign || type==='SM Content' || type==='Physician Video');
+  show('fld-perf-wrap',              isCampaign || type==='SM Content' || type==='Physician Video' || type==='Paid Media');
+  show('fld-eng-wrap',               isCampaign || type==='SM Content' || type==='Physician Video' || type==='Paid Media');
+  show('section-perf',               isCampaign || type==='SM Content' || type==='Physician Video' || type==='Paid Media');
 
   document.getElementById('fld-objective-label').textContent =
     (type==='Event' || type==='Website Update') ? 'Description' : 'Objective / Description';
@@ -2300,6 +2309,7 @@ window.openForm = function(initiative=null) {
   document.getElementById('form-title').textContent = initiative ? 'Edit Activity' : 'New Activity';
   selectedEntities = initiative ? [...(initiative.entity||[])] : [];
   selectedChannels = initiative ? [...(initiative.channels||[])] : [];
+  selectedPaidPlatforms = initiative ? [...(initiative.paidMediaPlatforms||[])] : [];
 
   populateParentCampaignSelect(editingId);
   selectType(initiative ? initiative.type : 'Event');
@@ -2350,6 +2360,7 @@ window.openForm = function(initiative=null) {
   // sync chips
   document.querySelectorAll('#fld-entity .chip').forEach(c=>c.classList.toggle('active', selectedEntities.includes(c.dataset.val)));
   document.querySelectorAll('#fld-channels .chip').forEach(c=>c.classList.toggle('active', selectedChannels.includes(c.dataset.val)));
+  document.querySelectorAll('#fld-paidPlatforms .chip').forEach(c=>c.classList.toggle('active', selectedPaidPlatforms.includes(c.dataset.val)));
 
   document.getElementById('form-overlay').classList.add('open');
 }
@@ -2390,6 +2401,7 @@ window.saveInitiative = async function() {
     googleSheetUrl: document.getElementById('fld-googleSheetUrl').value.trim(),
     objective: document.getElementById('fld-objective').value.trim(),
     channels: selectedChannels,
+    paidMediaPlatforms: currentType === 'Paid Media' ? selectedPaidPlatforms : [],
     contentType: document.getElementById('fld-contentType').value,
     printType: document.getElementById('fld-printType').value,
     eventScope: document.getElementById('fld-eventScope').value,
@@ -2690,7 +2702,7 @@ window.renderTable = function() {
         const overdue = isActivityOverdue(i);
         const typeCell = isCampaign
           ? `<span class="badge b-planned" style="cursor:pointer" onclick="openCampaignDrilldown('${i.id}')" title="View activities in this campaign">📦 Campaign${count?` · ${count}`:''}</span>`
-          : `<span class="type-pill">${i.type||''}</span>`;
+          : `<span class="type-pill">${i.type||''}</span>${i.type==='Paid Media' && (i.paidMediaPlatforms||[]).length ? `<div style="font-size:10px;color:var(--text-3);margin-top:3px">${i.paidMediaPlatforms.join(' · ')}</div>` : ''}`;
         return `
       <tr class="${overdue?'row-overdue':''}">
         <td>${typeCell}</td>
@@ -3081,7 +3093,7 @@ let budgetMonthChart = null;
 let budgetTypeChart  = null;
 
 const EXPENSE_TYPE_COLORS = [
-  '#00539B','#00A3D9','#C8A96E','#1DB87A','#E8820C','#6C5CE7','#E0392B','#0BA4A4'
+  '#00539B','#00A3D9','#C8A96E','#1DB87A','#E8820C','#6C5CE7','#E0392B','#0BA4A4','#8E44AD'
 ];
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -3104,6 +3116,7 @@ function getBudgetRows() {
     .map(i => ({
       id: i.id, title: i.title,
       type: i.type === 'SM Content' ? 'Paid Social'
+          : i.type === 'Paid Media' ? 'Paid Media'
           : i.type === 'Print'      ? 'Print Production'
           : i.type === 'Event'      ? 'Event' : 'Other',
       entity: (i.entity||[]).join(', '),

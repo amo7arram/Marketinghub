@@ -14,7 +14,7 @@ The core content-planning collection. Represents a single "Activity" — every c
 
 | Field | Type | Notes |
 |---|---|---|
-| `type` | string | One of: `Campaign`, `Event`, `SM Content`, `Print`, `Website Update`, `Physician Video`. Drives the public Dashboard's "Marketing Output" deliverable counts (`deliverableTypeFor()` in `index.html`) — maps to Videos/Social Posts/Events/Print/Website Updates by `type` (and `contentType` for `SM Content`/`Physician Video`, splitting Video/Reel into Videos vs. everything else into Social Posts). That classifier deliberately excludes `Cancelled`-status records (a real product decision — Planned/In Production/Ready/Published all still consumed real time and cost, so they count) and excludes `type: "Campaign"` container records themselves (a campaign is an organizing wrapper, not itself a deliverable — its real children already have their own type and are counted individually, so counting the container too would double-count the same work). The Activity-by-Department/Entity breakdown on the same Dashboard page uses this identical classifier, so the two can never disagree. |
+| `type` | string | One of: `Campaign`, `Event`, `SM Content`, `Paid Media`, `Print`, `Website Update`, `Physician Video`. (`Paid Media` is deliberately **not** counted in the Marketing Output buckets below — `deliverableTypeFor()` returns `null` for it, since it's ad spend rather than a produced organic deliverable; this also keeps it out of the Dashboard's Activity-by-Department/Entity breakdown, which shares that classifier.) Drives the public Dashboard's "Marketing Output" deliverable counts (`deliverableTypeFor()` in `index.html`) — maps to Videos/Social Posts/Events/Print/Website Updates by `type` (and `contentType` for `SM Content`/`Physician Video`, splitting Video/Reel into Videos vs. everything else into Social Posts). That classifier deliberately excludes `Cancelled`-status records (a real product decision — Planned/In Production/Ready/Published all still consumed real time and cost, so they count) and excludes `type: "Campaign"` container records themselves (a campaign is an organizing wrapper, not itself a deliverable — its real children already have their own type and are counted individually, so counting the container too would double-count the same work). The Activity-by-Department/Entity breakdown on the same Dashboard page uses this identical classifier, so the two can never disagree. |
 | `title` | string | Required |
 | `department` | string | From the `entities`-style shared `DEPARTMENTS` constant, or a custom "Other" value |
 | `entity` | array of strings | Which entities this applies to (IMC, Makkah, TFC, JP, RSM, or custom-added ones) |
@@ -22,7 +22,8 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `endDate` | string (YYYY-MM-DD) | Only meaningful for `type: "Campaign"` |
 | `status` | string | `Planned`, `In Production`, `Ready`, `Published`, `Cancelled` |
 | `objective` | string | Free-text brief/description |
-| `channels` | array of strings | e.g. `Instagram`, `TikTok`, `Facebook` — relevant for Event/SM Content |
+| `channels` | array of strings | e.g. `Instagram`, `TikTok`, `Facebook` — relevant for Event/SM Content, and for Paid Media running on the Social platform (which network) |
+| `paidMediaPlatforms` | array of strings | **`type: "Paid Media"` only** (saved as `[]` for every other type). Any of `Social`, `Search`, `Programmatic`, `App` (`PAID_MEDIA_PLATFORMS` in `firebase-data.js`) — a single paid activity can span several. Absent on documents created before this type existed. Paid Media has no Post Link field (so the "Published needs a link" rule doesn't apply) and no AI Caption Generator; it uses `cost` (budgeted under the `Paid Media` expense category), `reach`, `impressions`, `engagements`, `leadsGenerated`. |
 | `contentType` | string | `Post`, `Reel`, `Video`, `Story`, `Carousel` — for SM Content/Physician Video |
 | `printType` | string | `Brochure`, `Sticker`, `Flyer`, `Booklet`, `Signage`, `Countertop`, `Backdrop/Rollup` |
 | `eventScope` | string | `Internal` or `External` — for `type: "Event"` only |
@@ -229,7 +230,7 @@ Standalone budget line items (distinct from `initiatives.cost`, which tracks cos
 |---|---|---|
 | `title`, `description` | string | |
 | `cost` | number | SAR (corrected — this field was previously documented here as `amount`, which doesn't match the actual code) |
-| `type`, `entity` | string | `type` is a category (e.g. Paid Social, Print Production); `entity` is a single business entity, not an array like `initiatives.entity` |
+| `type`, `entity` | string | `type` is a category (e.g. Paid Social, Paid Media, Print Production — `Paid Media` is also what `type: "Paid Media"` initiatives are bucketed under in the Budget tab); `entity` is a single business entity, not an array like `initiatives.entity` |
 | `date` | string | |
 | `createdAt` | Timestamp | |
 

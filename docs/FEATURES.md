@@ -27,7 +27,8 @@ The complete, current feature set, organized by which file/role it lives in. Thi
 ## Admin Panel (`admin.html`) — `role: admin` only
 
 ### Activities (formerly "Initiatives")
-- Create/edit/delete any activity type: Campaign, Event, SM Content, Print, Website Update, Physician Video
+- Create/edit/delete any activity type: Campaign, Event, SM Content, Paid Media, Print, Website Update, Physician Video
+- **Paid Media** — an ad-spend activity that can run on any combination of Social, Search, Programmatic and App platforms (multi-select chips; Social also lets you pick the network via Channels). Shows its platforms under the type pill in the Activities table, tracks cost/reach/impressions/engagements/leads, and its cost is categorised as "Paid Media" in the Budget tab. Not counted in the public Dashboard's Marketing Output tiles (not an organic deliverable).
 - Two-tier type selector: choose "Single Activity" vs "📦 Campaign" first, then the specific subtype
 - Campaign-type records act as containers — the table shows them as a badge with a child count; clicking drills into a panel listing every linked activity (add/edit/remove children from there)
 - Any single activity can optionally link to a parent campaign via a dropdown

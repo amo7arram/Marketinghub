@@ -266,7 +266,7 @@ export const RESOURCE_TYPES = ["Social Media","Print","Stationery","Logo & Brand
 
 // ── EXPENSE TYPES ────────────────────────────────────────────────────────
 export const EXPENSE_TYPES = [
-  "Paid Social","Print Production","Event","Tools & Subscriptions",
+  "Paid Social","Paid Media","Print Production","Event","Tools & Subscriptions",
   "Agency / Freelance","Photography / Videography","Outdoor / OOH","Other"
 ];
 
@@ -717,7 +717,8 @@ export const DEPARTMENTS = [
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
 export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
-export const TYPES = ["Campaign","Event","SM Content","Print","Website Update","Physician Video"];
+export const TYPES = ["Campaign","Event","SM Content","Paid Media","Print","Website Update","Physician Video"];
+export const PAID_MEDIA_PLATFORMS = ["Social","Search","Programmatic","App"];
 export const WEBSITE_UPDATE_TYPES = ["News Article","Department Page Update","Doctor Profile Added","Doctor Profile Removed","Other"];
 export const CONTENT_TYPES = ["Post","Reel","Video","Story","Carousel"];
 export const PRINT_TYPES = ["Brochure","Sticker","Flyer","Booklet","Signage","Countertop","Backdrop/Rollup"];
