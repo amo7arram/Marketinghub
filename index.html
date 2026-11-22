@@ -667,9 +667,6 @@ a.post-link:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
 
       <!-- WELL-SPAN PROGRAM -->
       <div class="page" id="page-wellspan">
-        <div class="cal-controls" style="margin-bottom:20px">
-          <select class="cal-select" id="ws-entity-f" onchange="renderWellspan()"><option value="">All Entities</option></select>
-        </div>
         <div class="dash-section-title">Wellness Packages</div>
         <div class="promotions-grid" id="wellspan-packages-grid" style="margin-bottom:28px"><div class="loading">Loading...</div></div>
         <div class="dash-section-title">Wellspan Promotions</div>
@@ -847,7 +844,7 @@ document.addEventListener('click', (e) => {
 function populateEntityFilters() {
   const names = ALL_ENTITIES.map(e=>e.name);
   const optionsHtml = '<option value="">All Entities</option>' + names.map(e=>`<option>${e}</option>`).join('');
-  ['cal-entity','promo-entity-f','camp-entity-filter','evt-entity-filter','ws-entity-f','bd-entity-f'].forEach(id=>{
+  ['cal-entity','promo-entity-f','camp-entity-filter','evt-entity-filter','bd-entity-f'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) {
       const prevVal = el.value;
@@ -879,7 +876,7 @@ function populateFilters() {
   document.getElementById('res-type-filter').innerHTML += RESOURCE_TYPES.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('print-dept-filter').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
   document.getElementById('promo-dept-f').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  // wellspan and BD entity filters are pre-populated in HTML
+  // BD entity filter is pre-populated in HTML
 }
 
 // ── DATA LOAD ─────────────────────────────────────────────────────────
@@ -1938,8 +1935,6 @@ window.openPromoDetail = function(p) {
 
 // ── WELL-SPAN PROGRAM ────────────────────────────────────────────────────
 window.renderWellspan = function() {
-  const entityF = document.getElementById('ws-entity-f').value;
-
   // Packages
   const packages = WELLSPAN;
   const pgrid = document.getElementById('wellspan-packages-grid');
@@ -1965,7 +1960,7 @@ window.renderWellspan = function() {
   }
 
   // Wellspan promotions
-  const promos = PROMOTIONS.filter(p=>p.isWellspan && (!entityF || (p.entity||[]).includes(entityF)));
+  const promos = PROMOTIONS.filter(p=>p.isWellspan);
   const PROMO_STATUS_CLASS = {'Active':'b-published','Upcoming':'b-planned','Expired':'b-past'};
   const prGrid = document.getElementById('wellspan-promos-grid');
   if(!promos.length) {
