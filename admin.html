@@ -2707,7 +2707,7 @@ window.selectType = function(type) {
   show('fld-eventscope-wrap',        type==='Event');
   show('fld-physicianname-wrap',     type==='Physician Video');
   show('fld-parentcampaign-wrap',    !isCampaign);
-  show('fld-postlink-wrap',          isCampaign || type==='SM Content' || type==='Event' || type==='Print' || type==='Physician Video');
+  show('fld-postlink-wrap',          isCampaign || type==='SM Content' || type==='Event' || type==='Print' || type==='Physician Video' || type==='Paid Media');
   show('fld-agentscript-wrap',       isCampaign);
   show('fld-caption-gen-wrap',       type==='Event' || type==='SM Content' || type==='Print' || type==='Physician Video');
   show('fld-perf-wrap',              isCampaign || type==='SM Content' || type==='Physician Video' || type==='Paid Media');
@@ -2717,7 +2717,7 @@ window.selectType = function(type) {
   document.getElementById('fld-objective-label').textContent =
     (type==='Event' || type==='Website Update') ? 'Description' : 'Objective / Description';
   document.getElementById('fld-postlink-label').textContent =
-    type==='Print' ? 'Link to Content / File' : 'Post Link';
+    type==='Print' ? 'Link to Content / File' : type==='Paid Media' ? 'Post Link (optional)' : 'Post Link';
 }
 
 window.selectKind = function(kind) {
