@@ -22,7 +22,7 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `endDate` | string (YYYY-MM-DD) | Only meaningful for `type: "Campaign"` |
 | `status` | string | `Planned`, `In Production`, `Ready`, `Published`, `Cancelled` |
 | `objective` | string | Free-text brief/description |
-| `channels` | array of strings | e.g. `Instagram`, `TikTok`, `Facebook` — relevant for Event/SM Content, and for Paid Media running on the Social platform (which network) |
+| `channels` | array of strings | From `CHANNELS` in `firebase-data.js`: `Instagram`, `TikTok`, `Facebook`, `X`, `LinkedIn`, `Snapchat`, `Print`, `Multi-channel` (`Snapchat` added with the content-calendar import) — relevant for Event/SM Content, and for Paid Media running on the Social platform (which network) |
 | `paidMediaPlatforms` | array of strings | **`type: "Paid Media"` only** (saved as `[]` for every other type). Any of `Social`, `Search`, `Programmatic`, `App` (`PAID_MEDIA_PLATFORMS` in `firebase-data.js`) — a single paid activity can span several. Absent on documents created before this type existed. Paid Media has no Post Link field (so the "Published needs a link" rule doesn't apply) and no AI Caption Generator; it uses `cost` (budgeted under the `Paid Media` expense category), `reach`, `impressions`, `engagements`, `leadsGenerated`. |
 | `contentType` | string | `Post`, `Reel`, `Video`, `Story`, `Carousel` — for SM Content/Physician Video |
 | `printType` | string | `Brochure`, `Sticker`, `Flyer`, `Booklet`, `Signage`, `Countertop`, `Backdrop/Rollup` |
@@ -31,7 +31,7 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `websiteUpdateLink` | string | URL — for `type: "Website Update"` |
 | `physicianName` | string | Optional — for `type: "Physician Video"`, tracks which doctor is featured |
 | `postLink` | string | URL to the published content, once live. Originally shown only for `SM Content`/`Event`/`Print`/`Physician Video`; now also shown for `type: "Campaign"` so a campaign container can carry one representative post link, surfaced to agents alongside `agentScript` (see below). |
-| `socialImageUrl` | string \| null | Real published post image, auto-matched from Metricool and written by `admin.html`'s `syncMetricool()` — not by the user directly. Matches this initiative's `postLink` against Metricool's `/v2/scheduler/posts` (`providers[].publicUrl`) for the same live URL, and if found, stores the first non-video media item from that post. **Coverage is inherently partial, not a bug**: only content actually scheduled/published *through* Metricool can match at all (content posted natively bypasses Metricool's scheduler entirely), and LinkedIn essentially never matches, since the `postLink` typically pasted from LinkedIn's own "Share" link (`urn:li:activity:...`) uses a different URL scheme than what Metricool records for the same post (`urn:li:ugcPost:...`). Real-data test on this project: ~48% of published initiatives with a `postLink` matched. Used by `index.html`'s Dashboard "this month" campaign list to show a real thumbnail instead of a plain color dot, falling back to the dot when absent — and, since that list opens the shared `openDetail()` side panel (also used by SM Calendar and Dept Campaigns cards) on click, `socialImageUrl` renders full-size at the top of that panel automatically, for any initiative it's set on, from any entry point that already calls `openDetail()`. This is a zero-cost mechanism — no Firebase Storage/upload capability exists yet (would require the Blaze plan); a general upload-based fallback for the other ~50% is a deferred future decision. |
+| `socialImageUrl` | string \| null | Real published post media, auto-matched from Metricool and written by `admin.html`'s `syncMetricool()` — not by the user directly. Matches this initiative's `postLink` against Metricool's `/v2/scheduler/posts` (`providers[].publicUrl`) for the same live URL, and if found, stores the first non-video media item from that post — or, if the post has no still image at all (a reel/video-only post), the raw `.mp4` itself, so reels aren't excluded from coverage. **Coverage is inherently partial, not a bug**: only content actually scheduled/published *through* Metricool can match at all (content posted natively bypasses Metricool's scheduler entirely), and LinkedIn essentially never matches, since the `postLink` typically pasted from LinkedIn's own "Share" link (`urn:li:activity:...`) uses a different URL scheme than what Metricool records for the same post (`urn:li:ugcPost:...`). Real-data test on this project: ~48% of published initiatives with a `postLink` matched. Used by `index.html`'s Dashboard "this month" campaign list and Recent Posts gallery (the latter scoped to the dashboard's selected month) to show a real thumbnail instead of a plain color dot/empty state — every consumer checks the URL with `isVideoUrl()` and renders a muted, seeked-to-first-frame `<video>` instead of an `<img>` when it's a `.mp4`. Falls back to the dot/empty-state when absent — and, since the campaign list opens the shared `openDetail()` side panel (also used by SM Calendar and Dept Campaigns cards) on click, `socialImageUrl` renders full-size (with playback controls, if a video) at the top of that panel automatically, for any initiative it's set on, from any entry point that already calls `openDetail()`. This is a zero-cost mechanism — no Firebase Storage/upload capability exists yet (would require the Blaze plan); a general upload-based fallback for the other ~50% is a deferred future decision. |
 | `agentScript` | string | **`type: "Campaign"` only.** 1-2 paragraphs of calling context/talking points, shown to agents via a click-through popover on the Campaign cell in both `admin.html`'s and `call-center.html`'s leads tables, wherever a lead's `campaignId` points to this record. |
 | `captionEN` / `captionAR` | string | AI-generated or manually written captions |
 | `captionHeadline` | string | Short on-image headline text |
@@ -42,7 +42,11 @@ The core content-planning collection. Represents a single "Activity" — every c
 | `featuredBD` | boolean | Shows on the Business Development page |
 | `parentCampaignId` | string \| null | **Critical field** — links a single activity to a parent `Campaign`-type initiative. Absence means the activity is standalone. |
 | `googleSheetUrl` | string | Only on `type: "Campaign"` — optional linked Google Sheet for live lead import |
-| `assignedTo` | string | Team member name, sourced from `team_members` — **who's working on producing this content**, unrelated to `leads.assignedAgentUid`/`assignedAgentName` (which lead a call-center agent should follow up on). Two different assignment concepts that happen to share a similar name. |
+| `assignedTo` | string | Team member name, sourced from `team_members` — **who's working on producing this content**, unrelated to `leads.assignedAgentUid`/`assignedAgentName` (which lead a call-center agent should follow up on). Two different assignment concepts that happen to share a similar name. Still the display source of truth; `assignedToUid` is the stable companion. |
+| `assignedToUid` | string \| null | Firebase Auth UID of the assignee, resolved from the picked name against `team_members.authUid` at save time. Drives the Activities page's "👤 Mine only" filter (`i.assignedToUid === currentAdminUid`, with a name fallback for pre-existing rows). Null when the assignee has no login account, or on legacy documents. |
+| `createdByUid` / `createdByName` | string \| null | Stamped once, on create, from the signed-in admin (`createdByName` falls back to their login email, then `"Unknown"`, when they have no matching `team_members` directory row). Powers the **creator-locked reassignment** UI guard: the "Assigned To" field on an existing activity is editable only by the creator or the Super Admin (`admin.html`'s `canReassign()`). **UI-level only — no Firestore rule enforces it**, consistent with the app's other soft boundaries. Legacy documents with no `createdByUid` stay reassignable by any admin. `createdByName` is also shown on the public `openDetail()` panel. |
+| `planId` / `planSource` / `planMonth` / `plannerNote` | string | Set **only** on documents created by the Monthly Planner. `planId` (`plan-YYYY-MM-<random>`) is shared by every document in one plan and is what "Undo plan" keys on; `planSource` is always `"monthly-planner"`; `planMonth` is the planned month (`YYYY-MM`); `plannerNote` is the planner's one-line rationale plus what it anchored the activity to (e.g. `Anchor: calendar — World Diabetes Day`). Undo deletes only documents with this `planId` whose `status` is still `Planned`. Absent on everything created by hand, by the Campaign Generator, or from a request. |
+| `importId` / `importSource` | string | Set **only** on documents created by **Import content calendar** (`calendar-import.js` + `admin.html`). `importId` (`cal-YYYYMMDD-<random>`) is shared by every document in one import — posts and any campaign it created — and is what "Undo this import" keys on; `importSource` is always `"calendar-import"`. Undo deletes only documents with this `importId` whose `status` is still `Planned`; a campaign the import created goes only if no other activity has it as `parentCampaignId`. Absent on everything else (the Monthly Planner uses `planId` instead, so the two undo mechanisms never touch each other's documents). The import fills only existing fields (`type:"SM Content"`, `title`, `department`, `entity`, `startDate`, `status`, `objective` ← the content pillar, `channels`, `contentType`, `captionAR` ← caption + hashtags, `parentCampaignId`) — never internal notes, since this collection is public-read. |
 | `reach` / `impressions` / `engagements` | number \| null | Manually entered performance figures |
 | `createdAt` / `updatedAt` | Firestore Timestamp | |
 
@@ -65,9 +69,9 @@ Standalone reference calendar of health awareness days, Saudi/Islamic occasions,
 
 ---
 
-## `promotions`
+## `promotions` — ⚠️ legacy, retired
 
-Sales/marketing promotions (discount packages, seasonal offers).
+Sales/marketing promotions (discount packages, seasonal offers), manually entered one at a time. **Superseded by `offers_catalog` below** — the admin.html Promotions tab, the public Promotions Calendar page, and the Well-span page's promotions integration were all removed. Existing documents are left in place untouched (same convention as the old `metrics` collection) — nothing reads or writes this collection anymore.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -78,9 +82,43 @@ Sales/marketing promotions (discount packages, seasonal offers).
 | `discountPct` | number | Auto-calculated from the two prices above |
 | `startDate`, `endDate` | string | |
 | `conditions` | string | Fine print |
-| `isWellspan` | boolean | Shows on the Well-span Program page if true |
+| `isWellspan` | boolean | Used to show on the Well-span Program page — no longer read anywhere |
 | `leadsGenerated`, `estimatedBookings` | number \| null | |
 | `createdAt` | Timestamp | |
+
+---
+
+## `offers_catalog`
+
+Excel-driven public price/discount catalog — replaces `promotions` above. Admin uploads Finance's master Excel sheet (`admin.html`'s "Offers Catalog" tab); each publish wholesale-replaces the entire catalog. Read by the public `offers.html` page and by `call-center.html`'s read-only Offers tab.
+
+**Doc ID = a slugified branch key** (e.g. `imc_jeddah`), sharded one document per branch rather than one collection-wide document — a deliberate scaling precaution, since Firestore documents cap at 1 MiB and the real ongoing catalog is very likely larger than the 287-row National Day campaign subset this was modeled on (see `national-day-offers.html`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `branchLabelEN`, `branchLabelAR` | string | Display name for this branch's tab |
+| `offers` | array of objects | One entry per Excel row for this branch: `{code, description, category, arabic, price, discountedPrice, discountPct}`. `discountPct` is always computed from `price`/`discountedPrice` at import time, never trusted from a sheet column (with one exception — see below), so it can't drift out of sync with the two prices. |
+| `updatedAt` | Timestamp | |
+
+**Column detection is now verified against Finance's real "Promotional Campaigns" sheet** (confirmed with the user, not a guess). That sheet's actual columns are `Status, Provider, Year, Campaign Title, Code, Description, Gross Price, Proposed Discount, Net Price, Starting Date, End Date, Payor, Notes` — several real-world quirks this shapes the import around:
+- **`Status` gates what's imported.** Only rows marked `Active` are live offers. The sheet's own "Reference" tab defines `Inactive` as "code & discount previously approved in system" (i.e. retired, not current) and `Approved`/`Pending` as not-yet-live — in the real sheet, 520 of 840 rows were `Inactive`, so this filter is load-bearing, not cosmetic.
+- **`Provider` is the branch column**, mapped through a small hardcoded table (`OFFERS_BRANCH_CODE_MAP` in `admin.html`, confirmed with the user): `IMC`→IMC Jeddah, `FC`→The First Clinic, `MC`→IMC Makkah Branch, `RS`→Red Sea Mall Clinic. A cell can list several comma-separated (`"FC, IMC"`) — the same offer is then pushed into every branch named, not treated as one combined branch. An unrecognized code is used as-is and flagged in the preview rather than dropped.
+- **`Gross Price` can be blank.** When it is, and `Net Price` + `Proposed Discount` are both present, `price` is back-calculated (`Net ÷ (1 − discount)`) rather than skipping the row — verified against real rows where both figures were present that this relationship holds exactly. If nothing usable is present at all, the row is skipped (reported in the preview, with examples) rather than publishing a broken price.
+- **`Campaign Title` is used as `category`** (there's no dedicated specialty/department column) — an explicit product decision, not a fallback.
+- **No Arabic column exists.** `arabic` is AI-drafted from `description` at import time (`claude-sonnet-4-6`, batched) when the sheet doesn't supply one — degrades to English-only if no API key is configured or the call fails. The preview shows a sample of English→Arabic pairs for a spot-check; full manual review of every line isn't practical at typical row counts (a few hundred), so this is a "reviewable draft," not a guarantee.
+
+The import's preview step (per-branch/category counts, status-excluded counts, price-skip examples, unrecognized-branch warnings, Arabic sample) remains the safety net before anything publishes.
+
+## `config/offers_catalog_meta`
+
+```
+config/offers_catalog_meta = {
+  branches: [ { id, labelEN, labelAR, count }, ... ],
+  rowCount: <total offers across all branches>,
+  updatedAt: Timestamp,
+}
+```
+Public-readable single document — lets `offers.html` and `call-center.html`'s Offers tab discover which branch documents exist (and render tab labels immediately) with one small read, instead of listing the whole `offers_catalog` collection.
 
 ---
 
@@ -92,25 +130,38 @@ The CRM core. Each document is **one interaction** — a person engaging with on
 |---|---|---|
 | `name`, `phone` | string | Required. `phone` is the de facto identity key used for the Contact History lookup (not a formal foreign key — just a runtime filter) |
 | `department` | string | |
-| `entity` | string | Single value (not an array, unlike `initiatives.entity`) |
-| `source` | string | e.g. `Meta Ads`, `Google`, `Walk-in` |
+| `entity` | string | Single value (not an array, unlike `initiatives.entity`). Imports translate the sheet's wording to the system's entity names (`mapEntity()` / `ENTITY_ALIASES` in `lead-sync.js`: جدة/Jeddah → IMC, مكة → Makkah, First clinic → TFC); wording that isn't recognised is not stored, the default entity is used. Older leads may still carry the sheet's own wording until **🏷 Fix Entities** is run. |
+| `source` | string | e.g. `Meta Ads`, `Google`, `Walk-in`. When imported from a Meta Lead Ads export (Excel or Google Sheet), auto-populated from that sheet's `platform` column with `ig`/`fb` translated to `Instagram`/`Facebook`, and a blank platform value defaulting to `Meta` (still a Meta Lead Ads row even if untagged) — see `detectLeadColumns()`/`normalizeLeadSource()` in `admin.html`. A genuinely free-typed Source column on a non-Meta sheet is left exactly as typed, including blank. |
 | `campaignId` | string \| null | References an `initiatives` document where `type === "Campaign"` |
 | `campaign` | string | Denormalized campaign title, kept for display and for legacy free-text imports where no `campaignId` exists |
-| `dateCreated` | string (YYYY-MM-DD) | Drives every month-scoped lead figure app-wide (`config/lead_stats.byMonth`/`byMonthDept`, the public "Leads by Department" chart, the AI Reports MoM comparisons). **Two real incidents, same symptom (year silently read as 2001), different causes** — worth understanding both, since Excel date handling keeps finding new edge cases: (1) An ambiguous 2-digit-year string (e.g. `8/19/01`) fell through to the browser's native date parser, which defaults a missing/ambiguous century to 1900s-or-2000s guesswork; `parseExcelDate()` (`admin.html`) now rejects any date string with no 4-digit year anywhere in it, returning unparsed (shown as "not parsed" in red in the import preview) rather than guessing. (2) **The real cause of a second, later incident**: `handleExcelUpload()` originally read every column's *formatted display string* (`sheet_to_json({raw:false, dateNF:'yyyy-mm-dd'})`) — if a source date column happened to be styled with an Excel format that omits the year entirely (e.g. the built-in "d-mmm" style, displaying `19-Aug`), the year was gone from the string before `parseExcelDate` ever saw it, regardless of the underlying cell's real value — `dateNF`'s override doesn't reliably win over a cell's own format. Fixed by reading the date column's raw underlying value from a parallel `raw:true` pass instead of the formatted-string pass used for every other column — and deliberately *not* using SheetJS's `cellDates:true` conversion for this, since testing found its Date objects aren't reliably anchored to a clean UTC or local midnight (environment-dependent), unlike the plain numeric Excel serial, which converts deterministically. `fixCorruptedLeadYears()` (`firebase-data.js`) is a one-time correction for already-corrupted records from either cause, wired to a "🗓 Fix Corrupted Dates" button in the Leads CRM toolbar — safe to run repeatedly, a no-op once nothing matches. |
+| `dateCreated` | string (YYYY-MM-DD) | Drives every month-scoped lead figure app-wide (`config/lead_stats.byMonth`/`byMonthDept`, the public "Leads by Department" chart, the AI Reports MoM comparisons). **Two real incidents, same symptom (year silently read as 2001), different causes** — worth understanding both, since Excel date handling keeps finding new edge cases: (1) An ambiguous 2-digit-year string (e.g. `8/19/01`) fell through to the browser's native date parser, which defaults a missing/ambiguous century to 1900s-or-2000s guesswork; `parseExcelDate()` (now in `lead-sync.js`, shared by the manual importers and the automatic sync) now rejects any date string with no 4-digit year anywhere in it, returning unparsed (shown as "not parsed" in red in the import preview) rather than guessing. (2) **The real cause of a second, later incident**: `handleExcelUpload()` originally read every column's *formatted display string* (`sheet_to_json({raw:false, dateNF:'yyyy-mm-dd'})`) — if a source date column happened to be styled with an Excel format that omits the year entirely (e.g. the built-in "d-mmm" style, displaying `19-Aug`), the year was gone from the string before `parseExcelDate` ever saw it, regardless of the underlying cell's real value — `dateNF`'s override doesn't reliably win over a cell's own format. Fixed by reading the date column's raw underlying value from a parallel `raw:true` pass instead of the formatted-string pass used for every other column — and deliberately *not* using SheetJS's `cellDates:true` conversion for this, since testing found its Date objects aren't reliably anchored to a clean UTC or local midnight (environment-dependent), unlike the plain numeric Excel serial, which converts deterministically. `fixCorruptedLeadYears()` (`firebase-data.js`) is a one-time correction for already-corrupted records from either cause, wired to a "🗓 Fix Corrupted Dates" button in the Leads CRM toolbar — safe to run repeatedly, a no-op once nothing matches. |
 | `contactStatus` | string | `Untouched`, `Reached`, `Unreached`, `Missed` — **mutually exclusive, always sums to 100% of leads** |
 | `outcome` | string | `Pending`, `Open File`, `Follow-up Scheduled`, `Booked`, `Wrong Number`, `Already a Patient`, `Closed - Unsuccessful` (`OUTCOMES` in `firebase-data.js`) — **only meaningful when `contactStatus === "Reached"`**. Once `outcome === "Booked"`, both `contactStatus`/`outcome` are locked in the UI (agents: no override; admin: override with a confirm prompt) — a workflow guard, not a Firestore rule, to protect revenue reporting from accidental edits. |
 | `closureReason` | string \| null | Only meaningful when `outcome === "Closed - Unsuccessful"` — one of `CLOSURE_REASONS` (`firebase-data.js`). Captures *why* a lead didn't convert, cleared automatically if `outcome` changes away from Closed - Unsuccessful. |
 | `assignedAgentUid` | string \| null | Firebase Auth UID of the agent this lead is assigned to. Set only by admins (`admin.html`) — agents can't reassign, matching the existing role boundary (`ARCHITECTURE.md` §4.1). Only team members with `hasLoginAccount && authUid` can be assigned, since anyone else could never see the lead in their own scoped view. Drives Contact Center Control's default "My Leads" filter (`l.assignedAgentUid === auth.currentUser.uid`). |
 | `assignedAgentName` | string | Denormalized display name, same convention as `campaign`/`campaignId`. |
 | `revenueValue` | number \| null | SAR — actual known revenue from this booking, feeds campaign ROI |
-| `notes` | string | For `source:"Landing Page"` leads, populated from that page's optional Comment field |
-| `email` | string \| null | Optional everywhere, including on `source:"Landing Page"` leads — the landing page form only requires Name and Phone. Not yet added to the Excel/Sheet import column-detection — a natural, separate follow-up. |
+| `notes` | string | For `source:"Landing Page"` leads, populated from that page's optional Comment field. For Excel/Sheet-imported leads, carries any unrecognized source column (e.g. a Meta Lead Ads form's custom questions) appended as `Question: Answer` pairs — see `detectLeadColumns()` in `lead-sync.js` and `docs/FEATURES.md`'s Leads CRM section. Since the `comment` field was added, the lead's own free-text comment is **not** in here any more (older leads still have it mixed in). Agents also write their call notes here. |
+| `comment` | string | What the lead wrote in the form — the sheet column found by header (comment / تعليق / message / رسالة / استفسار / note / ملاحظات …) or, failing that, the one remaining column whose values are long and different on every row. Shown in the **Comment** column of both leads tables. Written (possibly empty) on every lead created by the automatic sync, Excel upload and Sheet import and on manually added leads; **absent = a lead from before this field existed**, whose table cell falls back to its old `notes` (greyed, italic). Capped at 2,000 characters on import. |
+| `adName` | string | The offer / ad the lead came from: the sheet column named for the offer (`offer name`, `اسم العرض`, `offer`, …), else Meta's `ad_name`. Shown in the **Ad name** column; searchable. Capped at 200 characters. Absent on leads from before this field existed. |
+| `departmentSource` | string \| null | `"ai"` when `department` was auto-classified from the lead's notes on a Google Sheet import (`classifyLeadDepartments()` in `admin.html`); `"keyword"` when it was found from keywords in the row (currently **paused**, as is the AI: `AI_DEPT_ENABLED` / `ROW_KEYWORD_DEPT_ENABLED` in `lead-sync.js`; existing marks stay) (see `guessDepartment()` in `lead-sync.js`: ad/offer/campaign/form names, the comment and the form answers; no department column needed); absent on everything else. Shown as 🤖 / 🔎 in the leads tables. Set to `null` whenever an admin changes the department by hand (single edit or bulk edit), so the mark only ever means "a guess nobody has reviewed". It is a *guess* — the admin accepted a percentage of errors by design. |
+| `autoImported`, `autoImportedAt` | boolean, number (ms) | Set only on leads brought in by the **automatic sync** (`lead-sync.js`; see `config/lead_automation`). `true` is what lets the Firestore rules accept the create from an *agent's* page — see `isAutoImportedLead()` in `firestore.rules`, which also pins `contactStatus:'Untouched'`, `outcome:'Pending'` and whitelists the exact field set. Also marks which leads the "assign the waiting backlog" step may hand out. Absent on everything imported by hand. |
+| `sourceRowId` | string \| null | The sheet row's own Meta lead id (the `id` column). The primary duplicate guard: a row whose id already exists on any lead is never imported again — by the automatic sync **or** by the manual "Import from Google Sheet". Absent on leads created before this existed (those are matched by phone + campaign + date within 2 days instead) and on rows with no `id` column. |
+| `deptPending` | boolean | `true` while `department` is only the default placeholder because the AI hadn't classified the lead yet (the automatic sync ran on a page without the API key, or the AI call failed/was skipped). An admin page's sweep classifies it, sets `department`, `departmentSource:'ai'` and `deptPending:false`; leaving the lead unclear clears the flag but keeps the default. Shown as ⏳. Absent otherwise. |
+| `sourceHint` | string | Up to 400 chars of the sheet's form/ad/campaign name, kept **only** on `deptPending` leads so the later sweep still has the hint the classifier uses. Contains no contact details. |
+| `email` | string \| null | Optional everywhere, including on `source:"Landing Page"` leads — the landing page form only requires Name and Phone. Also detected/imported by both Excel upload and Google Sheet import as of the shared `detectLeadColumns()` column-detection engine (English/Arabic keyword match, falling back to content-sniffing for "@"-containing values). |
 | `landingPageId` | string \| null | Set only when `source === "Landing Page"` — references the `landing_pages` doc (by slug) that generated this lead. Informational only, no live lookup renders against it the way `initiatives`-linking fields do elsewhere, so a deleted landing page leaves this harmlessly dangling. |
 | `createdAt`, `updatedAt` | Timestamp | |
 
 **⚠️ Legacy field:** `status` (old flat single-status model: `Lead`/`Open File`/`Booked`/`Closed`). Migrated via `migrateLegacyLeadStatuses()` — should be fully absent on any document that has gone through migration.
 
 **Known limitation:** there is no formal "Contact" entity separate from "Lead interaction." A phone-number lookup at read time simulates contact history; this is not a true relational model and would need a proper `contacts` collection (one per unique person) with `lead_interactions` as child records in any serious rebuild.
+
+---
+
+## `agent_presence` — who is online to receive leads
+
+One document per agent, **document id = the agent's Firebase Auth uid**: `{ name, page, lastSeen (ms) }`. Written by `call-center.html` for role `agent` only (never for an admin viewing that page, so admins are never handed leads) — once on load, when the tab becomes visible again, and every 60 s while it is visible. "Online" means `lastSeen` is within the last 3 minutes (`PRESENCE_FRESH_MS` in `lead-sync.js`); a closed or hidden tab ages out on its own, nothing needs to be cleaned up. Firestore rules: read admin + agent; an agent may create/update/delete **only their own** document, with exactly the keys `name`, `page`, `lastSeen`. Contains a display name and a timestamp — no contact data. Stale documents are harmless.
 
 ---
 
@@ -157,6 +208,8 @@ Directory of staff, used for the "Assigned To" dropdown and optionally linked to
 | `department` | string | Optional |
 | `hasLoginAccount` | boolean | |
 | `authUid` | string \| null | The Firebase Auth UID, if a login account was created |
+| `role` | string | Mirror of the `roles/{authUid}` value, set at login-account creation (`admin` / `coordinator` / `agent`) — display convenience only; `roles` is the auth source of truth |
+| `superAdmin` | boolean | UI-level flag (**not** a `roles` value): this person can reassign any activity regardless of who created it. Intended for exactly one person — `admin.html` soft-blocks setting a second one. Only meaningful for a member with a login account. Editable on the member's row in Settings → Team Members. |
 | `active` | boolean | |
 | `createdAt` | Timestamp | |
 
@@ -189,23 +242,46 @@ Marketing requests submitted by coordinators via `request.html`, reviewed (accep
 | `type` | string | From `REQUEST_TYPES` constant |
 | `deadline` | string | |
 | `priority` | string | From `PRIORITIES` constant — `Normal`/`High`/`Urgent` (previously documented here as including `Low`, which doesn't exist in the actual constant) |
-| `status` | string | One of `REQUEST_STATUSES` (`firebase-data.js`): `Pending`, `Accepted`, `Rejected` |
+| `submittedBy` | string | The submitter's Firebase Auth email — set by the form, and **pinned by the Firestore create rule to the caller's real `request.auth.token.email`**, so it can't be forged. This is what scopes a coordinator's view and their 5-per-24h quota. |
+| `status` | string | One of `REQUEST_STATUSES` (`firebase-data.js`): `Pending`, `Needs Info`, `Accepted`, `Completed`, `Rejected`, `Withdrawn`. Created as `Pending` (the rule insists). `Completed` is set by an admin (**✓ Mark complete** on an Accepted request) and can be undone (**↩ Reopen** → `Accepted`); it needs no rules change because admins may update any field. "In production"/"Published" are deliberately not statuses — they're read live from the linked initiative. |
+| `completedAt`, `completedBy` | timestamp, string | Set when an admin marks the request `Completed` (display name of the admin); set back to `null` on Reopen. Deliberately separate from `reviewedAt`, which stays the time of the accept/reject decision (it feeds "time to decide"). |
+| `handledBy` / `handledByUid` | string \| null | The admin handling this request: set by "Take it"/"Take over", or stamped automatically on Accept/Reject/Needs Info if nobody has claimed it (an existing handler is never overwritten by those). Admin-only fields (not in the create whitelist). Shown to the requester as "Handled by". |
+| `infoRequest` | string \| null | The admin's question, when `status === "Needs Info"` |
+| `infoReply` / `infoRepliedAt` | string / Timestamp \| null | The requester's answer; written by the requester via `replyToInfoRequest()`, which also flips `status` back to `Pending`. A re-ask clears them. Only the latest question/answer is kept — no thread history. |
+| `withdrawnAt` | Timestamp | Set when the requester withdraws (only possible from Pending/Needs Info) |
 | `rejectionReason` | string \| null | From `REQUEST_REJECTION_REASONS`, only meaningful when `status === "Rejected"` |
 | `rejectionNote` | string | Optional free-text elaboration alongside `rejectionReason` |
 | `linkedInitiativeId` | string \| null | Raw `initiatives` doc id, or `null` — same convention as `marketing_actions.linkedInitiativeId`. Set either by auto-creating a new initiative at Accept time, or by linking to an existing one. **No referential integrity** (same accepted gap as `marketing_actions`/`leads.campaignId`) — deleting the linked initiative leaves this dangling; both `admin.html` and `request.html`'s "My Requests" view render an explicit "(deleted)" label rather than going silently blank. |
 | `linkedInitiativeTitle` | string \| null | Denormalized display title. The *live* status shown anywhere is always a fresh lookup against `initiatives`, never a stored/denormalized status field. |
 | `reviewedAt` | Timestamp | Set when an admin accepts or rejects |
 | `reviewedBy` | string | Admin's email |
-| `createdAt` | Timestamp | Used to enforce `DAILY_REQUEST_LIMIT` per submitter |
+| `createdAt` | Timestamp | Drives the rolling-24h `DAILY_REQUEST_LIMIT` (5) per `submittedBy` — see `computeRequestQuota()`. Client-side only (Firestore rules can't count); an admin deleting a request frees one slot, withdrawing does not. |
 | `done` | boolean | ⚠️ Legacy — predates `status`. Requests created before the accept/reject workflow existed only ever had this boolean. `migrateLegacyRequestStatuses()` converts them one time (`done:true`→`Accepted`, `done:false`/missing→`Pending`); until migrated, `requestStatusOf()` in `admin.html` interprets `done` on the fly so old rows still render correctly. |
 
-The submitting coordinator can see their own requests and their live status/outcome via `request.html`'s "My Requests" panel (`watchMyRequests(email, ...)`, scoped client-side by `submittedBy` — the Firestore rule itself is the same blanket authenticated-read as every other internal collection, not a per-document restriction; see `docs/ARCHITECTURE.md` §4.2).
+The submitting coordinator can see their own requests and their live status/outcome via `request.html`'s "My Requests" panel (`watchMyRequests(email, ...)`). **That scoping is now enforced by the Firestore rule**, not just the query: a coordinator may only read documents whose `submittedBy` equals their own login email. The same rule limits what they can create (fixed field whitelist, `Pending` only) and update (withdraw, or answer a Needs Info question — nothing else); see `docs/ARCHITECTURE.md` §4.9.
+
+---
+
+## `request_accounts`
+
+The ~20 shared coordinator logins for `request.html`, managed in admin.html → Settings → Request Accounts. **Doc ID = the Firebase Auth UID** (deterministic, `setDoc`). **Admin-only** in `firestore.rules` — it holds plain-text passwords, so never move this data anywhere a coordinator can read.
+
+| Field | Type | Notes |
+|---|---|---|
+| `number` | number | Sequence number; new batches continue from the highest existing one |
+| `label` | string | `Request User 07` — deliberately not a department name |
+| `username` | string | Full Firebase identity, `rq-xxxxxx@requests.imc.med.sa`. Shown/typed as just the `rq-xxxxxx` part |
+| `password` | string | Plain text, 10 random chars — stored so admins can re-read it and re-export the credentials sheet |
+| `createdBy` | string | Admin's email |
+| `createdAt` | Timestamp | |
+
+Each account also has `roles/{uid} = { role: "coordinator", requestAccount: true }` (the extra flag is informational — nothing keys off it). Deleting an account removes both documents; the raw Firebase Auth user is not deleted (client code can't), so remove it in Console → Authentication for a full cleanup.
 
 ---
 
 ## `marketing_actions`
 
-Action items agreed between executive leadership and marketing in meetings, managed entirely from `admin.html`'s "Marketing Actions" tab. Read-only for leadership via the separate `actions.html` page (see `ARCHITECTURE.md` §4.4 for its access model — it deliberately reuses `admin.html`'s exact Magic Word session rather than getting its own role).
+Action items agreed between executive leadership and marketing in meetings, managed entirely from `admin.html`'s "Marketing Actions" tab. Read-only for leadership via the separate `actions.html` page (see `ARCHITECTURE.md` §4.4 for its access model — it deliberately reuses `admin.html`'s exact `role: admin` session rather than getting its own role).
 
 | Field | Type | Notes |
 |---|---|---|
@@ -261,7 +337,9 @@ See the `config` table below for where this fits among other single-document con
 
 ```
 config/metricool_stats = {
-  updatedAt: Timestamp,
+  updatedAt: Timestamp,          // when the last sync that actually fetched data finished (never bumped by a sync that fetched nothing)
+  lastSyncFailures: number,      // requests that failed on that sync (0 = clean) — shown as a warning beside "Last synced"
+  lastSyncAttempted: number,     // requests made on that sync (11: 9 timelines + follower snapshot + scheduled-posts lookup)
   series: {
     <seriesKey>: [ { date: "YYYY-MM-DD", value: number, source: "metricool" | "manual" }, ... ],
     ...
@@ -274,6 +352,61 @@ config/metricool_stats = {
 Points are daily. `source:"metricool"` points come from admin.html's "Sync Now" action; `source:"manual"` points are a whole-month admin override (dated to the last day of that month) that future syncs skip — see `mergeMetricoolSeries()` in `admin.html`. `metricoolMonthlyValue(stats, seriesKey, period)` (`firebase-data.js`, shared by both `admin.html` and `index.html` so the two pages can never disagree) derives one display number per series+month: a manual override wins outright if present, otherwise the series' points for that month are summed, averaged, or the latest one is taken, depending on that series' `agg` rule (`sum` for volume metrics like reach/views, `avg` for the engagement-rate percentage, `last` for point-in-time follower counts).
 
 **Known gap:** `instagram_followers` has no historical data available from Metricool at all (no working follower-history endpoint was found for Instagram specifically, unlike LinkedIn/X which do have real daily follower timelines) — only a live snapshot via a separate endpoint. Per project decision, this series only starts accumulating data from whenever syncing began; there is no backfill for it, unlike the other series which were backfilled from 2026-04-01.
+
+---
+
+## `social_comments`
+
+Comments and reviews pulled from Metricool's **Inbox API** — `GET /v2/inbox/post-comments?provider={INSTAGRAM|FACEBOOK|TIKTOKBUSINESS}` for comments and `GET /v2/inbox/reviews?provider=GMB` for Google Business reviews. These are Metricool's own real, documented endpoints (verified directly against their `swagger.json`, not assumed or reverse-engineered) — the same Inbox feature visible in Metricool's own web app, reached through the same CORS proxy Worker and token already used for everything else Metricool in this app. Not scraping: no separate Meta Developer App or App Review was needed. (Metricool's schema also allows `INSTAGRAMBUSINESS`; a live sync confirmed this account's connection needs plain `INSTAGRAM` instead — see the `provider` row below.)
+
+Doc ID = `${provider}_${sourceCommentOrReviewId}` (deterministic, so re-syncing the same item is a no-op `setDoc` rather than a duplicate).
+
+| Field | Type | Notes |
+|---|---|---|
+| `provider` | string | One of Metricool's own enum values actually used here: `INSTAGRAM`, `FACEBOOK`, `TIKTOKBUSINESS`, `GMB` (their schema also lists `INSTAGRAMBUSINESS`, `TWITTER`, `YOUTUBE`, `LINKEDIN` — not requested, confirmed unnecessary for this account's Instagram connection specifically) |
+| `type` | string | `comment` or `review` |
+| `text` | string | The comment text, or the review's `message` |
+| `authorName` | string \| null | From Metricool's `owner` (comments) or first `participants[].name` (reviews) |
+| `stars` | number \| null | Google Business reviews only — the star rating, returned by Metricool's `Review.stars` field |
+| `postText` | string \| null | The original post's caption, for context — comments only, null for reviews |
+| `createdAtRaw` | string \| null | The comment/review's own creation date/time, as returned by Metricool |
+| `sentiment` | `positive` \| `neutral` \| `negative` \| null | Set by `admin.html`'s `classifySentiment()` (Claude, `claude-sonnet-4-6`) — never re-computed once set, so re-syncing the same item doesn't re-spend AI tokens on it |
+| `sentimentThemes` | array of strings \| null | Up to 2 short lowercase theme tags per item (e.g. `"wait times"`, `"pricing"`), when a clear theme is present |
+| `countedInRollup` | boolean | Whether this item has already been added to its month's bucket in `config/sentiment_stats.byMonth` — **deliberately separate from `sentiment` existing.** An item can have a `sentiment` (no AI spend needed on the next sync) while not yet being `countedInRollup` — e.g. anything classified before this field existed. Missing/false on such pre-existing docs, so they get folded into the rollup the next time they're fetched, no manual reset needed. Gating the rollup on `sentiment` instead of this field caused a real incident: every already-classified comment silently disappeared from the monthly totals on the next sync, because none of them still counted as "needs classifying." |
+| `syncedAt` | ISO string | When this app last wrote this document |
+
+**Authenticated-only by product decision, not a technical PII rule**: this content was posted publicly, but some of it is patient-adjacent complaints, so it's admin-only and never read by any public page — see `ARCHITECTURE.md`'s security-model notes for the full reasoning.
+
+**Storage/read cost is a non-issue at any realistic volume**: comment text is small (a few hundred bytes each) — even tens of thousands of items stay far under Firestore's free-tier 1 GiB storage cap. The dashboard never queries this collection directly (see `config/sentiment_stats` below); it's read only during sync, to check whether an already-fetched item was already classified (bounded by however many items one sync run fetches, not the collection's full historical size).
+
+## `config/sentiment_stats`
+
+The rollup `admin.html`'s Comment Sentiment section actually reads — kept small and cheap regardless of how large `social_comments` grows, same reasoning as `config/lead_stats`/`config/metricool_stats`, except this one is **authenticated-only**, not public.
+
+```
+config/sentiment_stats = {
+  byMonth: {
+    "2026-09": { positive: number, neutral: number, negative: number, themeCounts: { "wait times": number, ... } },
+    "2026-08": { ... },
+    ...
+  },
+  recentComments: [ /* up to 30 social_comments-shaped objects, current calendar month only, negative-first then most-recent-first */ ],
+  lastSyncReport: "Instagram (Business): 0 · Instagram: 15 · Facebook: failed (HTTP 403 — ...) · TikTok: 0 · Google Business: 13",
+  lastSyncedAt: ISO string,
+}
+```
+
+**`lastSyncReport`** is the per-platform breakdown from the most recent sync (item count, or the failure reason) — shown persistently under the sync button, not just as a transient toast. Added after a real incident where every platform except Google Business silently returned nothing, with no visible indication of *why* (a per-provider fetch failure was only ever `console.error`'d, invisible to the admin). It's also what confirmed this account's Instagram connection needs plain `INSTAGRAM` — `INSTAGRAMBUSINESS` consistently returned 0 with no error and has since been dropped from `commentChannels` (`fetchInboxItems()` in `admin.html`).
+
+**A second, more serious bug found via that same real-sync process**: `/v2/inbox/post-comments` returns one `PostCommentsThread` per top-level comment, whose `root` field (type `RootComment`) **is that comment itself** (`root.text`/`root.owner`/`root.creationDate`) — `root.comments[]` is only *replies* to it, which is empty for the large majority of real comments (most comments never get a reply). The original code only ever read `root.comments[]` and never `root` itself, so it silently discarded almost every real comment — 140 fetched Instagram threads produced close to zero usable items. Fixed to extract `root` as a comment in its own right, in addition to any genuine replies in `root.comments[]`. **Confirmed working live** (2026-09-13): a real sync correctly surfaced comments across Instagram, Facebook, and Google Business. A temporary raw-sample debug view used to diagnose this has since been removed — no longer needed now that the mapping is verified against real data, not just the documented schema.
+
+**The recent-comments list has a client-side platform filter** (`sentimentPlatformFilter` / `setSentimentPlatformFilter()` in `admin.html`) — filter chips above the list (All / Instagram / Facebook / TikTok / Google Business) narrow the already-loaded `recentComments` array to one provider; no extra Firestore read, since the full month's recent list is already in memory.
+
+**Bucketed by each comment's own real date, not "the month it happened to sync in"** — a sync run just adds whatever it fetched to the month bucket that date actually falls in, and only for items not already counted from an earlier sync (checked per-item against `social_comments`, so re-syncing never double-counts a bucket). This is what makes the admin dashboard's month-over-month percentage comparison possible, mirroring the `byMonth` convention already used by `lead_stats`/`metricool_stats`.
+
+**Coverage caveat, worth knowing**: Metricool's `/v2/inbox/post-comments` and `/v2/inbox/reviews` endpoints document no date-range or page-size parameter (confirmed against their real `swagger.json` — several *other* Metricool endpoints do document `page`/`limit`/`from`/`to` when supported, so this appears to be a genuine gap, not an oversight in reading their docs). `admin.html`'s `fetchInboxItems()` best-effort follows the `page.next` cursor their response includes (bounded by `SENTIMENT_MAX_PAGES`, since it's unconfirmed whether their server actually honors that cursor), but a single sync is **not guaranteed to capture every comment for the current month** — coverage improves by syncing a few times through the month rather than only once at the end. Numbers still roll up correctly either way, since each comment lands in its own real month bucket whenever it's eventually fetched.
+
+Also folded into the Advisor tab's pulse (`buildAdvisorSentimentSummary()` in `admin.html`) as `pulse.sentiment` — `{ positivePct, negativePct, positiveDeltaPts, total, topThemes, lastSyncedAt }`, `positiveDeltaPts` being the percentage-point change vs. the previous month — so the AI briefing can reference it alongside everything else, e.g. "comment sentiment dipped 12pts this month, mostly complaints about wait times."
 
 ---
 
@@ -314,7 +447,12 @@ Several unrelated pieces of app-wide configuration are stored as individual docu
 | `brand_voice` | AI content generation brand voice settings (tone, hashtags, banned words, CTAs) |
 | `ai_settings` | Anthropic API key (⚠️ stored here, visible client-side — see `ARCHITECTURE.md` §4) |
 | `access_gate` | Public portal password gate settings |
-| `admin_passcode` | The "Magic Word" shared passcode hash |
+| ~~`admin_passcode`~~ | **Removed** — held the "Magic Word" shared admin-login passcode hash; that login path was retired once every admin had an individual account (`ARCHITECTURE.md` §4.4). The document may still exist in Firestore but has no rule and is read/written by nothing. |
+| `advisor_brief` | **Authenticated-only** (never public — lead-derived). The AI-written briefing for `admin.html`'s Advisor tab: `{ json: {headline, whatStandsOut, phoneRoomSignal, recommendations[], watchList[], campaignIdeas[], provocation}, generatedAt, generatedByName, coverageNote }`. One org-wide doc; any admin can regenerate it (overwrites). The pulse it's built from is computed client-side and not stored. Becomes `/orgs/{id}/config/advisor_brief` under multi-tenancy. |
+| `sentiment_stats` | **Authenticated-only.** Rollup for the Comment Sentiment section — see its own section above for the full shape. |
+| `entity_profiles` | **Admin-only.** `{ profiles: { "<entity name>": { positioning, audience, location, focusDepartments[], partnerships, competitors, constraints, monthlyVolume, monthlyBudget, notes, updatedBy, updatedAt } } }` — an internal brief per entity (who it serves, focus departments, partnerships, competitors, constraints, realistic activity count and budget guide), written in Settings → Entity Profiles and meant to be the planner's knowledge of each entity. Keyed by entity **name** (how every other collection references an entity) inside one document, saved with a deep merge so editing one entity never overwrites another. Deliberately NOT stored on `entities`, which is public-read. The core four fields — `positioning`, `audience`, `focusDepartments`, `monthlyVolume` — are what mark a profile "ready for planning"; the rest only sharpen it. A deleted entity's profile stays behind, harmless. |
+| `lead_automation` | **Read: admin + agent; write: admin.** Settings of the automatic Google-Sheet sync (Settings → Lead Automation): `{ enabled, sheets: [{ id, label, url, department, entity, startFromMs }] (1–5), sheetUrl, startFromMs, intervalMinutes (1–30), defaultDepartment, defaultEntity, classifyWithAI, autoAssign, maxUntouchedPerAgent (number\|null), excludedAgentUids[], startFromMode ('new'\|'all'), agentDirectory: [{uid, name}], updatedBy, updatedAt }`. **`sheets`** is the list of sheets read each run; per sheet, `department` (if set, rows with no department of their own get it directly — no AI) and `entity` (default entity for that sheet) are optional, and `startFromMs` is that sheet's cutoff: rows created before it are never imported (set to "now" when the sheet is added or its link is changed, `0` for "also import what's already there"; re-enabling after a pause deliberately keeps the old value so the sync catches up). **`sheetUrl` and `startFromMs` at the top level are legacy**: configs saved before multi-sheet support have only these (read as a single sheet — nothing to migrate), and saves now keep mirroring the *first* sheet into them so a browser tab that hasn't been refreshed yet keeps working. `startFromMode` only records the last "when a sheet is added" choice. `agentDirectory` is a copy of the team members who are agents with a login, kept current by the admin page — it exists only because agent pages cannot read `team_members` yet need names for `assignedAgentName`. Holds no PII and no secret (the sheet URL is the sheet's own "anyone with the link" address). |
+| `lead_sync_state` | **Read/write: admin + agent** (both page types run the sync). Run bookkeeping, written only by `lead-sync.js` via `firebase-data.js`: `{ holderRunnerId, holderName, holderPage, leaseUntil (ms), runStartedAt, lastRunAt (ms), lastResult: { startedAt, runBy, runPage, sheetRows, imported, assignedNew, assignedBacklog, classified, pendingDept, skipped:{noContact,tooOld,dupRowId,dupLegacy,dupPair,dupInSheet}, capped, agentsOnline, error, warning, sheets:[{label,key,rows,imported,error}] }, watermarks:{[sheetKey]:ms}, watermarkMs, watermarkSheet }`. `error` is set only when **every** sheet failed; `warning` names the sheets that failed while others worked; `sheets` is the per-sheet breakdown shown in the status panel. The **lease** (`holderRunnerId`/`leaseUntil`, 180 s) is taken in a transaction so only one browser syncs at a time and a crashed browser's lease simply expires; the same transaction refuses a run that starts less than the minimum interval after `lastRunAt`. **`watermarks`** = one entry per sheet, keyed by `sheetKey(url)` = spreadsheet id + `_` + tab gid (e.g. `1AbC…_0`, so another tab of the same workbook is a different sheet and a re-pasted link to the same tab keeps its marker): the newest row time seen, used with a 30-minute overlap to bound how far back each run looks. It is deep-merged, so a sheet that failed in a run keeps its previous value; entries for removed sheets are simply left behind. A failed sheet never advances its watermark, and a sheet that still has new rows waiting after the 300 cap only advances to what was imported from it. `watermarkMs`/`watermarkSheet` are the **legacy single-sheet pair** (now the first sheet's), still written for not-yet-refreshed tabs and still honoured: where `watermarks` has no entry for a sheet whose URL equals `watermarkSheet`, `watermarkMs` is used for it — it is never applied to a different sheet. |
 | `lead_stats` | **Public-readable** aggregated leads funnel snapshot — written by admin, read by `index.html`. Contains zero PII by design. |
 | `department_revenue_estimates` | Per-department average revenue, used as the ROI fallback when actual `leads.revenueValue` isn't entered |
 | `metricool_settings` | Metricool API token + userId/blogId (⚠️ stored here, visible client-side — same tradeoff as `ai_settings`, see `ARCHITECTURE.md` §4). Needs an authenticated-only Firestore rule, same sensitivity class as `ai_settings`. |
@@ -333,12 +471,18 @@ config/lead_stats = {
   byDepartment: { [dept]: {total, reached, booked} },   // all-time cumulative, not month-scoped
   byEntity:     { [entity]: {total, reached, booked} }, // all-time cumulative
   bySource:     { [source]: {total, reached, booked} }, // all-time cumulative
-  byMonth:      { [YYYY-MM]: {total, reached, booked} },
-  byMonthDept:  { [YYYY-MM]: { [dept]: count } },        // powers index.html's "Leads by Department" chart
-  campaigns:    [ {campaignId, title, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
+  byMonth:      { [YYYY-MM]: {total, reached, booked, untouched, unreached, missed, openFile, closedUnsuccessful} },
+  byMonthDept:  { [YYYY-MM]: { [dept]: count } },        // powers index.html's "Leads by Department" chart and the month-scoped By Department bars
+  byMonthEntity:   { [YYYY-MM]: { [entity]: count } },   // month-scoped By Entity bars on the public Leads & Attribution page
+  byMonthCampaign: { [YYYY-MM]: { [campaignId]: count } }, // the "Leads in <month>" column of the public campaign table
+  campaigns:    [ {campaignId, title, startDate, endDate, cancelled, runState, runDetail, cost, leads, reached, booked, openFile, cpl, cpa, actualRevenue, estimatedRevenue, roi, roiIsEstimated}, ... ],
   updatedAt,
 }
 ```
+
+All `byMonth*` structures key on the lead's `dateCreated` month — each month is a cohort ("how did the leads that *arrived* this month turn out so far"), not activity within the month. `byMonth`'s first three fields (`total`/`reached`/`booked`) predate the others; a document published before the full funnel was added has month entries missing `untouched`/`unreached`/`missed`/`openFile`/`closedUnsuccessful`, and no `byMonthEntity`/`byMonthCampaign` at all, until an admin next opens the Leads CRM and republishes — consumers must treat those as "not available yet", not zero. `index.html` renders them as "—".
+
+`campaigns[].runState` (`Running`/`Upcoming`/`Completed`/`Cancelled`) and `runDetail` ("3 days left", "ended 12 days ago", …) are derived from the campaign's own `startDate`/`endDate`/`status` by `campaignRunState()` in `admin.html`. **They are a snapshot as of the last publish** — a campaign whose end date passes overnight still reads "Running" in this document until an admin next loads the Leads CRM. The admin panel recomputes live on every render, so it is never stale. `cancelled` (campaign `status === "Cancelled"`) and `startDate`/`endDate` are published precisely so the public page can recompute the state itself rather than trust `runState` — `index.html`'s `ldCampaignRunState()` does, and mirrors `campaignRunState()`'s rules.
 
 `byDepartment`/`byEntity`/`bySource` are all-time totals with no month dimension — `byMonthDept` was added specifically because the Dashboard's monthly department breakdown needed one and none of the existing structures had it.
 
@@ -373,10 +517,16 @@ team_members
 entities.name
   ├── referenced by initiatives.entity[]
   ├── referenced by bd_cards.entity
-  └── referenced by promotions.entity[]
+  └── referenced by promotions.entity[]              [⚠️ legacy collection, see above]
 
 marketing_actions
   └── initiatives (linkedInitiativeId → initiative)   [optional, admin-managed]
+
+offers_catalog (branch slug = doc ID)
+  └── config/offers_catalog_meta                      [lists which branch docs exist]
+
+social_comments (provider_sourceId = doc ID)
+  └── config/sentiment_stats                          [rollup the dashboard/Advisor actually read]
 ```
 
 None of these relationships are enforced by Firestore itself — every "reference" is just a string ID or name stored on the child document, validated only by application code at write time. A real relational (or rigorously-validated document) database would be a meaningful reliability improvement in any SaaS rebuild.

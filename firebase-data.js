@@ -6,7 +6,7 @@
 import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, getDoc, setDoc,
-  getDocs, onSnapshot, query, where, Timestamp
+  getDocs, onSnapshot, query, where, Timestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword
@@ -288,7 +288,13 @@ export function deleteExpense(id) {
   return deleteDoc(doc(db, EXPENSES, id));
 }
 
-// ── PROMOTIONS CRUD ───────────────────────────────────────────────────────
+// ── PROMOTIONS CRUD — ⚠️ legacy, retired ──────────────────────────────────
+// Superseded by the Excel-driven OFFERS CATALOG below. No UI writes or reads
+// this anymore (admin.html's Promotions tab was removed, index.html's
+// Promotions Calendar and Well-span integration were removed) — existing
+// `promotions` documents are left in place untouched, exports kept only so
+// this history isn't silently lost, same convention as the old `metrics`
+// collection elsewhere in this file.
 export function watchPromotions(callback) {
   return onSnapshot(collection(db, PROMOTIONS), snap => {
     const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -318,6 +324,57 @@ export function promoStatus(startDate, endDate) {
   return 'Active';
 }
 
+// ── OFFERS CATALOG (Excel-driven, replaces the retired Promotions above) ──
+// Sharded one document per branch (not one collection-wide document) — a
+// deliberate scaling precaution: Firestore documents cap at 1 MiB, and the
+// real ongoing catalog is very likely larger than the 287-row National Day
+// campaign subset this was modeled on. Doc ID = a slugified branch key
+// (e.g. "imc_jeddah"), matching whatever branches the uploaded sheet
+// actually contains — never hardcoded to a fixed list of branches.
+const OFFERS_CATALOG = "offers_catalog";
+
+export function watchOffersCatalogMeta(callback) {
+  return onSnapshot(doc(db, CONFIG, "offers_catalog_meta"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchOffersCatalogMeta:', err.code); callback(null); }
+  );
+}
+
+// One-time fetch — used by the admin import UI to show what's currently live
+// before overwriting it, and by call-center.html's read-only Offers tab.
+export async function getOffersCatalogBranch(branchId) {
+  const snap = await getDoc(doc(db, OFFERS_CATALOG, branchId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+// Wholesale-replaces the entire catalog from a fresh Excel upload: one
+// setDoc per branch, reconciling away any branch document that existed in
+// the previous publish but isn't present in this one (e.g. a closed
+// location), then a meta document listing which branches now exist so
+// consumers (the public offers.html, call-center.html) know what to fetch
+// without needing to list the whole collection.
+export async function publishOffersCatalog(branches) {
+  const metaSnap = await getDoc(doc(db, CONFIG, "offers_catalog_meta"));
+  const oldBranchIds = metaSnap.exists() ? (metaSnap.data().branches || []).map(b => b.id) : [];
+  const newBranchIds = branches.map(b => b.id);
+  const staleIds = oldBranchIds.filter(id => !newBranchIds.includes(id));
+
+  await Promise.all([
+    ...branches.map(b => setDoc(doc(db, OFFERS_CATALOG, b.id), {
+      branchLabelEN: b.branchLabelEN, branchLabelAR: b.branchLabelAR || '',
+      offers: b.offers, updatedAt: Timestamp.now(),
+    })),
+    ...staleIds.map(id => deleteDoc(doc(db, OFFERS_CATALOG, id))),
+  ]);
+  // Per-branch label + count, not just bare IDs — lets both the admin status
+  // view and the public page's tab bar render immediately from this one
+  // small read, before fetching any branch's full offer list.
+  await setDoc(doc(db, CONFIG, "offers_catalog_meta"), {
+    branches: branches.map(b => ({ id: b.id, labelEN: b.branchLabelEN, labelAR: b.branchLabelAR || '', count: b.offers.length })),
+    rowCount: branches.reduce((s,b) => s + b.offers.length, 0),
+    updatedAt: Timestamp.now(),
+  });
+}
 
 // ── BRAND VOICE CONFIG ───────────────────────────────────────────────────
 // Stored as config/brand_voice — editable from admin, feeds every AI caption
@@ -417,7 +474,7 @@ export async function deleteTeamMember(id, authUid) {
 // Creates a REAL Firebase Auth login account for a team member, using a
 // secondary app instance so the admin's own current session is untouched.
 // Then writes their role and saves the team member record together.
-export async function createTeamMemberWithLogin({ name, email, department, password, role }) {
+export async function createTeamMemberWithLogin({ name, email, department, password, role, superAdmin = false }) {
   const secondaryApp = initializeApp(firebaseConfig, `secondary-${Date.now()}`);
   const secondaryAuth = getAuth(secondaryApp);
   let newUid;
@@ -435,30 +492,17 @@ export async function createTeamMemberWithLogin({ name, email, department, passw
 
   // Save the team member directory entry, linked to their new auth account.
   const docRef = await addDoc(collection(db, TEAM_MEMBERS), {
-    name, email, department: department || '', role,
+    name, email, department: department || '', role, superAdmin: !!superAdmin,
     hasLoginAccount: true, authUid: newUid, active: true, createdAt: Timestamp.now(),
   });
   return { id: docRef.id, authUid: newUid };
 }
 
-// ── ADMIN LOGIN PASSCODE ("Magic Word") ───────────────────────────────────
-// A temporary, parallel login path alongside real email/password auth —
-// not a replacement for it. Entering the correct passcode triggers a real,
-// silent Firebase Auth login behind the scenes (see admin.html), so nothing
-// about Firestore security rules changes; this is purely a faster front door
-// for trusted staff during a transitional period.
-// Stored as config/admin_passcode → { passwordHash: string }
-// Auto-seeds the default passcode "openIMC@123admin" on first use.
-export async function getAdminPasscode() {
-  const snap = await getDoc(doc(db, CONFIG, "admin_passcode"));
-  if (snap.exists()) return snap.data().passwordHash;
-  const defaultHash = await hashPassword("openIMC@123admin");
-  await setDoc(doc(db, CONFIG, "admin_passcode"), { passwordHash: defaultHash });
-  return defaultHash;
-}
-export function setAdminPasscode(passwordHash) {
-  return setDoc(doc(db, CONFIG, "admin_passcode"), { passwordHash }, { merge: true });
-}
+// The admin "Magic Word" passcode login (config/admin_passcode +
+// getAdminPasscode/setAdminPasscode) was removed once every admin had an
+// individual email/password account — see docs/ARCHITECTURE.md §4.4. The
+// abandoned config/admin_passcode document may still exist in Firestore; it
+// is no longer read or written by any code and its rule has been dropped.
 
 // ── PUBLIC ACCESS GATE ───────────────────────────────────────────────────
 // Stored as config/access_gate → { enabled: bool, passwordHash: string }
@@ -471,6 +515,51 @@ export async function getAccessGate() {
 }
 export function setAccessGate(data) {
   return setDoc(doc(db, CONFIG, "access_gate"), data, { merge: true });
+}
+
+// ── SOCIAL COMMENT SENTIMENT ───────────────────────────────────────────
+// Durable per-item store of comments/reviews pulled from Metricool's Inbox
+// API (GET /v2/inbox/post-comments, GET /v2/inbox/reviews — Metricool's own
+// documented endpoints, confirmed against their real swagger.json; not
+// scraping), sentiment-classified by Claude in admin.html. Authenticated-
+// only by product decision, not a technical PII rule: the comments were
+// posted publicly, but some are patient-adjacent complaints, so this stays
+// admin-only and is never read by any public page.
+const SOCIAL_COMMENTS = "social_comments";
+
+export function saveSocialComment(id, data) {
+  return setDoc(doc(db, SOCIAL_COMMENTS, id), data, { merge: true });
+}
+export async function getSocialComment(id) {
+  const snap = await getDoc(doc(db, SOCIAL_COMMENTS, id));
+  return snap.exists() ? snap.data() : null;
+}
+
+// Small rollup doc — the only thing admin.html's dashboard actually reads,
+// so display stays cheap no matter how large social_comments grows over
+// time. Stored as config/sentiment_stats: { totals, topThemes,
+// recentComments (capped), lastSyncedAt }.
+export async function getSentimentStats() {
+  const snap = await getDoc(doc(db, CONFIG, "sentiment_stats"));
+  return snap.exists() ? snap.data() : null;
+}
+export function setSentimentStats(data) {
+  return setDoc(doc(db, CONFIG, "sentiment_stats"), data);
+}
+
+// ── ADVISOR BRIEF ───────────────────────────────────────────────────────
+// Stored as config/advisor_brief → { json, generatedAt, generatedByName,
+// coverageNote }. The AI-written briefing shown on admin.html's Advisor tab.
+// Authenticated-only (never public-read) — it's derived from leads and
+// internal performance data. One org-wide document today; when multi-tenant
+// lands this becomes /orgs/{id}/config/advisor_brief.
+export function watchAdvisorBrief(callback) {
+  return onSnapshot(doc(db, CONFIG, "advisor_brief"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchAdvisorBrief:', err.code); callback(null); });
+}
+export function saveAdvisorBrief(data) {
+  return setDoc(doc(db, CONFIG, "advisor_brief"), data);
 }
 
 
@@ -625,19 +714,42 @@ export function reviewRequest(id, data) {
   return updateDoc(doc(db, REQUESTS, id), { ...data, reviewedAt: Timestamp.now() });
 }
 
+// Marking a request done / undoing it. Deliberately NOT reviewRequest(): that stamps
+// reviewedAt, which is the "decision time" used for time-to-decide — completing a
+// request weeks later must not rewrite when it was accepted.
+export function completeRequest(id, by) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Completed", completedAt: Timestamp.now(), completedBy: by || "" });
+}
+export function reopenRequest(id) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Accepted", completedAt: null, completedBy: null });
+}
+
 export const DAILY_REQUEST_LIMIT = 5;
 
-// Returns how many requests this email has submitted since midnight today
-export async function getTodayRequestCount(email) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0,0,0,0);
-  const q = query(
-    collection(db, REQUESTS),
-    where("submittedBy", "==", email),
-    where("createdAt", ">=", Timestamp.fromDate(startOfDay))
-  );
-  const snap = await getDocs(q);
-  return snap.size;
+// Rolling 24-hour window (not "since midnight"): a request stops counting
+// exactly 24h after it was submitted, so there is no midnight cliff where a
+// user could burn 5 at 23:59 and 5 more at 00:01. Counts every request still
+// on file regardless of status, so withdrawing one doesn't hand the slot
+// back (an admin deleting one does — an accepted gap, see DATA_MODEL.md).
+// `nextSlotAt` (ms) is only set when the limit is reached: when the oldest
+// counted request ages out.
+export function computeRequestQuota(createdAtMillis, now = Date.now()) {
+  const windowMs = 24 * 60 * 60 * 1000;
+  const recent = createdAtMillis.filter(t => t && t > now - windowMs).sort((a, b) => a - b);
+  const used = recent.length;
+  return {
+    used,
+    limit: DAILY_REQUEST_LIMIT,
+    remaining: Math.max(0, DAILY_REQUEST_LIMIT - used),
+    nextSlotAt: used >= DAILY_REQUEST_LIMIT ? recent[used - DAILY_REQUEST_LIMIT] + windowMs : null,
+  };
+}
+
+// Single-field query (submittedBy only) filtered client-side — the old
+// submittedBy + createdAt range query needed a composite index.
+export async function getRequestQuota(email) {
+  const snap = await getDocs(query(collection(db, REQUESTS), where("submittedBy", "==", email)));
+  return computeRequestQuota(snap.docs.map(d => d.data().createdAt?.toMillis?.() || 0));
 }
 
 export const REQUEST_TYPES = [
@@ -648,7 +760,11 @@ export const REQUEST_TYPES = [
 ];
 export const PRIORITIES = ["Normal","High","Urgent"];
 
-export const REQUEST_STATUSES = ["Pending", "Accepted", "Rejected"];
+// Pending → (Needs Info ⇄ Pending) → Accepted → Completed | Rejected; Withdrawn is the
+// requester pulling it back. "In production"/"Published" are still NOT stored — they're read
+// live from the linked initiative's own status; Completed is the admin's own "this request is
+// done" (markRequestComplete in admin.html), which can be undone back to Accepted.
+export const REQUEST_STATUSES = ["Pending", "Needs Info", "Accepted", "Completed", "Rejected", "Withdrawn"];
 export const REQUEST_REJECTION_REASONS = [
   "Insufficient Detail / Needs Clarification", "Outside Marketing Scope", "Duplicate Request",
   "Budget Not Available", "Lower Priority Than Current Workload",
@@ -665,6 +781,110 @@ export function watchMyRequests(email, callback) {
     data.sort((a,b) => (b.createdAt?.toMillis?.()||0) - (a.createdAt?.toMillis?.()||0));
     callback(data);
   });
+}
+
+// The only two writes a coordinator is allowed to make to a request after
+// creating it — firestore.rules permits exactly these field sets and nothing
+// else, so keep the written keys in sync with the rule.
+export function withdrawRequest(id) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Withdrawn", withdrawnAt: Timestamp.now() });
+}
+export function replyToInfoRequest(id, text) {
+  return updateDoc(doc(db, REQUESTS, id), { status: "Pending", infoReply: text, infoRepliedAt: Timestamp.now() });
+}
+
+// ── REQUEST ACCOUNTS (shared department logins for request.html) ─────────
+// Generic coordinator logins with random credentials, deliberately not named
+// after departments — any of them can file a request for any department.
+// Each is a normal Firebase Auth account + roles/{uid} {role:'coordinator'}.
+// The credentials are ALSO stored (plain text, request_accounts/{uid}) so an
+// admin can look them up and re-export the sheet later; that collection is
+// admin-only in firestore.rules, and it is deliberately NOT in team_members,
+// which every signed-in user could otherwise read.
+const REQUEST_ACCOUNTS = "request_accounts";
+export const REQUEST_ACCOUNT_DOMAIN = "requests.imc.med.sa";
+const CRED_USER_CHARS = "abcdefghjkmnpqrstuvwxyz23456789";                          // no 0/o/1/l/i
+const CRED_PASS_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";   // no 0/O/1/l/I
+
+// Rejection sampling so every character is equally likely (no modulo bias).
+function randomString(chars, len) {
+  const limit = Math.floor(256 / chars.length) * chars.length;
+  const out = [];
+  while (out.length < len) {
+    for (const b of crypto.getRandomValues(new Uint8Array(len * 2))) {
+      if (b < limit && out.length < len) out.push(chars[b % chars.length]);
+    }
+  }
+  return out.join('');
+}
+
+export function generateRequestCredentials() {
+  return {
+    username: `rq-${randomString(CRED_USER_CHARS, 6)}@${REQUEST_ACCOUNT_DOMAIN}`,
+    password: randomString(CRED_PASS_CHARS, 10),
+  };
+}
+
+export function watchRequestAccounts(callback) {
+  return onSnapshot(collection(db, REQUEST_ACCOUNTS), snap => {
+    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    data.sort((a, b) => (a.number || 0) - (b.number || 0));
+    callback(data);
+  }, err => { console.error('watchRequestAccounts:', err.code); callback([]); });
+}
+
+// Creates `count` accounts one after another (sequential on purpose — gentler
+// on Firebase Auth's signup rate limiting than firing 20 at once), using a
+// secondary app instance each time so the admin's own session is untouched.
+// Never throws for a single failed account — returns a per-account result
+// list so a partial batch is reported honestly instead of lost.
+export async function createRequestAccounts({ count, startNumber, createdBy, onProgress }) {
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    const number = startNumber + i;
+    let created = null, lastErr = null;
+    for (let attempt = 0; attempt < 3 && !created; attempt++) {
+      const { username, password } = generateRequestCredentials();
+      const secondaryApp = initializeApp(firebaseConfig, `reqacct-${Date.now()}-${i}-${attempt}`);
+      try {
+        const secondaryAuth = getAuth(secondaryApp);
+        const cred = await createUserWithEmailAndPassword(secondaryAuth, username, password);
+        created = { uid: cred.user.uid, username, password };
+        await signOut(secondaryAuth);
+      } catch (e) {
+        lastErr = e;
+        if (e.code !== 'auth/email-already-in-use') break; // only a username collision is worth retrying
+      } finally {
+        await deleteApp(secondaryApp);
+      }
+    }
+    if (!created) {
+      results.push({ ok: false, number, error: lastErr?.message || 'Could not create account' });
+    } else {
+      try {
+        await setDoc(doc(db, "roles", created.uid), { role: "coordinator", requestAccount: true });
+        await setDoc(doc(db, REQUEST_ACCOUNTS, created.uid), {
+          number, label: `Request User ${String(number).padStart(2, '0')}`,
+          username: created.username, password: created.password,
+          createdBy: createdBy || '', createdAt: Timestamp.now(),
+        });
+        results.push({ ok: true, number, label: `Request User ${String(number).padStart(2, '0')}`, username: created.username, password: created.password });
+      } catch (e) {
+        results.push({ ok: false, number, error: `Auth account ${created.username} was created but saving it failed: ${e.message}` });
+      }
+    }
+    if (onProgress) onProgress(i + 1, count);
+  }
+  return results;
+}
+
+// Revokes access immediately (the login flow blocks anyone with no roles doc)
+// and removes the stored credentials. The raw Firebase Auth user stays —
+// client code can only delete the currently signed-in user — so for full
+// removal also delete it in Firebase Console → Authentication.
+export async function deleteRequestAccount(uid) {
+  await deleteDoc(doc(db, "roles", uid));
+  await deleteDoc(doc(db, REQUEST_ACCOUNTS, uid));
 }
 
 // One-time migration for requests created before the accept/reject workflow
@@ -715,7 +935,7 @@ export const DEPARTMENTS = [
   "Fertility & IVF","Radiology & Imaging","Emergency Medicine (ER)"
 ];
 export const ENTITIES = ["IMC","Makkah","TFC","JP","RSM"];
-export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Print","Multi-channel"];
+export const CHANNELS = ["Instagram","TikTok","Facebook","X","LinkedIn","Snapchat","Print","Multi-channel"];
 export const STATUSES = ["Planned","In Production","Ready","Published","Cancelled"];
 export const TYPES = ["Campaign","Event","SM Content","Paid Media","Print","Website Update","Physician Video"];
 export const PAID_MEDIA_PLATFORMS = ["Social","Search","Programmatic","App"];
@@ -975,6 +1195,16 @@ export async function normalizeAllLeadPhones() {
   return { migrated: updates.length };
 }
 
+// One-time correction of lead entities (e.g. a sheet's "جده" → "IMC"). The caller works out
+// what each lead's entity should be (lead-sync.js mapEntity) and passes [{ id, entity }];
+// only the entity field is written, in chunks.
+export async function updateLeadEntities(updates) {
+  for(let i = 0; i < updates.length; i += 400) {
+    await Promise.all(updates.slice(i, i + 400).map(u => updateDoc(doc(db, LEADS, u.id), { entity: u.entity })));
+  }
+  return { migrated: updates.length };
+}
+
 // One-time correction for a real incident: parseExcelDate() (admin.html)
 // used to silently misread 2-digit-year dates (e.g. "8/19/01") as year 2001
 // instead of 2026 — corrupting 241 leads' dateCreated on an Excel import.
@@ -1007,7 +1237,11 @@ export function parseGoogleSheetId(url) {
 export async function fetchGoogleSheetCSV(sheetUrlOrId) {
   const sheetId = sheetUrlOrId.includes('/') ? parseGoogleSheetId(sheetUrlOrId) : sheetUrlOrId;
   if (!sheetId) throw new Error('Could not find a valid Google Sheet ID in that link');
-  const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+  // A link copied from the browser ends in #gid=<tab id>: read THAT tab (without
+  // it Google returns the first tab, which silently re-read the wrong data for a
+  // link to a second tab). No gid in the link = first tab, as before.
+  const gid = (String(sheetUrlOrId).match(/[#?&]gid=(\d+)/) || [])[1];
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv${gid ? `&gid=${gid}` : ''}`;
   const res = await fetch(exportUrl);
   if (!res.ok) throw new Error('Could not fetch the sheet — check that link-sharing is set to "Anyone with the link can view"');
   return res.text();
@@ -1087,6 +1321,85 @@ export function watchDepartmentRevenueEstimates(callback) {
     snap => callback(snap.exists() ? snap.data() : {}),
     err => { console.error('watchDepartmentRevenueEstimates:', err.code); callback({}); }
   );
+}
+
+// ── LEAD AUTOMATION (automatic Google-Sheet sync + assignment) ────────────
+// Three small documents, all readable by admins AND agents (the call-center
+// page can run the sync too), writable by admins only for the settings:
+//   config/lead_automation → the settings an admin controls (sheet link, interval,
+//                            default department, AI on/off, auto-assign, excluded agents…)
+//   config/lead_sync_state → who is syncing right now (a lease), when the last run
+//                            finished, its result, and the "newest row seen" watermark
+//   agent_presence/{uid}   → a heartbeat each agent's call-center page writes, so the
+//                            sync knows who is online to receive leads
+export function watchLeadAutomation(callback) {
+  return onSnapshot(doc(db, CONFIG, "lead_automation"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchLeadAutomation:', err.code); callback(null); });
+}
+export function saveLeadAutomation(patch, updatedBy) {
+  return setDoc(doc(db, CONFIG, "lead_automation"), { ...patch, updatedBy: updatedBy || '', updatedAt: Timestamp.now() }, { merge: true });
+}
+export function watchLeadSyncState(callback) {
+  return onSnapshot(doc(db, CONFIG, "lead_sync_state"),
+    snap => callback(snap.exists() ? snap.data() : null),
+    err => { console.error('watchLeadSyncState:', err.code); callback(null); });
+}
+
+// A lease, taken in a transaction so two browsers can never both think they
+// hold it. Refuses if someone else's lease is still live, or (unless the caller
+// is forcing) if a run finished less than minIntervalMs ago — checked HERE, not
+// just in the page, because ten open tabs would otherwise each sync every minute.
+export async function acquireLeadSyncLock({ runnerId, name, page, leaseMs, minIntervalMs }) {
+  const ref = doc(db, CONFIG, "lead_sync_state");
+  return runTransaction(db, async tx => {
+    const snap = await tx.get(ref);
+    const d = snap.exists() ? snap.data() : {};
+    const now = Date.now();
+    if(d.leaseUntil && d.leaseUntil > now && d.holderRunnerId !== runnerId) return { acquired: false, reason: 'busy', holder: d.holderName || '' };
+    if(minIntervalMs && d.lastRunAt && now - d.lastRunAt < minIntervalMs) return { acquired: false, reason: 'recent' };
+    tx.set(ref, { holderRunnerId: runnerId, holderName: name || '', holderPage: page || '', leaseUntil: now + leaseMs, runStartedAt: now }, { merge: true });
+    return { acquired: true, state: d };
+  });
+}
+// Releases the lease and records the outcome. The watermark only moves when
+// the run produced one (a failed run must not advance it).
+// `watermarks` = { [sheetKey]: ms }, one per sheet; it is deep-merged, so a sheet that
+// failed this time keeps its old value. watermarkMs/watermarkSheet are the legacy
+// single-sheet pair (the FIRST sheet), still written so a not-yet-refreshed page keeps working.
+export function finishLeadSyncRun({ runnerId, result, watermarkMs, watermarkSheet, watermarks }) {
+  const patch = { holderRunnerId: null, leaseUntil: 0, lastRunAt: Date.now(), lastResult: result };
+  if(Number.isFinite(watermarkMs)) { patch.watermarkMs = watermarkMs; patch.watermarkSheet = watermarkSheet || ''; }
+  if(watermarks && Object.keys(watermarks).length) patch.watermarks = watermarks;
+  return setDoc(doc(db, CONFIG, "lead_sync_state"), patch, { merge: true });
+}
+
+export function setAgentPresence(uid, data) {
+  return setDoc(doc(db, "agent_presence", uid), { name: data.name || '', page: data.page || '', lastSeen: Date.now() });
+}
+export function watchAgentPresence(callback) {
+  return onSnapshot(collection(db, "agent_presence"),
+    snap => callback(snap.docs.map(d => ({ uid: d.id, ...d.data() }))),
+    err => { console.error('watchAgentPresence:', err.code); callback([]); });
+}
+
+// ── ENTITY PROFILES (admin-only; the monthly planner's knowledge of each entity) ──
+// Stored as ONE document, config/entity_profiles → { profiles: { "<entity name>": {...} } },
+// keyed by entity NAME because that's how every other collection references an
+// entity. A separate admin-only document rather than fields on `entities`,
+// because `entities` is public-read (the portal lists them) and these briefs —
+// competitors, constraints, partnerships — are internal strategy.
+// Saved with a deep merge so editing one entity never overwrites another's.
+export function watchEntityProfiles(callback) {
+  return onSnapshot(doc(db, CONFIG, "entity_profiles"),
+    snap => callback(snap.exists() ? (snap.data().profiles || {}) : {}),
+    err => { console.error('watchEntityProfiles:', err.code); callback({}); }
+  );
+}
+export function saveEntityProfile(entityName, profile, updatedBy) {
+  return setDoc(doc(db, CONFIG, "entity_profiles"),
+    { profiles: { [entityName]: { ...profile, updatedBy: updatedBy || '', updatedAt: Timestamp.now() } } },
+    { merge: true });
 }
 
 // ── PUBLIC LEAD STATS (aggregated, no PII) ────────────────────────────────

@@ -12,7 +12,7 @@ These reduce the regression risk we've already hit multiple times in this projec
 
 1. **Delete `inject-promotions.html` from the live repo.** It was a one-time seed script, already used. Leaving dev tools in a production deployment is unnecessary risk.
 2. **Rotate the Anthropic API key periodically** given it's visible to anyone with admin browser access — not a code fix, an operational habit.
-3. **Reconsider the "Magic Word" passcode** before wider team rollout — it's a reasonable transitional convenience, not a permanent access pattern for a growing team.
+3. ~~**Reconsider the "Magic Word" passcode** before wider team rollout.~~ **Done** — removed once every admin had an individual email/password account (see `ARCHITECTURE.md` §4.4). Follow-up still open: rotate the old shared account's password in Firebase Auth, since it remains in git history.
 4. **Establish a lightweight verification habit before every upload:** run a syntax check and confirm every import resolves before shipping a change. (This is now standard practice going forward, and should stay standard practice regardless of who or what is making changes.)
 
 ---

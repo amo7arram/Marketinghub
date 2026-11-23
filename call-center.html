@@ -46,7 +46,8 @@ html,body{min-height:100%;font-family:'IBM Plex Sans',sans-serif;background:var(
 .page{display:none}
 .page.active{display:block}
 
-/* PROMOTIONS */
+/* OFFERS — class names kept as "promo-*" from the retired Promotions tab
+   this replaced; renaming is cosmetic-only so left as-is */
 .badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.03em;white-space:nowrap}
 .promotions-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .promo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow)}
@@ -79,6 +80,20 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 tr:last-child td{border-bottom:none}
 tr:hover td{background:var(--bg)}
 .empty-row td{text-align:center;padding:30px;color:var(--text-3)}
+/* Leads table: Name stays on the left and the action buttons on the right while the middle scrolls sideways;
+   related values share a cell (Entity/Source, Agent/Date, the status dropdowns) so far less scrolling is needed. */
+.lead-wrap{overflow-x:auto;border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+.lead-tbl{min-width:1050px;overflow:visible;box-shadow:none}
+.lead-tbl tbody tr{background:var(--surface)}
+.lead-tbl th.stk,.lead-tbl td.stk{position:sticky;z-index:2;background:inherit}
+.lead-tbl th.stk{z-index:3;background:var(--navy)}
+.lead-tbl tr:hover td.stk{background:var(--bg)}
+.lead-tbl .stk-name{left:0;min-width:150px;max-width:190px;box-shadow:6px 0 8px -6px rgba(0,0,0,.22)}
+.lead-tbl .stk-act{right:0;box-shadow:-6px 0 8px -6px rgba(0,0,0,.22)}
+.lead-tbl .stack{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.lead-tbl .sub{font-size:10px;color:var(--text-3);margin-top:2px}
+.lead-tbl .cmt{max-width:260px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;word-break:break-word}
+.lead-tbl .row-actions{display:flex;gap:6px}
 .status-select{font-size:10px;padding:3px 6px;border-radius:4px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid transparent}
 .pagination{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text-3)}
 
@@ -130,7 +145,7 @@ tr:hover td{background:var(--bg)}
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('leads',this)">Leads</div>
-    <div class="tab" onclick="switchTab('promotions',this)">Promotions</div>
+    <div class="tab" onclick="switchTab('offers',this)">Offers</div>
   </div>
 
   <div class="content">
@@ -152,25 +167,25 @@ tr:hover td{background:var(--bg)}
         <select class="filter-select" id="f-dept" onchange="resetPageAndRender()"><option value="">All Departments</option></select>
       </div>
 
-      <div style="overflow-x:auto">
-        <table style="min-width:1000px">
+      <div class="lead-wrap">
+        <table class="lead-tbl">
           <thead><tr>
-            <th>Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Entity</th><th>Source</th>
-            <th>Campaign</th><th>Agent</th><th>Date</th><th>Contact Status</th><th>Outcome</th><th>Closure Reason</th><th>Notes</th><th></th>
+            <th class="stk stk-name">Name</th><th>Phone</th><th>Email</th><th>Department</th><th>Campaign</th><th>Ad name</th><th>Comment</th><th>Entity / Source</th>
+            <th>Agent / Date</th><th>Status · Outcome · Closure</th><th class="stk stk-act"></th>
           </tr></thead>
-          <tbody id="table-body"><tr class="empty-row"><td colspan="14">Loading leads...</td></tr></tbody>
+          <tbody id="table-body"><tr class="empty-row"><td colspan="11">Loading leads...</td></tr></tbody>
         </table>
       </div>
       <div class="pagination" id="pagination"></div>
     </div>
 
-    <div class="page" id="page-promotions">
+    <div class="page" id="page-offers">
       <div class="filters-bar">
-        <select class="filter-select" id="p-status" onchange="renderPromotionsTab()"><option value="">All Status</option><option>Active</option><option>Upcoming</option><option>Expired</option></select>
-        <select class="filter-select" id="p-dept" onchange="renderPromotionsTab()"><option value="">All Departments</option></select>
-        <select class="filter-select" id="p-entity" onchange="renderPromotionsTab()"><option value="">All Entities</option></select>
+        <div class="branch-tabs" id="offers-branch-tabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <div class="category-chips" id="offers-category-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        <input class="filter-input" type="text" id="offers-search" placeholder="Search offers..." oninput="renderOffersGrid()" style="min-width:200px">
       </div>
-      <div class="promotions-grid" id="promotions-grid"></div>
+      <div class="promotions-grid" id="offers-grid"></div>
     </div>
   </div>
 </div>
@@ -205,6 +220,7 @@ tr:hover td{background:var(--bg)}
         <label class="field-label">Revenue Value (SAR) <span style="color:var(--text-3);font-weight:400">— if known, once booked</span></label>
         <input class="field-input" type="number" id="edit-revenue" placeholder="0.00" min="0" step="0.01">
       </div>
+      <div class="field-group" id="edit-comment-wrap" style="display:none"><label class="field-label">Lead's comment <span style="color:var(--text-3);font-weight:400">— what they wrote in the form</span></label><div id="edit-comment-view" dir="auto" style="font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;white-space:pre-wrap;max-height:120px;overflow:auto"></div></div>
       <div class="field-group"><label class="field-label">Notes</label><textarea class="field-textarea" id="edit-notes" placeholder="Call notes, follow-up needed, etc."></textarea></div>
       <div class="readonly-note">Department, Entity, and Campaign are set by the marketing team and can't be changed here.</div>
     </div>
@@ -221,18 +237,31 @@ tr:hover td{background:var(--bg)}
 import {
   login, logout, watchAuth, getUserRole,
   watchLeads, updateLead, watchInitiatives,
-  watchPromotions, promoStatus, getDeptColor, normalizePhone,
-  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS, ENTITIES
+  watchOffersCatalogMeta, getOffersCatalogBranch, normalizePhone,
+  CONTACT_STATUSES, OUTCOMES, CONTACT_STATUS_COLORS, OUTCOME_COLORS, CLOSURE_REASONS, DEPARTMENTS,
+  fetchGoogleSheetCSV, bulkAddLeads,
+  watchLeadAutomation, watchLeadSyncState, acquireLeadSyncLock, finishLeadSyncRun,
+  setAgentPresence, watchAgentPresence
 } from './firebase-data.js';
+import { createLeadAutomationRunner } from './lead-sync.js';
 
 let ALL_LEADS = [];
 let ALL_CAMPAIGNS = [];
-let ALL_PROMOTIONS = [];
+let OFFERS_META = null;
+const offersBranchCache = {};
+let currentOffersBranchId = null;
+let currentOffersCategory = 'ALL';
 let editingLeadId = null;
 let currentPage = 1;
 const PER_PAGE = 50;
 let CURRENT_USER_UID = null;
 let CURRENT_USER_ROLE = null;
+
+// Lead names, notes and form answers originate from public lead forms, so they
+// are untrusted text — always escaped before going into innerHTML.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 window.doLogin = async function() {
@@ -271,9 +300,16 @@ watchAuth(async user => {
       populateFilters();
       // Agents default to seeing only their own assigned leads; admins default to all.
       document.getElementById('f-scope').value = role === 'admin' ? 'all' : 'mine';
-      watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); renderTable(); });
-      watchLeads(data => { ALL_LEADS = data; renderStats(); renderTable(); });
-      watchPromotions(data => { ALL_PROMOTIONS = data; renderPromotionsTab(); });
+      CURRENT_USER_EMAIL = user.email || '';
+      startLeadAutomation();
+      watchInitiatives(data => { ALL_CAMPAIGNS = data.filter(i=>i.type==='Campaign'); ALL_INITIATIVES = data; laMarkReady('initiatives'); renderTable(); });
+      watchLeads(data => { ALL_LEADS = data; laMarkReady('leads'); renderStats(); renderTable(); });
+      watchOffersCatalogMeta(data => { OFFERS_META = data; renderOffersTab(); });
+      subsLeadAutomation = [
+        watchLeadAutomation(data => { LEAD_AUTOMATION = data; laMarkReady('cfg'); }),
+        watchLeadSyncState(data => { LEAD_SYNC_STATE = data; }),
+        watchAgentPresence(list => { AGENT_PRESENCE = list; laMarkReady('presence'); }),
+      ];
     } catch(e) {
       const errEl = document.getElementById('login-error');
       errEl.textContent = 'Could not verify access: ' + e.message;
@@ -285,15 +321,83 @@ watchAuth(async user => {
     if(btn){ btn.textContent = 'Sign In'; btn.disabled = false; }
     document.getElementById('login-wrap').style.display = 'flex';
     document.getElementById('page-wrap').classList.remove('active');
+    stopLeadAutomation();
+    subsLeadAutomation.forEach(u => { try { u(); } catch(e) {} });
+    subsLeadAutomation = [];
+    LEAD_AUTOMATION = null; LEAD_SYNC_STATE = null; AGENT_PRESENCE = [];
+    CURRENT_USER_UID = null; CURRENT_USER_ROLE = null;
   }
 });
+
+// ── AUTOMATIC LEAD SYNC ───────────────────────────────────────────────────
+// The same engine as the admin page (lead-sync.js): whichever page is open
+// first checks the Google Sheet, imports new leads and hands them to agents
+// who are online. A lease in Firestore ensures only one browser does it at a
+// time. This page can't classify departments with AI (the API key is
+// admin-only), so such leads are flagged ⏳ and an admin page classifies them.
+let LEAD_AUTOMATION = null, LEAD_SYNC_STATE = null, AGENT_PRESENCE = [], ALL_INITIATIVES = [];
+let CURRENT_USER_EMAIL = '', subsLeadAutomation = [], leadRunner = null, presenceTimer = null, laKickedOnce = false;
+const laReady = { cfg: false, leads: false, initiatives: false, presence: false };
+
+function laMarkReady(k) {
+  laReady[k] = true;
+  if(!laKickedOnce && leadRunner && laReady.cfg && laReady.leads && laReady.initiatives && laReady.presence) {
+    laKickedOnce = true;
+    leadRunner.tick(true).catch(() => {});
+  }
+}
+function myDisplayName() {
+  const dir = (LEAD_AUTOMATION && LEAD_AUTOMATION.agentDirectory) || [];
+  const hit = dir.find(a => a.uid === CURRENT_USER_UID);
+  return (hit && hit.name) || (CURRENT_USER_EMAIL ? CURRENT_USER_EMAIL.split('@')[0] : 'Agent');
+}
+// Only agents count as "online to receive leads" — an admin looking at this page must not be handed any.
+let lastBeatAt = 0;
+function beat() {
+  if(CURRENT_USER_ROLE !== 'agent' || !CURRENT_USER_UID || document.visibilityState !== 'visible') return;
+  const cameBack = Date.now() - lastBeatAt > 180000; // first beat, or back after being away: hand out waiting leads right now
+  lastBeatAt = Date.now();
+  setAgentPresence(CURRENT_USER_UID, { name: myDisplayName(), page: 'call-center' })
+    .then(() => { if(cameBack && leadRunner && laKickedOnce) leadRunner.tick(true).catch(() => {}); })
+    .catch(e => console.error('presence heartbeat:', e.code || e.message));
+}
+function startLeadAutomation() {
+  stopLeadAutomation();
+  Object.keys(laReady).forEach(k => { laReady[k] = false; });
+  laKickedOnce = false;
+  leadRunner = createLeadAutomationRunner({
+    page: 'call-center',
+    isReady: () => laReady.cfg && laReady.leads && laReady.initiatives && laReady.presence,
+    getCfg: () => LEAD_AUTOMATION,
+    getState: () => LEAD_SYNC_STATE,
+    who: () => myDisplayName(),
+    acquireLock: acquireLeadSyncLock,
+    finishRun: finishLeadSyncRun,
+    buildDeps: (state, cfg) => ({
+      config: cfg, now: Date.now(), watermarkMs: state.watermarkMs || 0,
+      fetchCsv: fetchGoogleSheetCSV, leads: ALL_LEADS, initiatives: ALL_INITIATIVES, presence: AGENT_PRESENCE,
+      addLeads: docs => bulkAddLeads(docs), updateLead,
+    }),
+    onRun: result => {
+      const assigned = (result.assignedNew || 0) + (result.assignedBacklog || 0);
+      if(!result.error && (result.imported || result.assignedBacklog)) showToast(`⚡ ${result.imported} new lead${result.imported === 1 ? '' : 's'} arrived${assigned ? ` — ${assigned} assigned` : ''}`);
+    },
+  });
+  leadRunner.start();
+  beat();
+  presenceTimer = setInterval(beat, 60000);
+  document.addEventListener('visibilitychange', beat);
+}
+function stopLeadAutomation() {
+  if(leadRunner) { leadRunner.stop(); leadRunner = null; }
+  clearInterval(presenceTimer); presenceTimer = null; lastBeatAt = 0;
+  document.removeEventListener('visibilitychange', beat);
+}
 
 function populateFilters() {
   document.getElementById('f-contact').innerHTML += CONTACT_STATUSES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('f-outcome').innerHTML += OUTCOMES.map(s=>`<option>${s}</option>`).join('');
   document.getElementById('f-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('p-dept').innerHTML += DEPARTMENTS.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('p-entity').innerHTML += ENTITIES.map(e=>`<option>${e}</option>`).join('');
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────
@@ -302,7 +406,7 @@ window.switchTab = function(id, el) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('page-'+id).classList.add('active');
-  if(id==='promotions') renderPromotionsTab();
+  if(id==='offers') renderOffersTab();
 }
 
 function campaignTitleFor(id) {
@@ -375,46 +479,58 @@ function renderTable() {
         const oc = l.outcome || 'Pending';
         const csColor = CONTACT_STATUS_COLORS[cs]||{bg:'#F0F2F7',t:'#8890A8'};
         const ocColor = OUTCOME_COLORS[oc]||{bg:'#F0F2F7',t:'#8890A8'};
-        const campaignLabel = l.campaign || campaignTitleFor(l.campaignId) || '—';
+        const deptCell = `${esc(l.department)||'—'}` +
+          (l.departmentSource === 'ai' ? ' <span title="Auto-classified from the lead\'s notes — may be wrong">🤖</span>' : '') +
+          (l.departmentSource === 'keyword' ? ' <span title="Found from keywords in the lead\'s answers or the offer name — may be wrong">🔎</span>' : '') +
+          (l.deptPending === true ? ' <span title="Department is a placeholder — waiting to be classified">⏳</span>' : '');
+        // A lead that belongs to a campaign keeps the ℹ️ agent-script link beside the campaign name.
+        const campCell = (esc(l.campaign || campaignTitleFor(l.campaignId)) || '—') +
+          (l.campaignId ? ` <a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script &amp; post link">ℹ️</a>` : '');
+        // Comment = what the lead wrote. Leads from before this field existed show their old notes (greyed) instead of going blank.
+        const legacyCmt = l.comment === undefined;
+        const cmtText = legacyCmt ? (l.notes || '') : (l.comment || '');
+        const cmtTip = [legacyCmt ? '' : (l.comment ? 'Comment: ' + l.comment : ''), l.notes ? (legacyCmt ? 'Notes: ' : 'Notes (other form answers): ') + l.notes : ''].filter(Boolean).join('\n\n');
         return `<tr>
-          <td style="font-weight:600">${l.name||'—'}</td>
-          <td>${l.phone||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.email||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.department||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.entity||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.source||'—'}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.campaignId?`<a href="javascript:void(0)" onclick="showCampaignInfo('${l.campaignId}')" title="View agent script & post link">${campaignLabel} ℹ️</a>`:campaignLabel}</td>
-          <td style="color:var(--text-3);font-size:11px">${l.assignedAgentName||'— Unassigned —'}</td>
-          <td style="color:var(--text-3);font-size:11px;white-space:nowrap">${l.dateCreated||'—'}</td>
-          <td>${oc==='Booked'
-            ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
-            : `<select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
-                ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
-              </select>`}
-          </td>
-          <td>${oc==='Booked'
-            ? `<span class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" title="Booked leads are locked — ask an admin to change this">${oc}</span>`
-            : cs==='Reached'
-              ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
-                  ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
-                </select>`
-              : `<span style="color:var(--text-3);font-size:11px">—</span>`}
-          </td>
-          <td>${oc==='Closed - Unsuccessful'
-            ? `<select class="status-select" style="background:var(--bg);color:var(--text-2)" onchange="changeClosureReason('${l.id}',this.value)">
-                <option value=""${!l.closureReason?' selected':''}>— Select —</option>
-                ${CLOSURE_REASONS.map(r=>`<option${l.closureReason===r?' selected':''}>${r}</option>`).join('')}
-              </select>`
-            : `<span style="color:var(--text-3);font-size:11px">—</span>`}
-          </td>
-          <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11px" title="${l.notes||''}">${l.notes||'—'}</td>
+          <td class="stk stk-name" style="font-weight:600">${esc(l.name)||'—'}</td>
+          <td style="white-space:nowrap">${esc(l.phone)||'—'}</td>
+          <td style="color:var(--text-3);font-size:11px">${esc(l.email)||'—'}</td>
+          <td style="color:var(--text-2);font-size:11px;font-weight:500">${deptCell}</td>
+          <td style="color:var(--text-2);font-size:11px;max-width:170px">${campCell}</td>
+          <td style="color:var(--text-2);font-size:11px;max-width:170px">${esc(l.adName)||'—'}</td>
+          <td style="color:${legacyCmt?'var(--text-3)':'var(--text-2)'};${legacyCmt?'font-style:italic;':''}font-size:11px;min-width:170px"><div class="cmt" title="${esc(cmtTip)}" dir="auto">${esc(cmtText)||'—'}</div></td>
+          <td style="color:var(--text-2);font-size:11px">${esc(l.entity)||'—'}<div class="sub">${esc(l.source)||'—'}</div></td>
+          <td style="color:var(--text-2);font-size:11px">${esc(l.assignedAgentName)||'— Unassigned —'}<div class="sub" style="white-space:nowrap">${l.dateCreated||'—'}</div></td>
           <td>
-            ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${l.phone}" target="_blank" title="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${l.phone}" title="Call">📞</a>`:''}
-            <button class="btn btn-sm" onclick="openEditModal('${l.id}')">Edit</button>
+            <div class="stack">
+              ${oc==='Booked'
+                ? `<span class="status-select" style="background:${csColor.bg};color:${csColor.t}" title="Booked leads are locked — ask an admin to change this">${cs}</span>`
+                : `<select class="status-select" style="background:${csColor.bg};color:${csColor.t}" onchange="changeContactStatus('${l.id}',this.value)">
+                    ${CONTACT_STATUSES.map(s=>`<option${cs===s?' selected':''}>${s}</option>`).join('')}
+                  </select>`}
+              ${oc==='Booked'
+                ? `<span class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" title="Booked leads are locked — ask an admin to change this">${oc}</span>`
+                : cs==='Reached'
+                  ? `<select class="status-select" style="background:${ocColor.bg};color:${ocColor.t}" onchange="changeOutcome('${l.id}',this.value)">
+                      ${OUTCOMES.map(s=>`<option${oc===s?' selected':''}>${s}</option>`).join('')}
+                    </select>`
+                  : ''}
+              ${oc==='Closed - Unsuccessful'
+                ? `<select class="status-select" style="background:var(--bg);color:var(--text-2)" onchange="changeClosureReason('${l.id}',this.value)">
+                    <option value=""${!l.closureReason?' selected':''}>— Closure reason —</option>
+                    ${CLOSURE_REASONS.map(r=>`<option${l.closureReason===r?' selected':''}>${r}</option>`).join('')}
+                  </select>`
+                : ''}
+            </div>
+          </td>
+          <td class="stk stk-act">
+            <div class="row-actions">
+              ${l.phone?`<a class="btn btn-sm" href="https://wa.me/${encodeURIComponent(l.phone)}" target="_blank" title="WhatsApp" aria-label="WhatsApp">💬</a><a class="btn btn-sm" href="tel:+${encodeURIComponent(l.phone)}" title="Call" aria-label="Call">📞</a>`:''}
+              <button class="btn btn-sm" onclick="openEditModal('${l.id}')" title="Edit" aria-label="Edit">✏️ Edit</button>
+            </div>
           </td>
         </tr>`;
       }).join('')
-    : `<tr class="empty-row"><td colspan="14">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="11">${ALL_LEADS.length?'No leads match filters':'No leads yet'}</td></tr>`;
 
   renderPagination(data.length, totalPages, startIdx, pageData.length);
 }
@@ -463,6 +579,8 @@ window.openEditModal = function(id) {
   document.getElementById('edit-phone').value = l.phone||'';
   document.getElementById('edit-revenue').value = l.revenueValue ?? '';
   document.getElementById('edit-notes').value = l.notes||'';
+  document.getElementById('edit-comment-wrap').style.display = l.comment ? '' : 'none';
+  document.getElementById('edit-comment-view').textContent = l.comment || '';
   document.getElementById('edit-overlay').classList.add('open');
 }
 window.closeEditModal = function() { document.getElementById('edit-overlay').classList.remove('open'); }
@@ -481,58 +599,76 @@ window.saveEdit = async function() {
   } catch(e) { showToast('Save failed: '+e.message, true); }
 }
 
-// ── PROMOTIONS (read-only) ──────────────────────────────────────────────
-const PROMO_STATUS_COLOR = {
-  Active:   {bg:'#D4F0E2', t:'#0D6E44'},
-  Upcoming: {bg:'#F0F2F7', t:'#8890A8'},
-  Expired:  {bg:'#FDE4E4', t:'#B0234A'},
-};
-window.renderPromotionsTab = function() {
-  const grid = document.getElementById('promotions-grid');
+// ── OFFERS (read-only, sourced from the Excel-driven public catalog) ────
+// Mirrors offers.html's tab/chip/card logic, but via the Firebase SDK
+// (already loaded for this authenticated tool's leads work) rather than the
+// REST-only approach offers.html uses for public load-time reasons.
+window.renderOffersTab = async function() {
+  const grid = document.getElementById('offers-grid');
   if(!grid) return;
-  const statusF = document.getElementById('p-status')?.value || '';
-  const deptF   = document.getElementById('p-dept')?.value || '';
-  const entityF = document.getElementById('p-entity')?.value || '';
-
-  const data = ALL_PROMOTIONS.filter(p=>{
-    if(statusF && promoStatus(p.startDate,p.endDate)!==statusF) return false;
-    if(deptF   && p.department!==deptF) return false;
-    if(entityF && !(p.entity||[]).includes(entityF)) return false;
-    return true;
-  });
-
-  if(!data.length) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No promotions match the current filters</div>';
+  if(!OFFERS_META || !OFFERS_META.branches?.length) {
+    document.getElementById('offers-branch-tabs').innerHTML = '';
+    document.getElementById('offers-category-chips').innerHTML = '';
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No offers catalog published yet</div>';
     return;
   }
+  if(!currentOffersBranchId || !OFFERS_META.branches.some(b=>b.id===currentOffersBranchId)) {
+    currentOffersBranchId = OFFERS_META.branches[0].id;
+    currentOffersCategory = 'ALL';
+  }
+  if(!offersBranchCache[currentOffersBranchId]) {
+    offersBranchCache[currentOffersBranchId] = await getOffersCatalogBranch(currentOffersBranchId) || {offers:[]};
+  }
 
-  grid.innerHTML = data.map(p=>{
-    const status = promoStatus(p.startDate, p.endDate);
-    const sc = PROMO_STATUS_COLOR[status] || PROMO_STATUS_COLOR.Upcoming;
-    const dc = getDeptColor(p.department);
-    return `<div class="promo-card ${status==='Active'?'active-promo':status==='Expired'?'expired-promo':''}">
+  document.getElementById('offers-branch-tabs').innerHTML = OFFERS_META.branches.map(b =>
+    `<button class="btn btn-sm${b.id===currentOffersBranchId?' btn-primary':''}" onclick="selectOffersBranch('${b.id}')">${b.labelEN}</button>`
+  ).join('');
+
+  const offers = offersBranchCache[currentOffersBranchId]?.offers || [];
+  const cats = ['ALL', ...new Set(offers.map(o=>o.category).filter(Boolean))];
+  document.getElementById('offers-category-chips').innerHTML = cats.map(c =>
+    `<button class="btn btn-sm${c===currentOffersCategory?' btn-primary':''}" onclick="selectOffersCategory(${JSON.stringify(c)})">${c==='ALL'?'All':c}</button>`
+  ).join('');
+
+  renderOffersGrid();
+}
+window.selectOffersBranch = async function(id) {
+  currentOffersBranchId = id;
+  currentOffersCategory = 'ALL';
+  await renderOffersTab();
+}
+window.selectOffersCategory = function(cat) {
+  currentOffersCategory = cat;
+  renderOffersTab();
+}
+window.renderOffersGrid = function() {
+  const grid = document.getElementById('offers-grid');
+  if(!grid) return;
+  let offers = offersBranchCache[currentOffersBranchId]?.offers || [];
+  if(currentOffersCategory !== 'ALL') offers = offers.filter(o=>o.category===currentOffersCategory);
+  const q = (document.getElementById('offers-search')?.value||'').trim().toLowerCase();
+  if(q) offers = offers.filter(o => (o.description||'').toLowerCase().includes(q) || (o.category||'').toLowerCase().includes(q));
+
+  if(!offers.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-3)">No offers match the current filters</div>';
+    return;
+  }
+  grid.innerHTML = offers.map(o=>{
+    const hasDiscount = o.discountPct > 0;
+    return `<div class="promo-card">
       <div class="promo-card-header">
-        <div class="promo-card-title">${p.title||''}</div>
-        <div class="promo-discount-badge">${p.discountPct||0}%</div>
+        <div class="promo-card-title">${o.description||''}</div>
+        ${hasDiscount?`<div class="promo-discount-badge">${o.discountPct}%</div>`:''}
       </div>
       <div class="promo-card-body">
-        <div>${p.description ? p.description.substring(0,110)+(p.description.length>110?'...':'') : ''}</div>
+        ${o.category?`<div style="font-size:10px;text-transform:uppercase;color:var(--navy);font-weight:700;margin-bottom:4px">${o.category}</div>`:''}
+        ${o.arabic?`<div dir="rtl" style="margin-bottom:6px">${o.arabic}</div>`:''}
         <div class="promo-price-row">
           <div>
-            <div class="promo-price-orig">${p.originalPrice?.toLocaleString()||''} SAR</div>
-            <div class="promo-price-new">${p.discountedPrice?.toLocaleString()||''}</div>
+            ${hasDiscount?`<div class="promo-price-orig">${o.price?.toLocaleString()||''} SAR</div>`:''}
+            <div class="promo-price-new">${o.discountedPrice?.toLocaleString()||''}</div>
             <div class="promo-price-sar">SAR</div>
           </div>
-        </div>
-      </div>
-      <div class="promo-card-footer">
-        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-          <span class="badge" style="background:${dc.bg};color:${dc.t}">${p.department||''}</span>
-          ${(p.entity||[]).map(e=>`<span class="badge" style="background:var(--bg);color:var(--text-2)">${e}</span>`).join('')}
-        </div>
-        <div style="text-align:right">
-          <span class="badge" style="background:${sc.bg};color:${sc.t}">${status}</span>
-          <div style="margin-top:2px">${p.endDate?'Ends '+p.endDate:'Open-ended'}</div>
         </div>
       </div>
     </div>`;

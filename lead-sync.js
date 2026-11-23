@@ -1,0 +1,802 @@
+// ── Shared lead-import engine ──────────────────────────────────────────────
+// Used by admin.html (manual Excel / Google Sheet import AND the automatic
+// sync) and call-center.html (automatic sync), so every page that imports
+// leads runs the SAME parsing, column detection, dedupe and assignment code.
+// Nothing in here talks to Firebase directly: the automatic sync receives its
+// reads/writes as injected functions (see runLeadSync), which keeps it
+// unit-testable and keeps `firebase-data.js` the only place that touches
+// Firestore. (It does import two pure helpers from firebase-data.js.)
+
+import { DEPARTMENTS, normalizePhone } from './firebase-data.js';
+
+// ── Tunables for the automatic sync ───────────────────────────────────────
+export const SYNC_OVERLAP_MS = 30 * 60 * 1000;   // re-examine the last 30 min each run, so a row that lands late in the sheet isn't missed
+export const SYNC_MAX_PER_RUN = 300;             // runaway guard: never import more than this in one run
+export const PRESENCE_FRESH_MS = 3 * 60 * 1000;  // an agent counts as "online" if seen in the last 3 minutes
+export const SYNC_ASSIGN_BACKLOG_MAX = 100;      // unassigned auto-imported leads picked up per run
+export const SAME_SUBMISSION_DAYS = 2;           // a legacy lead (no source row id) this close in date to a row is treated as the same submission
+export const SYNC_MAX_SHEETS = 5;                // sheets the automatic sync will read per run
+
+// ── Sheets the sync reads ─────────────────────────────────────────────────
+// config/lead_automation.sheets = [{ id, label, url, department, entity, startFromMs }].
+// Configs saved before multi-sheet support only have `sheetUrl` (+ startFromMs);
+// those read as a single sheet, so nothing needs migrating by hand.
+//   department — if set, rows in that sheet that carry no department of their own
+//                get it directly (no AI call); '' = let the AI decide
+//   entity     — default entity for that sheet's rows (a sheet column still wins)
+//   startFromMs— rows created before this are never imported from that sheet
+export function getSheets(cfg) {
+  if(cfg && Array.isArray(cfg.sheets) && cfg.sheets.length) {
+    return cfg.sheets.filter(s => s && s.url).slice(0, SYNC_MAX_SHEETS).map((s, i) => ({
+      id: s.id || ('s' + (i + 1)), label: s.label || `Sheet ${i + 1}`, url: s.url,
+      department: s.department || '', entity: s.entity || '', startFromMs: Number(s.startFromMs) || 0,
+    }));
+  }
+  if(cfg && cfg.sheetUrl) return [{ id: 'main', label: 'Main sheet', url: cfg.sheetUrl, department: '', entity: '', startFromMs: Number(cfg.startFromMs) || 0 }];
+  return [];
+}
+// Identity of a sheet for its watermark: the spreadsheet id plus the tab (gid).
+// Editing a link to point at a different sheet or tab therefore starts a fresh
+// watermark, while re-pasting the same sheet keeps it. Safe to use as a Firestore map key.
+export function sheetKey(url) {
+  const u = String(url || '');
+  const id = (u.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/) || [])[1];
+  const gid = (u.match(/[#?&]gid=(\d+)/) || [])[1];
+  return (id ? `${id}_${gid || '0'}` : u.slice(0, 60)).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+// ══ CSV ════════════════════════════════════════════════════════════════════
+// A real CSV reader: quoted fields may contain commas, doubled quotes ("")
+// and LINE BREAKS (a lead-form free-text answer can), none of which the old
+// line-split parser survived — fine while an admin watched the preview, not
+// OK for an unattended sync that would turn one multi-line answer into
+// garbage rows.
+export function parseCSVRecords(text) {
+  const s = String(text || '').replace(/^﻿/, '');
+  const rows = [];
+  let row = [], cur = '', inQ = false;
+  for(let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if(inQ) {
+      if(ch === '"') { if(s[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else if(ch === '"') inQ = true;
+    else if(ch === ',') { row.push(cur); cur = ''; }
+    else if(ch === '\n' || ch === '\r') {
+      if(ch === '\r' && s[i + 1] === '\n') i++;
+      row.push(cur); cur = ''; rows.push(row); row = [];
+    } else cur += ch;
+  }
+  if(cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+// → array of { header: value } objects (values trimmed), blank lines skipped.
+export function parseCSVText(text) {
+  const recs = parseCSVRecords(text).filter(r => r.some(c => String(c).trim() !== ''));
+  if(recs.length < 2) return [];
+  const headers = recs[0].map(h => String(h).trim());
+  return recs.slice(1).map(r => {
+    const o = {};
+    headers.forEach((h, idx) => { o[h] = String(r[idx] ?? '').trim(); });
+    return o;
+  });
+}
+
+// ══ Dates ══════════════════════════════════════════════════════════════════
+// Robust Excel date parser — handles ISO strings, DD/MM/YYYY, MM/DD/YYYY,
+// JS Date objects, and raw Excel serial numbers (the common causes of a
+// date column silently failing to import).
+export function parseExcelDate(raw) {
+  if (!raw) return '';
+  if (raw instanceof Date && !isNaN(raw)) {
+    // Use local date components, not toISOString() — toISOString() converts
+    // to UTC first, which silently shifts the date back a day for anyone in
+    // a timezone ahead of UTC (e.g. Asia/Riyadh, UTC+3).
+    return `${raw.getFullYear()}-${String(raw.getMonth()+1).padStart(2,'0')}-${String(raw.getDate()).padStart(2,'0')}`;
+  }
+  const s = String(raw).trim();
+  if (!s) return '';
+  // Already ISO: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0,10);
+  // Raw Excel serial number (days since 1899-12-30) — this Date is
+  // constructed directly from a computed UTC timestamp, so UTC getters are
+  // correct here (no local-timezone shift risk, unlike the branches above/below).
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    const serial = parseFloat(s);
+    const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+    if (!isNaN(date)) return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}`;
+  }
+  // DD/MM/YYYY or DD-MM-YYYY — 4-digit year only, deliberately.
+  let m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) {
+    const [, d, mo, y] = m;
+    if (parseInt(d) <= 31 && parseInt(mo) <= 12) {
+      return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+    }
+  }
+  // A 2-digit-year date (e.g. "8/19/01") is genuinely ambiguous — never guess
+  // a century. Real incident: this silently fell through to the browser's
+  // native Date parser below, which read "01" as 2001 instead of 2026,
+  // corrupting 241 leads' dates by 25 years. Flag as unparsed instead so it's
+  // caught in the import preview ("not parsed", shown in red) before import.
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2}$/.test(s)) return '';
+  // No 4-digit year anywhere in the string at all (e.g. "19-Aug", a real
+  // incident caused by a source cell formatted with Excel's "d-mmm" style,
+  // which drops the year from the displayed text entirely). new Date() below
+  // would silently default a missing year to 2001 rather than erroring —
+  // reject instead of guessing, same reasoning as the 2-digit-year case above.
+  if (!/\d{4}/.test(s)) return '';
+  // Fallback: let the browser try, for any remaining genuinely date-like text
+  const parsed = new Date(s);
+  if (!isNaN(parsed)) return `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
+  return '';
+}
+
+// A timestamp in ms, but ONLY when the value really carries a time of day
+// ("2026-09-20T05:59:58-05:00"). A bare date can't order rows within a day,
+// so it returns null and the row is judged by its other dedupe keys instead.
+export function parseRowTimeMs(raw) {
+  const s = String(raw ?? '').trim();
+  if(!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s)) return null;
+  const ms = Date.parse(s.replace(' ', 'T'));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+// The calendar date in Saudi time. The sheet's timestamps carry their own
+// UTC offset (Meta's are -05:00), and reading the first 10 characters of that
+// string would put an evening-in-Riyadh lead on the wrong day.
+export function riyadhDate(ms) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+}
+
+// ══ Departments / status ═══════════════════════════════════════════════════
+// Matches a raw department string from the sheet to our canonical
+// DEPARTMENTS spelling, case-insensitively. Returns null if no match.
+export function matchDepartment(raw) {
+  if (!raw) return null;
+  const clean = String(raw).trim().toLowerCase();
+  const found = DEPARTMENTS.find(d => d.toLowerCase() === clean);
+  if (found) return found;
+  // Loose partial match as a second attempt (e.g. "ortho" → "Orthopedics")
+  const partial = DEPARTMENTS.find(d => d.toLowerCase().includes(clean) || clean.includes(d.toLowerCase()));
+  return partial || null;
+}
+
+// ══ Department from keywords ═══════════════════════════════════════════════
+// Most Meta lead forms carry no clear "department" column, so the department is
+// guessed from EVERYTHING the row says: the ad / offer / campaign / form names
+// (strong evidence), the lead's own comment, and the form answers. Plain
+// keyword rules — free, instant, the same every time — run before the AI, which
+// is then only asked about what these rules could not place.
+// Keywords are Arabic or English, matched on whole words (Arabic prefixes like
+// ال / ب / ل / و are allowed in front; a trailing * lets the word continue, so
+// "اسنان*" also finds "اسنانك"). A longer phrase beats a shorter word inside it
+// ("تاخر الحمل" is Fertility, not Women's Health "حمل"). Edit the table to tune.
+export function normText(s) {
+  return String(s ?? '').toLowerCase()
+    .replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c))
+    .replace(/[ً-ٰٟـ]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+const DEPT_KEYWORDS = [
+  ['Dental', ['اسنان*', 'سنان*', 'تبييض الاسنان', 'ابتسامه هوليود', 'فينير*', 'تقويم الاسنان', 'زراعه الاسنان', 'حشو العصب', 'dental', 'dentist*', 'teeth', 'tooth', 'orthodont*', 'invisalign', 'veneer*', 'teeth whitening']],
+  ['Dermatology & Plastics', ['جلديه', 'جلد', 'بشره', 'ليزر', 'بوتوكس', 'بوتكس', 'فيلر', 'حب الشباب', 'تصبغات', 'ندبات', 'ازاله الشعر', 'زراعه الشعر', 'تساقط الشعر', 'شفط الدهون', 'نحت الجسم', 'تجميل', 'تجميليه', 'نضاره', 'هيدرافيشل', 'derma*', 'skin*', 'laser', 'botox', 'filler*', 'acne', 'hair removal', 'hair transplant', 'hair loss', 'plastic*', 'cosmetic*', 'rhinoplasty', 'liposuction', 'hydrafacial', 'prp', 'pigmentation']],
+  ['Orthopedics', ['عظام', 'مفاصل', 'مفصل', 'ركبه', 'الركبه', 'غضروف', 'كسور', 'اربطه', 'ديسك', 'الم الظهر', 'الم الكتف', 'عمود فقري', 'استبدال المفصل', 'منظار المفصل', 'ortho*', 'knee*', 'shoulder', 'spine', 'spinal', 'joint*', 'fracture*', 'arthroscop*', 'back pain', 'bone*']],
+  ['Cardiology', ['قلب*', 'القلب', 'قسطره', 'شرايين', 'ضغط الدم', 'جلطه القلب', 'دقات القلب', 'سكته قلبيه', 'cardio*', 'cardiac', 'heart*', 'angio*', 'ecg', 'echo', 'blood pressure', 'hypertension', 'cholesterol']],
+  ['Diabetes & Chronic', ['سكري', 'داء السكر', 'مرض السكر', 'سكر الدم', 'سكر دم', 'غده درقيه', 'الغده الدرقيه', 'غدد صماء', 'انسولين', 'diabet*', 'endocrin*', 'insulin', 'thyroid', 'hba1c', 'chronic', 'امراض مزمنه', 'مزمنه']],
+  ["Women's Health", ['نساء', 'ولاده', 'الولاده', 'حمل', 'حامل', 'نسائيه', 'رحم', 'الدوره الشهريه', 'ماموجرام', 'الثدي', 'سن الياس', 'متابعه الحمل', 'ولاده طبيعيه', 'ولاده قيصريه', 'مسحه عنق الرحم', 'obgyn', 'ob gyn', 'gyne*', 'pregnan*', 'maternity', 'antenatal', 'prenatal', 'women*', 'mammogram', 'cesarean', 'c section', 'menopause', 'pap smear']],
+  ['Fertility & IVF', ['حقن مجهري', 'عقم', 'تاخر الحمل', 'تاخر الانجاب', 'اطفال انابيب', 'اطفال الانابيب', 'تلقيح صناعي', 'تلقيح', 'خصوبه', 'اخصاب', 'ivf', 'icsi', 'iui', 'fertility', 'infertility']],
+  ["Children's Health", ['اطفال', 'طفل', 'طفلي', 'رضيع', 'رضع', 'حديثي الولاده', 'تطعيم الاطفال', 'تطعيمات', 'نمو الطفل', 'pediatric*', 'paediatric*', 'child*', 'baby', 'babies', 'infant*', 'newborn*', 'vaccin*', 'kids']],
+  ['Oncology', ['سرطان*', 'اورام', 'ورم', 'كيماوي', 'علاج اشعاعي', 'oncolog*', 'cancer*', 'tumor*', 'tumour*', 'chemotherapy', 'screening for cancer']],
+  ['General Surgery', ['جراحه عامه', 'جراحه السمنه', 'عمليات السمنه', 'تكميم المعده', 'تكميم', 'بالون المعده', 'تحويل مسار', 'فتق', 'مراره', 'الزايده الدوديه', 'بواسير', 'bariatric*', 'sleeve gastrectomy', 'gastric sleeve', 'gastric balloon', 'hernia', 'gallbladder', 'appendix', 'appendectomy', 'hemorrhoid*', 'general surgery', 'weight loss surgery']],
+  ['Internal Medicine', ['باطنه', 'باطنيه', 'الباطنيه', 'فحص شامل', 'فحوصات شامله', 'كشف شامل', 'فحص دوري', 'internal medicine', 'check up', 'checkup', 'health check*', 'full body check*', 'executive check*']],
+  ['ENT (Otolaryngology)', ['انف', 'اذن', 'حنجره', 'لوزتين', 'اللوزتين', 'الجيوب الانفيه', 'جيوب انفيه', 'سمع', 'ضعف السمع', 'لحميه', 'التهاب الاذن', 'ent', 'otolaryng*', 'tonsil*', 'sinus*', 'hearing', 'adenoid*', 'ear nose throat', 'throat']],
+  ['Ophthalmology', ['عيون', 'عين', 'عيني', 'نظر', 'ضعف النظر', 'ليزك', 'تصحيح النظر', 'ازاله النظارات', 'قرنيه', 'مياه بيضاء', 'مياه زرقاء', 'شبكيه', 'حول العين', 'ophthalm*', 'eye*', 'lasik', 'cataract*', 'retina*', 'glaucoma', 'vision', 'cornea*', 'optical']],
+  ['Urology', ['مسالك بوليه', 'مسالك', 'بروستات', 'حصوات الكلى', 'حصوه الكلى', 'ذكوره', 'ضعف الانتصاب', 'سلس البول', 'ختان', 'عقم الرجال', 'تاخر الانجاب عند الرجال', 'urolog*', 'prostate', 'kidney stone*', 'erectile', 'circumcision', 'vasectomy', "men's health", 'male infertility']],
+  ['Neurology', ['اعصاب', 'الاعصاب', 'صداع', 'شقيقه', 'صرع', 'جلطه دماغيه', 'سكته دماغيه', 'دوخه', 'تنميل', 'باركنسون', 'الزهايمر', 'neuro*', 'migraine*', 'epilep*', 'stroke', 'headache*', 'dizziness', 'parkinson*', 'alzheimer*']],
+  ['Nephrology', ['غسيل كلوي', 'فشل كلوي', 'الكلى', 'كلى', 'كلوي*', 'nephro*', 'dialysis', 'kidney*', 'renal']],
+  ['Gastroenterology', ['جهاز هضمي', 'الجهاز الهضمي', 'منظار المعده', 'منظار القولون', 'منظار', 'قولون', 'معده', 'كبد', 'قرحه', 'ارتجاع', 'ارتجاع المريء', 'فيروس سي', 'دهون الكبد', 'gastro*', 'endoscop*', 'colonoscop*', 'liver', 'ibs', 'gerd', 'reflux', 'stomach', 'digestive']],
+  ['Pulmonology', ['صدريه', 'امراض الصدر', 'ربو', 'رئه', 'الرئه', 'تنفس', 'ضيق التنفس', 'انقطاع النفس', 'شخير', 'الشخير', 'طب النوم', 'عياده النوم', 'سعال', 'pulmon*', 'asthma', 'copd', 'sleep apnea', 'sleep clinic', 'sleep', 'snoring', 'respiratory', 'lung*']],
+  ['Physiotherapy & Rehabilitation', ['علاج طبيعي', 'العلاج الطبيعي', 'تاهيل', 'اعاده تاهيل', 'تمارين علاجيه', 'physio*', 'rehab*', 'physical therapy']],
+  ['Psychiatry & Mental Health', ['نفسي', 'نفسيه', 'استشارات نفسيه', 'اكتئاب', 'قلق', 'توتر', 'ادمان', 'اضطراب*', 'psych*', 'mental*', 'depress*', 'anxiety', 'counsel*', 'adhd', 'therapy session*']],
+  ['Nutrition & Dietetics', ['تغذيه', 'اخصائي تغذيه', 'حميه', 'رجيم', 'نظام غذائي', 'زياده الوزن', 'انقاص الوزن', 'خساره الوزن', 'خسارة الوزن','نحافه', 'nutrition*', 'dietit*', 'diet', 'weight management', 'weight loss']],
+  ['Family Medicine', ['طب الاسره', 'طبيب الاسره', 'عياده الاسره', 'فحص ما قبل الزواج', 'ما قبل الزواج', 'انفلونزا', 'family medicine', 'family doctor', 'general practitioner', 'premarital', 'flu']],
+  ['Home Healthcare', ['رعايه منزليه', 'زياره منزليه', 'تمريض منزلي', 'العنايه المنزليه', 'نقاهه', 'home care', 'home visit*', 'home health*', 'home nursing']],
+  ['Radiology & Imaging', ['اشعه', 'اشعه مقطعيه', 'رنين مغناطيسي', 'تصوير بالرنين', 'تصوير مقطعي', 'سونار', 'تصوير الثدي', 'radiolog*', 'mri', 'ct scan', 'x ray', 'xray', 'ultrasound', 'imaging', 'sonar']],
+  ['Emergency Medicine (ER)', ['طوارئ', 'الطوارئ', 'emergency', 'urgent care']],
+];
+const KW_PREFIX = '(?:وال|بال|فال|كال|لل|ال|و|ب|ل|ف|ك)?';
+const KW_RULES = (() => {
+  const rules = [];
+  DEPT_KEYWORDS.forEach(([dept, kws]) => {
+    if(!DEPARTMENTS.includes(dept)) return; // a department that was renamed must not silently stay in the table
+    kws.forEach(k => {
+      const star = k.endsWith('*'), words = normText(k.replace(/\*$/, '')).split(' ').filter(Boolean);
+      if(!words.length) return;
+      const body = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(' ');
+      rules.push({ dept, re: new RegExp('(^| )' + KW_PREFIX + body + (star ? '[^ ]*' : '') + '(?= |$)', 'g'), weight: words.length > 1 ? 2 : 1, len: body.length });
+    });
+  });
+  return rules.sort((a, b) => b.len - a.len); // longest phrase first, so it uses up its words before a shorter keyword can
+})();
+
+// parts = [{ text, weight }]. → { dept, score } when ONE department is clearly ahead, else null
+// (the caller then falls back to the AI, then to the default department).
+export function guessDepartment(parts) {
+  const score = {};
+  (parts || []).forEach(p => {
+    let t = normText(p && p.text);
+    if(!t) return;
+    const w = (p && p.weight) || 1;
+    KW_RULES.forEach(r => {
+      let hit = false;
+      t = t.replace(r.re, m => { hit = true; return ' '.repeat(m.length); }); // used words can't be matched again
+      if(hit) score[r.dept] = (score[r.dept] || 0) + r.weight * w; // each keyword counts once per part, however often it repeats
+    });
+  });
+  const ranked = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  if(!ranked.length || ranked[0][1] < 2) return null;
+  if(ranked[1] && ranked[1][1] === ranked[0][1]) return null; // a tie is not a decision
+  return { dept: ranked[0][0], score: ranked[0][1] };
+}
+
+export function mapLeadStatus(raw) {
+  const r = String(raw).toLowerCase().trim();
+  if(r.includes('book'))                          return { contactStatus:'Reached',   outcome:'Booked' };
+  if(r.includes('open')||r.includes('file'))       return { contactStatus:'Reached',   outcome:'Open File' };
+  if(r.includes('close')||r.includes('unsuccess')) return { contactStatus:'Reached',   outcome:'Closed - Unsuccessful' };
+  if(r.includes('unreach')||r.includes('no answer'))return{ contactStatus:'Unreached', outcome:'Pending' };
+  if(r.includes('miss'))                           return { contactStatus:'Missed',    outcome:'Pending' };
+  if(r.includes('reach'))                          return { contactStatus:'Reached',   outcome:'Pending' };
+  return { contactStatus:'Untouched', outcome:'Pending' };
+}
+
+// ══ Column detection — shared by Excel upload, Google Sheet import, auto-sync ══
+// Both import paths accept raw exports from Meta Lead Ads (synced via
+// Zapier/Make into a Google Sheet, or downloaded as Excel), which name each
+// column after the literal question text configured inside the lead form —
+// often Arabic, and varying form-to-form — not a fixed English field name.
+// Keyword matching alone can't reliably find name/phone/email against that,
+// so content-sniffing (does the column's actual data look like an email or
+// a phone number?) is the real fallback. Internal Meta bookkeeping columns
+// are recognized by name so they're never mistaken for a real answer.
+export const META_SYSTEM_COLUMNS = new Set([
+  'id','created_time','ad_id','ad_name','adset_id','adset_name',
+  'campaign_id','campaign_name','form_id','form_name','is_organic','lead_status'
+]);
+
+// Finds the first header containing any of `keywords` (case-insensitive
+// substring). Columns ending in "_id" are never matched — an ID column is
+// never the human-facing field we want for name/phone/email/source/etc.
+// `exclude` additionally rules out specific columns by exact name — needed
+// because Meta's own bookkeeping columns (ad_name, adset_name, form_name)
+// all contain the substring "name" and would otherwise win over the real
+// name column before an Arabic keyword ever gets a chance to match.
+export function findColByKeywords(headers, keywords, exclude = new Set()) {
+  const candidates = headers.filter(h => !/_id$/i.test(h.trim()) && !exclude.has(h));
+  const lower = candidates.map(h => h.toLowerCase());
+  for (const kw of keywords) {
+    const idx = lower.findIndex(h => h.includes(kw));
+    if (idx !== -1) return candidates[idx];
+  }
+  return null;
+}
+
+// Guesses which column holds email/phone by sampling actual cell values,
+// for when keyword matching finds nothing (e.g. an Arabic-only header).
+// Requires >50% of a column's non-empty values to match to be confident.
+export function sniffColumnByContent(headers, rows, exclude, test) {
+  let best = null, bestScore = 0;
+  for (const h of headers) {
+    if (exclude.has(h)) continue;
+    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
+    if (!vals.length) continue;
+    const score = vals.filter(test).length / vals.length;
+    if (score > 0.5 && score > bestScore) { best = h; bestScore = score; }
+  }
+  return best;
+}
+
+// The offer / ad the lead came from. A column NAMED for the offer wins; failing
+// that, Meta's own ad_name. Claimed before the name column because "offer name"
+// contains the word "name" and would otherwise be read as the patient's name.
+const AD_NAME_KEYWORDS = ['offer name', 'offer_name', 'offername', 'اسم العرض', 'offer', 'العرض'];
+// The lead's own free-text message. Header words first; failing that, the one
+// remaining column whose values are long and different from row to row (a
+// multiple-choice answer repeats, an address is excluded by name).
+const COMMENT_KEYWORDS = ['comment', 'تعليق', 'message', 'رسالة', 'رسالتك', 'inquiry', 'enquiry', 'استفسار', 'how can we help', 'كيف يمكننا', 'anything else', 'remark', 'ملاحظ', 'note'];
+const NOT_COMMENT_HEADER = /address|عنوان|city|مدين|street|district|حي |location|موقع|insurance|تأمين|تامين/i;
+export function sniffFreeTextColumn(headers, rows, exclude) {
+  let best = null, bestScore = 0;
+  for(const h of headers) {
+    if(exclude.has(h) || /_id$/i.test(h.trim()) || NOT_COMMENT_HEADER.test(h)) continue;
+    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
+    if(vals.length < 3) continue;
+    const avg = vals.reduce((a, v) => a + v.length, 0) / vals.length;
+    const distinct = new Set(vals.map(v => v.toLowerCase())).size / vals.length;
+    if(avg >= 20 && distinct >= 0.6 && avg * distinct > bestScore) { best = h; bestScore = avg * distinct; }
+  }
+  return best;
+}
+
+// ══ Entity ═════════════════════════════════════════════════════════════════
+// The sheet says where the lead belongs in its own words (a city, a clinic name);
+// the system's entities are IMC, Makkah, TFC, JP, RSM. Edit this table to add a
+// spelling. Order matters: the first entity whose alias appears as a whole word
+// wins, so "First clinic - Jeddah" is TFC, not IMC.
+const ENTITY_ALIASES = [
+  ['TFC',    ['first clinic', 'the first clinic', 'tfc', 'فيرست كلينك', 'فرست كلينك', 'فيرست كلنك', 'ذا فيرست كلينك']],
+  ['Makkah', ['makkah', 'makka', 'mecca', 'مكه', 'مكه المكرمه']],
+  ['IMC',    ['jeddah', 'jedda', 'jed', 'imc', 'جده', 'international medical center', 'المركز الطبي الدولي']],
+  ['JP',     ['jp']],
+  ['RSM',    ['rsm']],
+];
+const ENTITY_RULES = ENTITY_ALIASES.flatMap(([entity, aliases]) => aliases.map(a => ({
+  entity, re: new RegExp('(^| )' + KW_PREFIX + normText(a).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?= |$)'),
+})));
+// → the system entity name for a sheet value, or '' when it isn't one we know.
+export function mapEntity(raw) {
+  const t = normText(raw);
+  if(!t) return '';
+  const hit = ENTITY_RULES.find(r => r.re.test(t));
+  return hit ? hit.entity : '';
+}
+// A column whose values are (mostly) places we can map — found by content, so it works whatever the header says.
+function sniffEntityColumn(headers, rows, exclude) {
+  let best = null, bestScore = 0;
+  for(const h of headers) {
+    if(exclude.has(h) || /_id$/i.test(h.trim())) continue;
+    const vals = rows.map(r => String(r[h] ?? '').trim()).filter(Boolean);
+    if(!vals.length) continue;
+    const score = vals.filter(v => mapEntity(v)).length / vals.length;
+    if(score > 0.5 && score > bestScore) { best = h; bestScore = score; }
+  }
+  return best;
+}
+
+// Department by AI / by keywords found anywhere in the row — both PAUSED by the admin's decision:
+// for now a lead's department is the sheet's own department column, else the default.
+// (The code stays; flip these to bring either back. A department column's own value is
+// still translated, e.g. an Arabic "القلب" → Cardiology.)
+export const AI_DEPT_ENABLED = false;
+export const ROW_KEYWORD_DEPT_ENABLED = false;
+
+export function detectLeadColumns(headers, rows) {
+  const used = new Set();
+  const claim = col => { if (col) used.add(col); return col; };
+  const sniffExclude = () => new Set([...used, ...headers.filter(h => META_SYSTEM_COLUMNS.has(h))]);
+
+  const adNameCol     = claim(findColByKeywords(headers, AD_NAME_KEYWORDS, META_SYSTEM_COLUMNS) || headers.find(h => h.trim().toLowerCase() === 'ad_name') || null);
+  const sys = new Set([...META_SYSTEM_COLUMNS, ...(adNameCol ? [adNameCol] : [])]); // never offered as name/phone/email/… even if it happens to contain the word
+  const nameCol      = claim(findColByKeywords(headers, ['name','اسم'], sys));
+  const phoneCol      = claim(findColByKeywords(headers, ['phone','mobile','number','هاتف','جوال','موبايل'], sys)
+                          || sniffColumnByContent(headers, rows, sniffExclude(), v => { const d = v.replace(/\D/g,''); return d.length >= 7 && d.length <= 15; }));
+  const emailCol      = claim(findColByKeywords(headers, ['email','ايميل','إيميل','بريد'], sys)
+                          || sniffColumnByContent(headers, rows, sniffExclude(), v => v.includes('@')));
+  const platformCol   = claim(findColByKeywords(headers, ['platform'], sys));
+  const sourceCol      = platformCol || claim(findColByKeywords(headers, ['source'], sys));
+  const dateCol        = claim(findColByKeywords(headers, ['date'], sys) || (headers.includes('created_time') ? 'created_time' : null));
+  const statusCol      = claim(findColByKeywords(headers, ['status'], sys));
+  // Entity BEFORE department: a column holding "جده / مكه / First clinic" may well be headed "clinic", which would otherwise be taken for the department.
+  const entityCol      = claim(findColByKeywords(headers, ['entity','branch','فرع'], new Set([...sys, ...used])) || sniffEntityColumn(headers, rows, sniffExclude()));
+  const deptCol        = claim(findColByKeywords(headers, ['department','dept','specialty','speciality','clinic','تخصص','قسم','عيادة'], new Set([...sys, ...used]))); // not a column already taken (e.g. the entity column headed "clinic")
+  // Deliberately no META_SYSTEM_COLUMNS exclusion here — campaign_name is
+  // the one Meta bookkeeping field worth surfacing as a real value (the
+  // ad campaign's human-readable name), unlike ad_name/adset_name/form_name.
+  const campaignCol    = claim(findColByKeywords(headers, ['campaign'], new Set(adNameCol ? [adNameCol] : [])));
+  const commentCol     = claim(findColByKeywords(headers, COMMENT_KEYWORDS, sys) || sniffFreeTextColumn(headers, rows, sniffExclude()));
+
+  // Anything left — e.g. a lead form's custom questions — isn't a column we
+  // recognize but isn't Meta bookkeeping either. Carried into notes below
+  // rather than silently dropped.
+  const leftoverCols = headers.filter(h => !used.has(h) && !META_SYSTEM_COLUMNS.has(h));
+
+  return { nameCol, phoneCol, emailCol, sourceCol, isPlatformSource: !!platformCol, dateCol, statusCol, deptCol, entityCol, adNameCol, commentCol, campaignCol, leftoverCols };
+}
+
+// Everything the department guess may read from one row: ad/offer/campaign/form
+// names count most, the lead's comment next, then the form answers (and, when an
+// answer is not "no", the question it answers — a knee-pain form says so in its
+// questions). The lead's name, phone, email, date and status are never read.
+const NEGATIVE_ANSWER = /^(no|none|n\/a|na|-|—|لا|لا يوجد|لايوجد|لا اعاني|لا أعاني)$/i;
+export function leadDeptEvidence(row, c, headers) {
+  const skip = new Set([c.nameCol, c.phoneCol, c.emailCol, c.dateCol, c.statusCol, c.sourceCol, c.entityCol, c.deptCol].filter(Boolean));
+  const strongSys = new Set(['ad_name', 'adset_name', 'campaign_name', 'form_name']);
+  const clean = s => String(s ?? '').replace(/_/g, ' ').trim();
+  const parts = [];
+  headers.forEach(h => {
+    const lh = h.trim().toLowerCase();
+    if(skip.has(h) || /_id$/.test(lh) || ['id', 'created_time', 'is_organic', 'lead_status', 'platform'].includes(lh)) return;
+    const v = clean(row[h]);
+    if(!v) return;
+    if(strongSys.has(lh) || h === c.adNameCol || h === c.campaignCol) parts.push({ text: v, weight: 3 });
+    else if(h === c.commentCol) parts.push({ text: v, weight: 2 });
+    else { parts.push({ text: v, weight: 1 }); if(!NEGATIVE_ANSWER.test(v)) parts.push({ text: clean(h), weight: 1 }); }
+  });
+  return parts;
+}
+
+// The values common to all three import paths (automatic sync, Excel, Google Sheet)
+// so they can never drift apart. `notes` is now only the leftover form answers;
+// the lead's own comment and the offer name have fields of their own.
+export function leadRowFields(row, c, headers) {
+  const dept = c.deptCol ? String(row[c.deptCol] ?? '').trim() : '';
+  const fromCol = matchDepartment(dept) || (dept ? (guessDepartment([{ text: dept, weight: 3 }]) || {}).dept || null : null);
+  return {
+    adName: c.adNameCol ? String(row[c.adNameCol] ?? '').replace(/_/g, ' ').trim() : '',
+    comment: c.commentCol ? String(row[c.commentCol] ?? '').trim() : '',
+    notes: buildLeadNotesWithLeftover(row, c.leftoverCols, ''),
+    department: fromCol,                                   // a real department column (or a clear answer in it)
+    deptGuess: (!ROW_KEYWORD_DEPT_ENABLED || fromCol) ? null : ((guessDepartment(leadDeptEvidence(row, c, headers)) || {}).dept || null), // from keywords anywhere in the row (paused)
+    entity: c.entityCol ? mapEntity(row[c.entityCol]) : '',  // IMC / Makkah / TFC … (never the sheet's own wording)
+    entityRaw: c.entityCol ? String(row[c.entityCol] ?? '').trim() : '',
+  };
+}
+
+// ig/fb are Meta's own shorthand for where the lead form was shown — only
+// applied when the detected source column really was "platform" (Meta's
+// field), never to a genuinely free-typed Source column, where blank should
+// stay blank rather than being overwritten with a guess.
+export function normalizeLeadSource(raw, isPlatformSource) {
+  const val = String(raw || '').trim();
+  if (!isPlatformSource) return val;
+  const lower = val.toLowerCase();
+  if (lower === 'ig') return 'Instagram';
+  if (lower === 'fb') return 'Facebook';
+  return val || 'Meta';
+}
+
+// Appends any unrecognized columns (a lead form's custom questions) onto
+// notes as "Question: Answer" pairs, so they're preserved instead of
+// silently dropped — necessary because custom questions vary form-to-form
+// and can't be mapped to a fixed field. Underscores are replaced with
+// spaces in both the question and the answer — Meta's export encodes
+// spaces as underscores in predefined multiple-choice answer text the same
+// way it does in column headers, not just the header.
+export function buildLeadNotesWithLeftover(row, leftoverCols, existingNotes) {
+  const clean = s => String(s ?? '').trim().replace(/_/g, ' ');
+  const qa = leftoverCols
+    .map(col => { const val = clean(row[col]); return val ? `${clean(col)}: ${val}` : null; })
+    .filter(Boolean);
+  return [existingNotes, ...qa].map(s => (s||'').trim()).filter(Boolean).join('\n');
+}
+
+// ══ Automatic sync ═════════════════════════════════════════════════════════
+
+// Turns the sheet's text into candidate leads (not yet filtered or saved).
+// Automatic imports always create NEW leads: Untouched / Pending, whatever a
+// sheet's own status column says.
+export function buildCandidates(csvText) {
+  const rows = parseCSVText(csvText);
+  if(!rows.length) return { candidates: [], columns: null, error: 'No rows found in the sheet' };
+  const headers = Object.keys(rows[0]);
+  const c = detectLeadColumns(headers, rows);
+  if(!c.nameCol || !c.phoneCol) return { candidates: [], columns: c, error: 'Could not find Name or Phone columns in the sheet' };
+  const idCol = headers.find(h => h.toLowerCase() === 'id') || null;
+  const timeCol = headers.find(h => h.toLowerCase() === 'created_time') || c.dateCol || null;
+  const hintCols = headers.filter(h => ['form_name', 'ad_name', 'adset_name', 'campaign_name'].includes(h.toLowerCase()));
+  if(c.adNameCol && !hintCols.includes(c.adNameCol)) hintCols.push(c.adNameCol); // an "offer name" column is as good a hint as Meta's ad_name
+  const candidates = rows.map(r => {
+    const rowTimeMs = timeCol ? parseRowTimeMs(r[timeCol]) : null;
+    const f = leadRowFields(r, c, headers);
+    return {
+      rowId: idCol ? (r[idCol] || '') : '',
+      rowTimeMs,
+      name: r[c.nameCol] || '',
+      phone: normalizePhone(r[c.phoneCol]),
+      email: c.emailCol ? (r[c.emailCol] || '') : '',
+      source: c.sourceCol ? normalizeLeadSource(r[c.sourceCol], c.isPlatformSource) : '',
+      entity: f.entity, entityRaw: f.entityRaw,
+      sheetDate: c.dateCol ? parseExcelDate(r[c.dateCol]) : '',
+      notes: f.notes, comment: f.comment, adName: f.adName,
+      department: f.department, deptGuess: f.deptGuess,
+      campaignName: c.campaignCol ? (r[c.campaignCol] || '') : '',
+      hint: hintCols.map(h => r[h] ? `${h.replace(/_/g, ' ')}: ${r[h]}` : '').filter(Boolean).join(' | '),
+    };
+  });
+  return { candidates, columns: c, error: '' };
+}
+
+const digitsOnly = p => String(p || '').replace(/\D/g, '');
+const dayNumber = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? Math.floor(Date.UTC(+m[1], +m[2]-1, +m[3]) / 86400000) : null; };
+
+// Which candidates are genuinely new. Rules, in order:
+//  1. no name/phone → skip
+//  2. older than the cutoff (start-from time, or last-seen watermark minus the
+//     overlap) → skip. This is what stops a lead you deleted from being
+//     re-imported on the next run, and stops a first run swallowing history.
+//  3. its sheet row id is already on a lead (sourceRowId) → skip
+//  4. a LEGACY lead (imported before row ids were stored, so it has none) with
+//     the same phone + campaign and a date within SAME_SUBMISSION_DAYS → skip:
+//     that is almost certainly the same submission imported by hand
+//  5. for rows with no id at all: same phone + campaign as any lead → skip
+//  6. duplicated inside the sheet itself → keep the first
+// A returning patient who submits again later (new row id) is NOT skipped —
+// each submission is a real interaction and the cost of a missed hot lead is
+// higher than a second record (Contact History groups them by phone).
+export function selectEligible(candidates, existingLeads, opts = {}) {
+  const cutoffMs = opts.cutoffMs || 0;
+  const campaignIdFor = opts.campaignIdFor || (() => null);
+  const skipped = { noContact: 0, tooOld: 0, dupRowId: 0, dupLegacy: 0, dupPair: 0, dupInSheet: 0 };
+  const knownRowIds = new Set();
+  const byPair = new Map(); // phone__campaign -> [lead]
+  (existingLeads || []).forEach(l => {
+    if(l.sourceRowId) knownRowIds.add(String(l.sourceRowId));
+    const key = `${digitsOnly(l.phone)}__${l.campaignId || ''}`;
+    if(!byPair.has(key)) byPair.set(key, []);
+    byPair.get(key).push(l);
+  });
+  const seenInSheet = new Set();
+  const eligible = [];
+  candidates.forEach(r => {
+    if(!r.name || !r.phone) { skipped.noContact++; return; }
+    if(r.rowTimeMs != null && r.rowTimeMs < cutoffMs) { skipped.tooOld++; return; }
+    if(r.rowId && knownRowIds.has(String(r.rowId))) { skipped.dupRowId++; return; }
+    const campaignId = campaignIdFor(r) || '';
+    const pair = `${digitsOnly(r.phone)}__${campaignId}`;
+    const sameKey = byPair.get(pair) || [];
+    if(r.rowId) {
+      const rowDay = r.rowTimeMs != null ? dayNumber(riyadhDate(r.rowTimeMs)) : dayNumber(r.sheetDate);
+      const legacyHit = sameKey.some(l => {
+        if(l.sourceRowId) return false;
+        const ld = dayNumber(l.dateCreated);
+        return rowDay == null || ld == null || Math.abs(ld - rowDay) <= SAME_SUBMISSION_DAYS;
+      });
+      if(legacyHit) { skipped.dupLegacy++; return; }
+    } else if(sameKey.length) { skipped.dupPair++; return; }
+    const sheetKey = r.rowId ? `id:${r.rowId}` : `pair:${pair}`;
+    if(seenInSheet.has(sheetKey)) { skipped.dupInSheet++; return; }
+    seenInSheet.add(sheetKey);
+    r._campaignId = campaignId || null;
+    eligible.push(r);
+  });
+  return { eligible, skipped };
+}
+
+// ── Assignment ────────────────────────────────────────────────────────────
+// "Online" = seen within the last PRESENCE_FRESH_MS, and not excluded by the
+// admin. Names come from the admin-maintained directory (agents can't read
+// team_members), falling back to whatever the presence record carries.
+export function eligibleAgents(presence, cfg, nowMs) {
+  const exclude = new Set((cfg && cfg.excludedAgentUids) || []);
+  const dir = new Map(((cfg && cfg.agentDirectory) || []).map(a => [a.uid, a.name]));
+  return (presence || [])
+    .filter(p => p && p.uid && !exclude.has(p.uid) && nowMs - (p.lastSeen || 0) <= PRESENCE_FRESH_MS)
+    .map(p => ({ uid: p.uid, name: dir.get(p.uid) || p.name || 'Agent' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Fewest untouched leads first (the person most free to call right now),
+// updated as each lead is handed out so a batch spreads evenly. Ties go to
+// name order for determinism. Honours an optional cap per agent.
+export function planAssignments(agents, existingLeads, items, cfg) {
+  const plan = new Map();
+  if(!agents.length || !items.length) return plan;
+  const cap = Number(cfg && cfg.maxUntouchedPerAgent) > 0 ? Number(cfg.maxUntouchedPerAgent) : Infinity;
+  const counts = {};
+  agents.forEach(a => { counts[a.uid] = 0; });
+  (existingLeads || []).forEach(l => {
+    if(l.assignedAgentUid in counts && (l.contactStatus || 'Untouched') === 'Untouched') counts[l.assignedAgentUid]++;
+  });
+  items.forEach(item => {
+    let best = null;
+    agents.forEach(a => { if(counts[a.uid] < cap && (best === null || counts[a.uid] < counts[best.uid])) best = a; });
+    if(!best) return; // everyone is at the cap — leave unassigned, picked up later
+    counts[best.uid]++;
+    plan.set(item.key, best);
+  });
+  return plan;
+}
+
+// ── Lead document ─────────────────────────────────────────────────────────
+// Only keys that have a value are included (Firestore rejects `undefined`).
+// The field set is mirrored in firestore.rules' agent-create whitelist.
+export function buildLeadDoc(r, cfg, nowMs) {
+  const doc = {
+    name: r.name, phone: r.phone, email: r.email || '',
+    source: r.source || '',
+    entity: r.entity || cfg.defaultEntity || '',
+    dateCreated: r.rowTimeMs != null ? riyadhDate(r.rowTimeMs) : (r.sheetDate || riyadhDate(nowMs)),
+    contactStatus: 'Untouched', outcome: 'Pending',
+    notes: r.notes || '',
+    comment: String(r.comment || '').slice(0, 2000),   // always present (even empty): a lead WITHOUT this field is from before it existed
+    adName: String(r.adName || '').slice(0, 200),
+    department: r.department || cfg.defaultDepartment || '',
+    campaign: r.campaignName || '',
+    campaignId: r._campaignId || null,
+    autoImported: true, autoImportedAt: nowMs,
+  };
+  if(r.rowId) doc.sourceRowId = String(r.rowId);
+  if(r.departmentSource) doc.departmentSource = r.departmentSource;
+  if(r._pending) { doc.deptPending = true; if(r.hint) doc.sourceHint = String(r.hint).slice(0, 400); }
+  return doc;
+}
+
+// ── The sync itself ───────────────────────────────────────────────────────
+// d (all injected): { config, now, watermarks, fetchCsv(url), leads[], initiatives[],
+//   presence[], addLeads(docs), updateLead(id, data), classify?(rows) }
+// Returns { result, watermarks, watermarkMs (first sheet's, legacy) }. `classify` exists only where an API key is
+// readable (the admin page); elsewhere leads that needed the AI are marked
+// deptPending and swept later by an admin session.
+// Several sheets: each is read in turn (a failing one is reported and skipped —
+// the others still sync), their new rows are pooled, capped together, classified,
+// assigned in ONE plan (so agents are balanced across sheets) and written.
+// Watermarks are per sheet: d.watermarks = { [sheetKey]: ms } in, same out.
+export async function runLeadSync(d) {
+  const cfg = d.config || {};
+  const now = d.now;
+  const result = { startedAt: now, sheetRows: 0, imported: 0, assignedNew: 0, assignedBacklog: 0, classified: 0, keywordDept: 0, entityUnmapped: [], pendingDept: 0,
+                   skipped: {}, capped: false, agentsOnline: 0, error: '', warning: '', sheets: [] };
+  const sheets = getSheets(cfg);
+  const wmIn = { ...(d.watermarks || {}) };
+  if(sheets.length && d.watermarkMs && !Object.keys(wmIn).length) wmIn[sheetKey(sheets[0].url)] = d.watermarkMs; // single-sheet callers
+  const wmOut = {};
+  if(!sheets.length) { result.error = 'No sheet link is set'; return { result, watermarks: wmOut, watermarkMs: undefined }; }
+
+  const campaigns = (d.initiatives || []).filter(i => i.type === 'Campaign');
+  const campaignIdFor = r => {
+    const t = String(r.campaignName || '').trim().toLowerCase();
+    if(!t) return null;
+    const hit = campaigns.find(c => String(c.title || '').trim().toLowerCase() === t);
+    return hit ? hit.id : null;
+  };
+
+  // 1. read every sheet, collect what is new in each
+  const known = (d.leads || []).slice(); // grows as sheets are read, so one lead appearing in two sheets is taken once
+  const pool = [], perSheet = [];
+  const sumSkipped = {};
+  for(const sheet of sheets) {
+    const key = sheetKey(sheet.url), prevWm = wmIn[key] || 0;
+    const info = { label: sheet.label, key, rows: 0, imported: 0, error: '' };
+    result.sheets.push(info);
+    let parsed;
+    try { parsed = buildCandidates(await d.fetchCsv(sheet.url)); }
+    catch(e) { info.error = e.message || String(e); continue; }
+    if(parsed.error) { info.error = parsed.error; continue; }
+    info.rows = parsed.candidates.length; result.sheetRows += info.rows;
+    // Which sheet column fed each field, so the admin can see (and correct the sheet) if a guess was wrong.
+    const cl = parsed.columns || {}, short = s => (s ? String(s).slice(0, 80) : '');
+    info.map = { adName: short(cl.adNameCol), comment: short(cl.commentCol), department: short(cl.deptCol), campaign: short(cl.campaignCol), entity: short(cl.entityCol) };
+    // Department order: the sheet's own department column (already applied) → a sheet dedicated to one department
+    // → keywords found anywhere in the row → (below) the AI → the default.
+    parsed.candidates.forEach(r => {
+      if(!r.department && sheet.department) r.department = sheet.department;
+      else if(!r.department && r.deptGuess) { r.department = r.deptGuess; r.departmentSource = 'keyword'; }
+    });
+    const cutoffMs = Math.max(sheet.startFromMs || 0, prevWm ? prevWm - SYNC_OVERLAP_MS : 0);
+    const sel = selectEligible(parsed.candidates, known, { cutoffMs, campaignIdFor });
+    Object.entries(sel.skipped).forEach(([k, n]) => { sumSkipped[k] = (sumSkipped[k] || 0) + n; });
+    sel.eligible.forEach(r => {
+      r._sheet = sheet;
+      known.push({ sourceRowId: r.rowId ? String(r.rowId) : '', phone: r.phone, campaignId: r._campaignId || '', dateCreated: r.rowTimeMs != null ? riyadhDate(r.rowTimeMs) : (r.sheetDate || '') });
+    });
+    pool.push(...sel.eligible);
+    perSheet.push({ key, prevWm, info, candidates: parsed.candidates, eligible: sel.eligible });
+  }
+  result.skipped = sumSkipped;
+  const failed = result.sheets.filter(s => s.error);
+  if(failed.length === sheets.length) { result.error = failed.map(s => sheets.length > 1 ? `${s.label}: ${s.error}` : s.error).join(' · '); return { result, watermarks: wmOut, watermarkMs: undefined }; }
+  if(failed.length) result.warning = failed.map(s => `${s.label}: ${s.error}`).join(' · ');
+
+  // 2. pool, oldest first, one cap for the whole run
+  let eligible = pool.slice().sort((a, b) => (a.rowTimeMs ?? 0) - (b.rowTimeMs ?? 0));
+  if(eligible.length > SYNC_MAX_PER_RUN) { eligible = eligible.slice(0, SYNC_MAX_PER_RUN); result.capped = true; }
+
+  // Department: a sheet column (or a dedicated sheet) always wins, then keywords; otherwise the AI where this page can run it.
+  result.keywordDept = eligible.filter(r => r.departmentSource === 'keyword').length;
+  // Entity values in the sheet that are not one of ours — those leads get the default entity; say which wording, so it can be added.
+  result.entityUnmapped = [...new Set(eligible.filter(r => r.entityRaw && !r.entity).map(r => r.entityRaw))].slice(0, 5);
+  const needDept = eligible.filter(r => !r.department);
+  if(AI_DEPT_ENABLED && needDept.length && cfg.classifyWithAI) {
+    if(d.classify) { await d.classify(needDept); }
+    else needDept.forEach(r => { r._aiFailed = true; });
+    needDept.forEach(r => { if(r.department) result.classified++; else if(r._aiFailed) { r._pending = true; result.pendingDept++; } });
+  }
+
+  const docs = eligible.map(r => buildLeadDoc(r, { ...cfg, defaultEntity: (r._sheet && r._sheet.entity) || cfg.defaultEntity }, now));
+
+  // Assignment: fresh leads first, then any earlier auto-imported leads still waiting for someone.
+  let assignedBacklog = [];
+  const agents = cfg.autoAssign ? eligibleAgents(d.presence, cfg, now) : [];
+  result.agentsOnline = agents.length;
+  if(agents.length) {
+    const backlog = (d.leads || [])
+      .filter(l => l.autoImported && !l.assignedAgentUid && (l.contactStatus || 'Untouched') === 'Untouched')
+      .sort((a, b) => (a.autoImportedAt || 0) - (b.autoImportedAt || 0))
+      .slice(0, SYNC_ASSIGN_BACKLOG_MAX);
+    const items = [...backlog.map(l => ({ key: 'e:' + l.id })), ...docs.map((_, i) => ({ key: 'n:' + i }))];
+    const plan = planAssignments(agents, d.leads, items, cfg);
+    docs.forEach((doc, i) => { const a = plan.get('n:' + i); if(a) { doc.assignedAgentUid = a.uid; doc.assignedAgentName = a.name; result.assignedNew++; } });
+    assignedBacklog = backlog.map(l => ({ l, a: plan.get('e:' + l.id) })).filter(x => x.a);
+  }
+
+  if(docs.length) await d.addLeads(docs);
+  for(const { l, a } of assignedBacklog) { await d.updateLead(l.id, { assignedAgentUid: a.uid, assignedAgentName: a.name }); result.assignedBacklog++; }
+  result.imported = docs.length;
+
+  // Watermarks, per sheet: the newest row time seen. A sheet that still has new
+  // rows waiting (we hit the per-run cap) only advances as far as what was
+  // actually imported from it, so the rest is picked up next time.
+  const importedSet = new Set(eligible);
+  perSheet.forEach(s => {
+    const mine = s.eligible.filter(r => importedSet.has(r));
+    mine.forEach(() => { s.info.imported++; });
+    const leftover = s.eligible.length - mine.length;
+    const times = (leftover ? mine : s.candidates).map(r => r.rowTimeMs).filter(t => t != null);
+    const wm = times.length ? Math.max(...times, s.prevWm) : s.prevWm;
+    if(wm) wmOut[s.key] = wm;
+  });
+  return { result, watermarks: wmOut, watermarkMs: wmOut[sheetKey(sheets[0].url)] };
+}
+
+// ── Scheduler ─────────────────────────────────────────────────────────────
+// One per page. Ticks every minute; a Firestore lease (acquireLock) makes sure
+// only one browser actually syncs at a time, and `minIntervalMs` is re-checked
+// inside that transaction, so ten open tabs don't mean ten syncs a minute.
+//   force=true  → page just opened / an agent just came online: skip the long
+//                 interval (still honours a 30s floor so a burst of page loads
+//                 doesn't hammer the sheet).
+export function createLeadAutomationRunner(o) {
+  const runnerId = o.runnerId || Math.random().toString(36).slice(2, 10);
+  const nowFn = o.now || (() => Date.now());
+  let timer = null, running = false, visHandler = null;
+
+  async function tick(force = false) {
+    const cfg = o.getCfg();
+    if(!cfg || !cfg.enabled || !getSheets(cfg).length) return { skipped: 'disabled' };
+    if(running) return { skipped: 'running' };
+    // SAFETY: never run before the page has finished loading the existing leads
+    // and campaigns. With an empty "existing leads" list every row in the sheet
+    // would look new and the whole sheet would be imported a second time.
+    if(o.isReady && !o.isReady()) return { skipped: 'not-ready' };
+    const intervalMs = Math.min(30, Math.max(1, Number(cfg.intervalMinutes) || 2)) * 60000;
+    const minIntervalMs = force ? 30000 : Math.round(intervalMs * 0.9);
+    const state = o.getState() || {};
+    if(state.lastRunAt && nowFn() - state.lastRunAt < minIntervalMs) return { skipped: 'recent' };
+    running = true;
+    try {
+      const lock = await o.acquireLock({ runnerId, name: o.who(), page: o.page, leaseMs: 180000, minIntervalMs });
+      if(!lock.acquired) return { skipped: lock.reason };
+      let out;
+      try {
+        // A watermark belongs to the sheet it was measured on — a different sheet starts fresh.
+        const st = lock.state || {};
+        const sheets = getSheets(cfg);
+        const wms = { ...(st.watermarks || {}) };
+        // State written before multi-sheet support holds ONE watermark + the link it belonged to.
+        if(st.watermarkMs && st.watermarkSheet) sheets.forEach(s => { if(s.url === st.watermarkSheet && wms[sheetKey(s.url)] == null) wms[sheetKey(s.url)] = st.watermarkMs; });
+        // watermarkMs is zeroed on purpose: `wms` above already holds every valid watermark, and the
+        // legacy single value must not be applied to a sheet it wasn't measured on.
+        out = await runLeadSync({ ...o.buildDeps({ ...st, watermarks: wms }, cfg), watermarks: wms, watermarkMs: 0 });
+      } catch(e) {
+        out = { result: { startedAt: nowFn(), error: e.message || String(e), imported: 0, assignedNew: 0, assignedBacklog: 0, skipped: {}, sheets: [] }, watermarks: {}, watermarkMs: undefined };
+      }
+      out.result.runBy = o.who(); out.result.runPage = o.page;
+      const first = getSheets(cfg)[0];
+      // watermarkMs/watermarkSheet are still written for the FIRST sheet so a page that hasn't been refreshed yet keeps working.
+      await o.finishRun({ runnerId, result: out.result, watermarks: out.watermarks, watermarkMs: out.watermarkMs, watermarkSheet: first ? first.url : '' });
+      if(o.onRun) o.onRun(out.result);
+      return { ran: true, result: out.result };
+    } finally { running = false; }
+  }
+
+  return {
+    runnerId, tick,
+    start() {
+      if(timer) return;
+      timer = setInterval(() => { tick(false).catch(() => {}); }, 60000);
+      if(typeof document !== 'undefined') {
+        visHandler = () => { if(document.visibilityState === 'visible') tick(false).catch(() => {}); };
+        document.addEventListener('visibilitychange', visHandler);
+      }
+      tick(true).catch(() => {});
+    },
+    stop() {
+      if(timer) { clearInterval(timer); timer = null; }
+      if(visHandler && typeof document !== 'undefined') { document.removeEventListener('visibilitychange', visHandler); visHandler = null; }
+    },
+    isRunning: () => running,
+  };
+}
